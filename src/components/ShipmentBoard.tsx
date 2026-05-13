@@ -79,8 +79,10 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
         notes: data.notes || '',
       })
       if (kol) await onUpdate({ ...kol, status: '合作完成', updated_at: new Date().toISOString() })
+      await onShipmentsChange()
     } catch {
       if (kol) await onUpdate({ ...kol, status: '合作完成', updated_at: new Date().toISOString() })
+      await onShipmentsChange()
     }
     setCompletingShipment(null)
   }

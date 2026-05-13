@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { KOL, Invitation, STATUSES, PLATFORMS } from '../types'
 import { createInvitation } from '../services/invitationService'
+import { updateKOL } from '../services/kolService'
 import AddKolModal, { KolFormData } from './AddKolModal'
 
 interface Props {
@@ -71,7 +72,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
 
   const statusColor = (s: string) => {
     const map: Record<string, string> = {
-      '已邀约': 'bg-purple-100 text-purple-700', '沟通中': 'bg-yellow-100 text-yellow-700',
+      '已邀约': 'bg-purple-100 text-purple-700',
       '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
       '已签收': 'bg-teal-100 text-teal-700', '合作完成': 'bg-green-100 text-green-700',
       '拒绝合作': 'bg-red-100 text-red-700', '未回复': 'bg-yellow-100 text-yellow-700',
@@ -116,6 +117,16 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
   }
 
   const selectedKols = kols.filter(k => selectedIds.has(k.id))
+  const INVITATION_ENTRY_STATUSES = ['未首触', '未回复', '拒绝合作', '']
+
+  const shipmentDateLabel = (kol: KOL) => {
+    if (!kol.sample_date) return null
+    if (kol.status === '待寄出') return `待寄 ${kol.sample_date}`
+    if (kol.status === '运输中') return `已发出 ${kol.sample_date}`
+    if (kol.status === '已签收') return `已签收 ${kol.sample_date}`
+    if (kol.status === '合作完成') return `合作完成 ${kol.sample_date}`
+    return `寄样日期 ${kol.sample_date}`
+  }
 
   const handleBatchInvite = async () => {
     if (selectedKols.length === 0) return
@@ -125,9 +136,9 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
       const emails = selectedKols.map(k => k.email).filter(Boolean).join(', ')
       await navigator.clipboard.writeText(emails)
 
-      // 2. Create invitation records for each selected KOL
-      await Promise.all(selectedKols.map(k =>
-        createInvitation({
+      // 2. Create invitation records for each selected KOL and advance only early-stage KOLs
+      await Promise.all(selectedKols.map(async k => {
+        await createInvitation({
           kol_id: k.id,
           product: batchProduct.trim(),
           invited_at: new Date().toISOString().slice(0, 10),
@@ -136,7 +147,10 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
           reply_result: '',
           notes: '',
         })
-      ))
+        if (INVITATION_ENTRY_STATUSES.includes(k.status)) {
+          await updateKOL(k.id, { status: '已邀约' })
+        }
+      }))
 
       setBatchDone(true)
       setTimeout(() => {
@@ -279,7 +293,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
                       {kol.sample_product || kol.sample_date ? (
                         <div className="space-y-0.5">
                           {kol.sample_product && <div className="text-[10px] font-medium text-orange-600 truncate">{kol.sample_product}</div>}
-                          {kol.sample_date && <div className="text-[10px] text-green-600">已寄 {kol.sample_date}</div>}
+                          {kol.sample_date && <div className="text-[10px] text-green-600">{shipmentDateLabel(kol)}</div>}
                         </div>
                       ) : (
                         <span className="text-[10px] text-gray-300">-</span>

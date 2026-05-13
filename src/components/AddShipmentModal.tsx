@@ -23,7 +23,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
   const [form, setForm] = useState<ShipmentFormData>({
     kol_id: kolId,
     product: '',
-    sample_date: new Date().toISOString().slice(0, 10),
+    sample_date: '',
     tracking_number: '',
     shipping_details: '',
     status: '待寄出',

@@ -50,14 +50,12 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
   }
 
   const shipmentStatus = (trackingNumber: string) => trackingNumber.trim() ? '运输中' : '待寄出'
+  const INVITATION_ENTRY_STATUSES = ['未首触', '未回复', '拒绝合作', '']
 
-  const nextKolStatus = (shipment: ShipmentFormData | Shipment, fallbackStatus = kol.status) => {
+  const nextKolStatus = (shipment: ShipmentFormData | Shipment) => {
     if (shipment.status === '已签收') return '已签收'
     if (shipment.tracking_number?.trim()) return '运输中'
-    if (shipment.sample_date || shipment.product) {
-      if (['未首触', '已邀约', '沟通中', '待寄出'].includes(fallbackStatus)) return '待寄出'
-    }
-    return fallbackStatus
+    return '待寄出'
   }
 
   const syncKolSnapshot = async (shipment: ShipmentFormData | Shipment, status?: string) => {
@@ -99,10 +97,41 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
     }
   }
 
+  const resetKolAfterShipmentDelete = async (deletedShipmentId: string) => {
+    const remaining = kolShipments.filter(s => s.id !== deletedShipmentId)
+    const latest = remaining[0]
+
+    if (latest) {
+      await syncKolSnapshot(latest)
+      return
+    }
+
+    const latestInvitation = invitations[0]
+    let fallbackStatus = '未首触'
+    if (latestInvitation) {
+      if (!latestInvitation.replied) fallbackStatus = '已邀约'
+      else if (latestInvitation.reply_result.includes('同意')) fallbackStatus = '待寄出'
+      else if (latestInvitation.reply_result.includes('拒绝')) fallbackStatus = '拒绝合作'
+      else if (latestInvitation.reply_result === '未回复') fallbackStatus = '未回复'
+      else fallbackStatus = '已邀约'
+    }
+
+    await onUpdate({
+      ...kol,
+      sample_product: '',
+      sample_date: null,
+      tracking_number: '',
+      shipping_details: '',
+      status: fallbackStatus,
+      updated_at: new Date().toISOString(),
+    })
+  }
+
   const handleDeleteShipment = async (shipment: Shipment) => {
     if (!confirm('删除该寄样记录？')) return
     try {
       await deleteShipment(shipment.id)
+      await resetKolAfterShipmentDelete(shipment.id)
       await onShipmentsChange()
       showToast('寄样已删除')
     } catch {
@@ -130,7 +159,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
       const updated = [inv, ...invitations]
       setInvitations(updated)
       setShowInvModal(false)
-      pushStatus('已邀约')
+      if (INVITATION_ENTRY_STATUSES.includes(kol.status)) pushStatus('已邀约')
       showToast('邀约已添加')
     } catch { showToast('添加失败') }
   }
@@ -139,7 +168,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
     try {
       const saved = await updateInvitation(inv.id, { replied: true, reply_result: result })
       setInvitations(prev => prev.map(i => i.id === inv.id ? saved : i))
-      if (result === '同意合作') pushStatus('沟通中')
+      if (result === '同意合作') pushStatus('待寄出')
       else if (result === '拒绝合作' || result === '未回复') pushStatus(result === '拒绝合作' ? '拒绝合作' : '未回复')
       showToast('回复已更新')
     } catch {
@@ -160,6 +189,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
       const col = await createCollaboration(data)
       setCollaborations(prev => [col, ...prev])
       setShowColModal(false)
+      pushStatus('合作完成')
       showToast('合作已添加')
     } catch { showToast('添加失败') }
   }
@@ -183,8 +213,8 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       '未首触': 'bg-gray-100 text-gray-600', '已邀约': 'bg-purple-100 text-purple-700',
-      '沟通中': 'bg-yellow-100 text-yellow-700', '待寄出': 'bg-orange-100 text-orange-700',
-      '运输中': 'bg-blue-100 text-blue-700', '已签收': 'bg-teal-100 text-teal-700',
+      '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
+      '已签收': 'bg-teal-100 text-teal-700',
       '合作完成': 'bg-green-100 text-green-700', '拒绝合作': 'bg-red-100 text-red-700', '未回复': 'bg-yellow-100 text-yellow-700',
     }
     return `px-2 py-0.5 rounded-full text-[11px] font-medium ${map[s] || 'bg-gray-100 text-gray-600'}`
@@ -273,7 +303,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
                   </div>
                 )}
                 <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2 text-[11px] text-orange-700">
-                  新规则：每次寄产品都是一条寄样记录；有寄样日期/产品进入待寄出，填快递单号进入运输中，确认签收后进入已签收。
+                  新规则：每次寄产品都是一条寄样记录；邀约同意后进入待寄出，填快递单号进入运输中，确认签收后进入已签收。
                 </div>
               </SectionCard>
             </div>
