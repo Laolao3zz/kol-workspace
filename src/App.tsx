@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { KOL, Invitation } from './types'
+import { KOL, Invitation, Shipment } from './types'
 import { getKOLs, createKOL, updateKOL, deleteKOL } from './services/kolService'
 import { getInvitationsByKOL } from './services/invitationService'
+import { getShipments } from './services/shipmentService'
 import KolTable from './components/KolTable'
 import KolDrawer from './components/KolDrawer'
 import ShipmentBoard from './components/ShipmentBoard'
@@ -13,6 +14,7 @@ type ViewMode = 'table' | 'shipment'
 function App() {
   const [kols, setKols] = useState<KOL[]>([])
   const [invitations, setInvitations] = useState<Record<string, Invitation[]>>({})
+  const [shipments, setShipments] = useState<Shipment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedKol, setSelectedKol] = useState<KOL | null>(null)
@@ -22,8 +24,12 @@ function App() {
     try {
       setLoading(true)
       setError(null)
-      const data = await getKOLs()
+      const [data, shipmentData] = await Promise.all([
+        getKOLs(),
+        getShipments(),
+      ])
       setKols(data)
+      setShipments(shipmentData)
       const invMap: Record<string, Invitation[]> = {}
       await Promise.all(data.map(async kol => {
         try {
@@ -81,6 +87,15 @@ function App() {
     } catch {}
   }
 
+  const refreshShipments = async () => {
+    try {
+      const data = await getShipments()
+      setShipments(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '寄样记录加载失败')
+    }
+  }
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
@@ -128,18 +143,26 @@ function App() {
               onRefresh={loadAll}
             />
           ) : (
-            <ShipmentBoard kols={kols} onSelect={setSelectedKol} onUpdate={handleUpdateKol} />
+            <ShipmentBoard
+              kols={kols}
+              shipments={shipments}
+              onSelect={setSelectedKol}
+              onUpdate={handleUpdateKol}
+              onShipmentsChange={refreshShipments}
+            />
           )}
         </div>
 
         {selectedKol && (
           <KolDrawer
             kol={selectedKol}
+            shipments={shipments}
             onClose={() => {
               setSelectedKol(null)
               refreshInvitations(selectedKol.id)
             }}
             onUpdate={handleUpdateKol}
+            onShipmentsChange={refreshShipments}
           />
         )}
       </div>

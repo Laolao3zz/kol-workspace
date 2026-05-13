@@ -1,26 +1,34 @@
 import { useState, useEffect } from 'react'
-import { KOL, Invitation, Collaboration } from '../types'
+import { KOL, Invitation, Collaboration, Shipment } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
 import { getCollaborationsByKOL, createCollaboration, deleteCollaboration } from '../services/collaborationService'
+import { createShipment, updateShipment, deleteShipment } from '../services/shipmentService'
 import InlineEdit from './InlineEdit'
 import MailPanel from './MailPanel'
 import AddInvitationModal, { InvitationFormData } from './AddInvitationModal'
 import AddCollaborationModal, { CollaborationFormData } from './AddCollaborationModal'
+import AddShipmentModal, { ShipmentFormData } from './AddShipmentModal'
 
 interface Props {
   kol: KOL
+  shipments: Shipment[]
   onClose: () => void
-  onUpdate: (kol: KOL) => void
+  onUpdate: (kol: KOL) => Promise<void> | void
+  onShipmentsChange: () => Promise<void> | void
 }
 
-export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
+export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmentsChange }: Props) {
   const [toast, setToast] = useState('')
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [collaborations, setCollaborations] = useState<Collaboration[]>([])
   const [loadingSub, setLoadingSub] = useState(true)
   const [showInvModal, setShowInvModal] = useState(false)
   const [showColModal, setShowColModal] = useState(false)
+  const [showShipmentModal, setShowShipmentModal] = useState(false)
+  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null)
   const [showMail, setShowMail] = useState(false)
+
+  const kolShipments = shipments.filter(s => s.kol_id === kol.id)
 
   useEffect(() => { loadSubData() }, [kol.id])
 
@@ -36,6 +44,34 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
     } catch {} finally { setLoadingSub(false) }
   }
 
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2200)
+  }
+
+  const shipmentStatus = (trackingNumber: string) => trackingNumber.trim() ? '运输中' : '待寄出'
+
+  const nextKolStatus = (shipment: ShipmentFormData | Shipment, fallbackStatus = kol.status) => {
+    if (shipment.status === '已签收') return '已签收'
+    if (shipment.tracking_number?.trim()) return '运输中'
+    if (shipment.sample_date || shipment.product) {
+      if (['未首触', '已邀约', '沟通中', '待寄出'].includes(fallbackStatus)) return '待寄出'
+    }
+    return fallbackStatus
+  }
+
+  const syncKolSnapshot = async (shipment: ShipmentFormData | Shipment, status?: string) => {
+    await onUpdate({
+      ...kol,
+      sample_product: shipment.product,
+      sample_date: shipment.sample_date || null,
+      tracking_number: shipment.tracking_number || '',
+      shipping_details: shipment.shipping_details || '',
+      status: status || nextKolStatus(shipment),
+      updated_at: new Date().toISOString(),
+    })
+  }
+
   const pushStatus = (newStatus: string) => {
     const updated = { ...kol, status: newStatus, updated_at: new Date().toISOString() }
     onUpdate(updated)
@@ -44,8 +80,48 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
   const save = (field: keyof KOL, value: string | string[]) => {
     const updated = { ...kol, [field]: value, updated_at: new Date().toISOString() }
     onUpdate(updated)
-    setToast('已保存')
-    setTimeout(() => setToast(''), 2200)
+    showToast('已保存')
+  }
+
+  const handleSaveShipment = async (data: ShipmentFormData) => {
+    try {
+      const payload = { ...data, status: data.status === '已签收' ? '已签收' : shipmentStatus(data.tracking_number) }
+      const saved = editingShipment
+        ? await updateShipment(editingShipment.id, payload)
+        : await createShipment(payload)
+      await syncKolSnapshot(saved)
+      await onShipmentsChange()
+      setShowShipmentModal(false)
+      setEditingShipment(null)
+      showToast(editingShipment ? '寄样已更新' : '寄样已新增')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '寄样保存失败')
+    }
+  }
+
+  const handleDeleteShipment = async (shipment: Shipment) => {
+    if (!confirm('删除该寄样记录？')) return
+    try {
+      await deleteShipment(shipment.id)
+      await onShipmentsChange()
+      showToast('寄样已删除')
+    } catch {
+      showToast('删除失败')
+    }
+  }
+
+  const handleConfirmDelivered = async (shipment: Shipment) => {
+    try {
+      const saved = await updateShipment(shipment.id, {
+        status: '已签收',
+        delivered_at: new Date().toISOString().slice(0, 10),
+      })
+      await syncKolSnapshot(saved, '已签收')
+      await onShipmentsChange()
+      showToast('已确认签收')
+    } catch {
+      showToast('更新失败')
+    }
   }
 
   const handleAddInvitation = async (data: InvitationFormData) => {
@@ -54,27 +130,21 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
       const updated = [inv, ...invitations]
       setInvitations(updated)
       setShowInvModal(false)
-      // Push status to "已邀约"
       pushStatus('已邀约')
-      setToast('邀约已添加')
-      setTimeout(() => setToast(''), 2200)
-    } catch { setToast('添加失败'); setTimeout(() => setToast(''), 2200) }
+      showToast('邀约已添加')
+    } catch { showToast('添加失败') }
   }
 
   const handleReplyUpdate = async (inv: Invitation, result: string) => {
     try {
       const saved = await updateInvitation(inv.id, { replied: true, reply_result: result })
       setInvitations(prev => prev.map(i => i.id === inv.id ? saved : i))
-      // Push KOL status based on reply
       if (result === '同意合作') pushStatus('沟通中')
-      else if (result === '拒绝合作' || result === '未回复') {
-        pushStatus(result === '拒绝合作' ? '拒绝合作' : '未回复')
-      }
-      setToast('回复已更新')
+      else if (result === '拒绝合作' || result === '未回复') pushStatus(result === '拒绝合作' ? '拒绝合作' : '未回复')
+      showToast('回复已更新')
     } catch {
-      setToast('更新失败')
+      showToast('更新失败')
     }
-    setTimeout(() => setToast(''), 2200)
   }
 
   const handleDeleteInvitation = async (id: string) => {
@@ -90,9 +160,8 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
       const col = await createCollaboration(data)
       setCollaborations(prev => [col, ...prev])
       setShowColModal(false)
-      setToast('合作已添加')
-      setTimeout(() => setToast(''), 2200)
-    } catch { setToast('添加失败'); setTimeout(() => setToast(''), 2200) }
+      showToast('合作已添加')
+    } catch { showToast('添加失败') }
   }
 
   const handleDeleteCollaboration = async (id: string) => {
@@ -116,8 +185,7 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
       '未首触': 'bg-gray-100 text-gray-600', '已邀约': 'bg-purple-100 text-purple-700',
       '沟通中': 'bg-yellow-100 text-yellow-700', '待寄出': 'bg-orange-100 text-orange-700',
       '运输中': 'bg-blue-100 text-blue-700', '已签收': 'bg-teal-100 text-teal-700',
-      '合作完成': 'bg-green-100 text-green-700',
-      '拒绝合作': 'bg-red-100 text-red-700', '未回复': 'bg-yellow-100 text-yellow-700',
+      '合作完成': 'bg-green-100 text-green-700', '拒绝合作': 'bg-red-100 text-red-700', '未回复': 'bg-yellow-100 text-yellow-700',
     }
     return `px-2 py-0.5 rounded-full text-[11px] font-medium ${map[s] || 'bg-gray-100 text-gray-600'}`
   }
@@ -133,7 +201,6 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
       <div className="ml-auto relative w-[90%] max-w-[1400px] bg-white shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
         <div className="shrink-0 px-8 py-5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white flex items-center gap-5">
           <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white font-bold text-lg shadow-inner">
             {kol.name.slice(0, 2).toUpperCase()}
@@ -152,10 +219,8 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
           <button onClick={onClose} className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors text-lg">✕</button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto p-8 bg-gray-50/50">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {/* Left column */}
             <div className="space-y-6">
               <SectionCard icon="👤" title="基础身份" accent="border-l-indigo-500" bg="bg-white">
                 <FieldGrid>
@@ -170,27 +235,49 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
               </SectionCard>
 
               <SectionCard icon="📦" title="寄样与进度" accent="border-l-orange-500" bg="bg-white"
-                action={<span className={statusLabel(kol.status)}>{kol.status}</span>}
+                action={<button onClick={() => { setEditingShipment(null); setShowShipmentModal(true) }} className="text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium">+ 新增寄样</button>}
               >
-                <div className="space-y-3">
-                  <InlineEdit label="寄送产品" value={kol.sample_product || ''} onSave={v => save('sample_product', v)} />
-                  <div className="grid grid-cols-2 gap-3">
-                    <InlineEdit label="寄样日期" value={kol.sample_date || ''} onSave={v => save('sample_date', v)} type="date" />
-                    <InlineEdit label="快递单号" value={kol.tracking_number} onSave={v => save('tracking_number', v)} />
+                {kolShipments.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50/50 px-4 py-6 text-center">
+                    <p className="text-sm font-medium text-orange-700">暂无寄样记录</p>
+                    <p className="text-xs text-orange-500 mt-1">点击右上角新增，第二次补寄也会单独成一条记录。</p>
                   </div>
-                  <InlineEdit label="收件详情" value={kol.shipping_details} onSave={v => save('shipping_details', v)} type="textarea" />
-                  <div className="mt-2 rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2 text-[11px] text-orange-700">
-                    {kol.status === '沟通中' && '下一步：填写「寄样日期」后，状态会自动变为「待寄出」。'}
-                    {kol.status === '待寄出' && '下一步：填写「快递单号」后，状态会自动变为「运输中」。'}
-                    {kol.status === '运输中' && '下一步：到「寄样看板」点击「确认签收」，状态会变为「已签收」。'}
-                    {kol.status === '已签收' && '下一步：到「寄样看板」点击「合作完成」并填写合作数据，会进入合作历史。'}
-                    {!['沟通中', '待寄出', '运输中', '已签收'].includes(kol.status) && '提示：当邀约回复标记为「同意合作」后进入沟通中，再填写寄样信息推进状态。'}
+                ) : (
+                  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                    {kolShipments.map(shipment => (
+                      <div key={shipment.id} className="rounded-xl border border-orange-100 bg-orange-50/40 p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-gray-900">📦 {shipment.product}</span>
+                              <span className={statusLabel(shipment.status)}>{shipment.status}</span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-1">创建于 {shipment.created_at?.slice(0, 10)}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {shipment.status === '运输中' && (
+                              <button onClick={() => handleConfirmDelivered(shipment)} className="text-[11px] px-2.5 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600">确认签收</button>
+                            )}
+                            <button onClick={() => { setEditingShipment(shipment); setShowShipmentModal(true) }} className="text-[11px] text-orange-600 hover:text-orange-800">编辑</button>
+                            <button onClick={() => handleDeleteShipment(shipment)} className="text-[11px] text-red-400 hover:text-red-600">删除</button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">📅 寄样日期：{shipment.sample_date || '-'}</div>
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">📮 快递单号：{shipment.tracking_number || '-'}</div>
+                        </div>
+                        {shipment.shipping_details && <p className="mt-2 text-xs text-gray-500 bg-white/70 rounded-lg px-2 py-1.5">📍 {shipment.shipping_details}</p>}
+                        {shipment.notes && <p className="mt-2 text-[11px] text-gray-400 border-t border-orange-100 pt-2">备注：{shipment.notes}</p>}
+                      </div>
+                    ))}
                   </div>
+                )}
+                <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2 text-[11px] text-orange-700">
+                  新规则：每次寄产品都是一条寄样记录；有寄样日期/产品进入待寄出，填快递单号进入运输中，确认签收后进入已签收。
                 </div>
               </SectionCard>
             </div>
 
-            {/* Right column */}
             <div className="space-y-6">
               <SectionCard icon="📩" title="邀约记录" accent="border-l-purple-500" bg="bg-white"
                 action={<button onClick={() => setShowInvModal(true)} className="text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium">+ 发起邀约</button>}
@@ -209,16 +296,8 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
                         <span className="text-gray-600 text-xs flex-1 truncate">{inv.notes || '-'}</span>
                         {invReplyBadge(inv)}
                         {!inv.replied && (
-                          <select
-                            value=""
-                            onChange={e => { if (e.target.value) handleReplyUpdate(inv, e.target.value) }}
-                            className="text-[10px] border border-purple-200 rounded px-1 py-0.5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <option value="">标记</option>
-                            <option value="同意合作">同意</option>
-                            <option value="拒绝合作">拒绝</option>
-                            <option value="未回复">未回复</option>
+                          <select value="" onChange={e => { if (e.target.value) handleReplyUpdate(inv, e.target.value) }} className="text-[10px] border border-purple-200 rounded px-1 py-0.5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
+                            <option value="">标记</option><option value="同意合作">同意</option><option value="拒绝合作">拒绝</option><option value="未回复">未回复</option>
                           </select>
                         )}
                         <button onClick={() => handleDeleteInvitation(inv.id)} className="opacity-0 group-hover:opacity-100 text-[10px] text-red-400 hover:text-red-600 transition-all shrink-0">删除</button>
@@ -260,30 +339,22 @@ export default function KolDrawer({ kol, onClose, onUpdate }: Props) {
                 )}
               </SectionCard>
 
-              {/* Mail toggle */}
               <div>
                 <button onClick={() => setShowMail(!showMail)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
                   <span>{showMail ? '▼' : '▶'}</span> ✉️ 邮件往来
                 </button>
-                {showMail && (
-                  <div className="mt-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm max-h-[400px] overflow-hidden">
-                    <MailPanel kolEmail={kol.email} kolId={kol.id} />
-                  </div>
-                )}
+                {showMail && <div className="mt-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm max-h-[400px] overflow-hidden"><MailPanel kolEmail={kol.email} kolId={kol.id} /></div>}
               </div>
             </div>
           </div>
         </div>
 
-        {toast && (
-          <div className="fixed bottom-6 right-6 z-[60] px-5 py-2.5 bg-gray-900 text-white text-sm rounded-xl shadow-lg">
-            {toast}
-          </div>
-        )}
+        {toast && <div className="fixed bottom-6 right-6 z-[60] px-5 py-2.5 bg-gray-900 text-white text-sm rounded-xl shadow-lg">{toast}</div>}
       </div>
 
       {showInvModal && <AddInvitationModal kolId={kol.id} onClose={() => setShowInvModal(false)} onSubmit={handleAddInvitation} />}
       {showColModal && <AddCollaborationModal kolId={kol.id} onClose={() => setShowColModal(false)} onSubmit={handleAddCollaboration} />}
+      {showShipmentModal && <AddShipmentModal kolId={kol.id} shipment={editingShipment} onClose={() => { setShowShipmentModal(false); setEditingShipment(null) }} onSubmit={handleSaveShipment} />}
     </div>
   )
 }

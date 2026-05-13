@@ -276,8 +276,11 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {kol.sample_date ? (
-                        <span className="text-[10px] text-green-600">已寄 {kol.sample_date}</span>
+                      {kol.sample_product || kol.sample_date ? (
+                        <div className="space-y-0.5">
+                          {kol.sample_product && <div className="text-[10px] font-medium text-orange-600 truncate">{kol.sample_product}</div>}
+                          {kol.sample_date && <div className="text-[10px] text-green-600">已寄 {kol.sample_date}</div>}
+                        </div>
                       ) : (
                         <span className="text-[10px] text-gray-300">-</span>
                       )}

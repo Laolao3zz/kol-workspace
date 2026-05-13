@@ -28,9 +28,11 @@ export async function updateKOL(
   id: string,
   updates: Partial<KOL>
 ): Promise<KOL> {
+  const { id: _id, created_at: _created_at, ...safeUpdates } = updates
+
   const { data, error } = await getSupabase()
     .from('kols')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...safeUpdates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single()
