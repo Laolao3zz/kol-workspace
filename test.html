@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KOL 工作台 - 测试</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/umd/supabase.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const { createClient } = supabase
+    const supabaseClient = createClient(
+      'https://ahccmjpobipgrzeplkpl.supabase.co',
+      'sb_publishable_FMiFFRmAJcqbGADmZ0FTwg_T2Xu10AQ'
+    )
+
+    function App() {
+      const [kols, setKols] = React.useState([])
+      const [loading, setLoading] = React.useState(true)
+      const [error, setError] = React.useState(null)
+
+      React.useEffect(() => {
+        supabaseClient.from('kols').select('*').order('created_at', { ascending: false })
+          .then(({ data, error }) => {
+            if (error) setError(error.message)
+            else setKols(data)
+          })
+          .catch(e => setError(e.message))
+          .finally(() => setLoading(false))
+      }, [])
+
+      if (loading) return React.createElement('div', { className: 'p-8 text-gray-500' }, '加载中...')
+      if (error) return React.createElement('div', { className: 'p-8 text-red-600' }, '错误: ' + error)
+      if (kols.length === 0) return React.createElement('div', { className: 'p-8 text-gray-500' }, '暂无 KOL（数据库为空）')
+
+      return React.createElement('div', { className: 'max-w-4xl mx-auto p-6' },
+        React.createElement('h1', { className: 'text-xl font-bold mb-4 text-gray-900' }, 'KOL 资源池'),
+        React.createElement('table', { className: 'w-full bg-white rounded-lg shadow text-sm' },
+          React.createElement('thead', null,
+            React.createElement('tr', { className: 'border-b bg-gray-50' },
+              ['名称', '平台', '粉丝', '状态', '邮箱'].map(h =>
+                React.createElement('th', { key: h, className: 'text-left px-4 py-2.5 font-medium text-gray-500' }, h)
+              )
+            )
+          ),
+          React.createElement('tbody', null,
+            kols.map(kol =>
+              React.createElement('tr', { key: kol.id, className: 'border-b hover:bg-blue-50' },
+                React.createElement('td', { className: 'px-4 py-2.5 font-medium text-blue-600' }, kol.name),
+                React.createElement('td', { className: 'px-4 py-2.5 text-gray-700' }, kol.platform),
+                React.createElement('td', { className: 'px-4 py-2.5 text-gray-700' }, kol.followers),
+                React.createElement('td', { className: 'px-4 py-2.5' },
+                  React.createElement('span', { className: 'px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs' }, kol.status)
+                ),
+                React.createElement('td', { className: 'px-4 py-2.5 text-gray-500' }, kol.email)
+              )
+            )
+          )
+        )
+      )
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      React.createElement(App)
+    )
+  </script>
+</body>
+</html>

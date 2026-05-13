@@ -1,0 +1,153 @@
+import { useState } from 'react'
+
+interface Props {
+  kolId: string
+  onClose: () => void
+  onSubmit: (data: CollaborationFormData) => void
+}
+
+export interface CollaborationFormData {
+  kol_id: string
+  product: string
+  cooperation_date: string
+  publish_date: string
+  work_url: string
+  views: number
+  comments: number
+  likes: number
+  fee: string
+  notes: string
+}
+
+export default function AddCollaborationModal({ kolId, onClose, onSubmit }: Props) {
+  const [form, setForm] = useState<CollaborationFormData>({
+    kol_id: kolId,
+    product: '',
+    cooperation_date: '',
+    publish_date: '',
+    work_url: '',
+    views: 0,
+    comments: 0,
+    likes: 0,
+    fee: '',
+    notes: '',
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.product.trim()) return
+    onSubmit({ ...form, product: form.product.trim() })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        <h2 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
+          <span className="text-xl">📊</span> 添加合作记录
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">产品名</label>
+              <input
+                type="text"
+                value={form.product}
+                onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="手动输入产品名称"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">合作日期</label>
+              <input
+                type="date"
+                value={form.cooperation_date}
+                onChange={e => setForm(p => ({ ...p, cooperation_date: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">发布日期</label>
+              <input
+                type="date"
+                value={form.publish_date}
+                onChange={e => setForm(p => ({ ...p, publish_date: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">合作费用</label>
+              <input
+                type="text"
+                value={form.fee}
+                onChange={e => setForm(p => ({ ...p, fee: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="如 $500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">作品链接</label>
+            <input
+              type="url"
+              value={form.work_url}
+              onChange={e => setForm(p => ({ ...p, work_url: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="https://..."
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">播放量</label>
+              <input
+                type="number"
+                value={form.views || ''}
+                onChange={e => setForm(p => ({ ...p, views: Number(e.target.value) }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">评论数</label>
+              <input
+                type="number"
+                value={form.comments || ''}
+                onChange={e => setForm(p => ({ ...p, comments: Number(e.target.value) }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">点赞数</label>
+              <input
+                type="number"
+                value={form.likes || ''}
+                onChange={e => setForm(p => ({ ...p, likes: Number(e.target.value) }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">备注</label>
+            <textarea
+              value={form.notes}
+              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+              rows={2}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">取消</button>
+            <button type="submit" className="px-5 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-sm">确认添加</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
