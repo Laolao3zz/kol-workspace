@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS shipments (
   status TEXT DEFAULT '待寄出',
   notes TEXT,
   delivered_at DATE,
+  progress_status TEXT DEFAULT '待制作',
+  progress_notes TEXT,
+  expected_publish_date DATE,
+  completed_at DATE,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -120,4 +124,11 @@ CREATE INDEX IF NOT EXISTS idx_shipments_created_at ON shipments (created_at DES
 -- V4 升级：增加寄送产品字段
 -- 如已有旧表请执行：
 -- ============================================================
--- ALTER TABLE kols ADD COLUMN IF NOT EXISTS sample_product TEXT;
+-- ============================================================
+-- V5 升级：送达后的内容进度跟踪
+-- 如已有旧表请执行：
+-- ============================================================
+-- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS progress_status TEXT DEFAULT '待制作';
+-- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS progress_notes TEXT;
+-- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS expected_publish_date DATE;
+-- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS completed_at DATE;

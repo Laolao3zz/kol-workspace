@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "sync-emails": "node --env-file=.env.local scripts/sync-emails.mjs"
+    "sync-emails": "node --env-file=.env.local scripts/sync-emails.mjs",
+    "sync-emails:debug": "node --env-file=.env.local scripts/sync-emails.mjs",
+    "repair:collaborations": "node scripts/repair-misclassified-collaborations.mjs --apply",
+    "repair:collaborations:dry": "node scripts/repair-misclassified-collaborations.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

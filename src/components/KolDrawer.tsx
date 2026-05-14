@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { KOL, Invitation, Collaboration, Shipment } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
-import { getCollaborationsByKOL, createCollaboration, deleteCollaboration } from '../services/collaborationService'
+import { getCollaborationsByKOL, createCollaboration, deleteCollaboration, updateCollaboration } from '../services/collaborationService'
 import { createShipment, updateShipment, deleteShipment, getShipmentsByKOL } from '../services/shipmentService'
+import { applyKolSnapshot, deriveKolStatus } from '../utils/kolStatus'
 import InlineEdit from './InlineEdit'
 import MailPanel from './MailPanel'
 import AddInvitationModal, { InvitationFormData } from './AddInvitationModal'
@@ -12,12 +13,15 @@ import AddShipmentModal, { ShipmentFormData } from './AddShipmentModal'
 interface Props {
   kol: KOL
   shipments: Shipment[]
+  collaborationCount: number
   onClose: () => void
   onUpdate: (kol: KOL) => Promise<void> | void
+  onInvitationsChange: () => Promise<void> | void
+  onCollaborationsChange: () => Promise<void> | void
   onShipmentsChange: () => Promise<void> | void
 }
 
-export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmentsChange }: Props) {
+export default function KolDrawer({ kol, shipments, collaborationCount, onClose, onUpdate, onInvitationsChange, onCollaborationsChange, onShipmentsChange }: Props) {
   const [toast, setToast] = useState('')
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [collaborations, setCollaborations] = useState<Collaboration[]>([])
@@ -25,6 +29,8 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
   const [showInvModal, setShowInvModal] = useState(false)
   const [showColModal, setShowColModal] = useState(false)
   const [showShipmentModal, setShowShipmentModal] = useState(false)
+  const [editingInvitation, setEditingInvitation] = useState<Invitation | null>(null)
+  const [editingCollaboration, setEditingCollaboration] = useState<Collaboration | null>(null)
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null)
   const [showMail, setShowMail] = useState(false)
 
@@ -70,15 +76,33 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
     })
   }
 
+  const syncDerivedKolStatus = async (
+    nextInvitations: Invitation[] = invitations,
+    nextShipments: Shipment[] = kolShipments,
+    nextCollaborations: Collaboration[] = collaborations
+  ) => {
+    const nextStatus = deriveKolStatus(kol, nextInvitations, nextShipments, nextCollaborations)
+    await onUpdate(applyKolSnapshot({ ...kol, status: nextStatus }, nextInvitations, nextShipments, nextCollaborations))
+  }
+
   const pushStatus = (newStatus: string) => {
     const updated = { ...kol, status: newStatus, updated_at: new Date().toISOString() }
     onUpdate(updated)
   }
 
-  const save = (field: keyof KOL, value: string | string[]) => {
-    const updated = { ...kol, [field]: value, updated_at: new Date().toISOString() }
-    onUpdate(updated)
-    showToast('已保存')
+  const save = async (field: keyof KOL, value: string | string[]) => {
+    try {
+      const updated = { ...kol, [field]: value, updated_at: new Date().toISOString() }
+      await onUpdate(updated)
+      showToast('已保存')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '保存失败')
+    }
+  }
+
+  const saveTags = async (raw: string) => {
+    const tags = raw.split(',').map(s => s.trim()).filter(Boolean)
+    await save('tags', tags)
   }
 
   const handleSaveShipment = async (data: ShipmentFormData) => {
@@ -154,13 +178,27 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
 
   const handleAddInvitation = async (data: InvitationFormData) => {
     try {
+      if (editingInvitation) {
+        const saved = await updateInvitation(editingInvitation.id, data)
+        const next = invitations.map(inv => inv.id === saved.id ? saved : inv)
+        setInvitations(next)
+        setShowInvModal(false)
+        setEditingInvitation(null)
+        await syncDerivedKolStatus(next)
+        await onInvitationsChange()
+        showToast('邀约已更新')
+        return
+      }
+
       const inv = await createInvitation(data)
       const updated = [inv, ...invitations]
       setInvitations(updated)
       setShowInvModal(false)
+      await syncDerivedKolStatus(updated)
       if (INVITATION_ENTRY_STATUSES.includes(kol.status)) pushStatus('已邀约')
+      await onInvitationsChange()
       showToast('邀约已添加')
-    } catch { showToast('添加失败') }
+    } catch { showToast(editingInvitation ? '更新失败' : '添加失败') }
   }
 
   const handleReplyUpdate = async (inv: Invitation, result: string) => {
@@ -182,6 +220,10 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
             status: '待寄出',
             notes: '邀约同意后自动生成',
             delivered_at: null,
+            progress_status: '待制作',
+            progress_notes: '',
+            expected_publish_date: null,
+            completed_at: null,
           })
           await syncKolSnapshot(shipment, '待寄出')
           await onShipmentsChange()
@@ -200,26 +242,50 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
     if (!confirm('删除该邀约记录？')) return
     try {
       await deleteInvitation(id)
-      setInvitations(prev => prev.filter(i => i.id !== id))
+      const next = invitations.filter(i => i.id !== id)
+      setInvitations(next)
+      await syncDerivedKolStatus(next)
+      await onInvitationsChange()
+      showToast('邀约已删除')
     } catch {}
   }
 
   const handleAddCollaboration = async (data: CollaborationFormData) => {
     try {
+      if (editingCollaboration) {
+        const saved = await updateCollaboration(editingCollaboration.id, data)
+        const next = collaborations.map(col => col.id === saved.id ? saved : col)
+        setCollaborations(next)
+        setShowColModal(false)
+        setEditingCollaboration(null)
+        await syncDerivedKolStatus(invitations, kolShipments, next)
+        await onCollaborationsChange()
+        showToast('合作已更新')
+        return
+      }
+
       const col = await createCollaboration(data)
-      setCollaborations(prev => [col, ...prev])
+      const next = [col, ...collaborations]
+      setCollaborations(next)
       setShowColModal(false)
-      pushStatus('合作完成')
+      await syncDerivedKolStatus(invitations, kolShipments, next)
+      await onCollaborationsChange()
       showToast('合作已添加')
-    } catch { showToast('添加失败') }
+    } catch { showToast(editingCollaboration ? '更新失败' : '添加失败') }
   }
 
   const handleDeleteCollaboration = async (id: string) => {
     if (!confirm('删除该合作记录？')) return
     try {
       await deleteCollaboration(id)
-      setCollaborations(prev => prev.filter(c => c.id !== id))
-    } catch {}
+      const next = collaborations.filter(c => c.id !== id)
+      setCollaborations(next)
+      await syncDerivedKolStatus(invitations, kolShipments, next)
+      await onCollaborationsChange()
+      showToast('合作已删除')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '删除失败')
+    }
   }
 
   const invReplyBadge = (inv: Invitation) => {
@@ -234,7 +300,9 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
     const map: Record<string, string> = {
       '未首触': 'bg-gray-100 text-gray-600', '已邀约': 'bg-purple-100 text-purple-700',
       '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
-      '已签收': 'bg-teal-100 text-teal-700',
+        '已签收': 'bg-teal-100 text-teal-700',
+      '待制作': 'bg-amber-100 text-amber-700', '制作中': 'bg-sky-100 text-sky-700',
+      '待发布': 'bg-cyan-100 text-cyan-700', '进度异常': 'bg-red-100 text-red-700',
       '合作完成': 'bg-green-100 text-green-700', '拒绝合作': 'bg-red-100 text-red-700',
     }
     return `px-2 py-0.5 rounded-full text-[11px] font-medium ${map[s] || 'bg-gray-100 text-gray-600'}`
@@ -259,6 +327,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold tracking-tight">{kol.name}</h2>
               <span className={statusLabel(kol.status)}>{kol.status}</span>
+              {collaborationCount > 0 && <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/25">合作过 {collaborationCount} 次</span>}
             </div>
             <div className="flex items-center gap-3 mt-1 text-purple-200 text-sm">
               <span>{kol.platform}</span><span className="opacity-40">|</span>
@@ -280,7 +349,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
                   <InlineEdit label="主页链接" value={kol.homepage_url} onSave={v => save('homepage_url', v)} />
                   <InlineEdit label="粉丝量级" value={kol.followers} onSave={v => save('followers', v)} />
                   <InlineEdit label="国家/地区" value={kol.country} onSave={v => save('country', v)} />
-                  <InlineEdit label="领域标签" value={kol.tags.join(', ')} onSave={v => save('tags', v.split(',').map(s => s.trim()).filter(Boolean))} />
+                  <InlineEdit label="领域标签" value={kol.tags.join(', ')} onSave={saveTags} />
                 </FieldGrid>
               </SectionCard>
 
@@ -315,9 +384,12 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
                         <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                           <div className="bg-white/70 rounded-lg px-2 py-1.5">📅 寄样日期：{shipment.sample_date || '-'}</div>
                           <div className="bg-white/70 rounded-lg px-2 py-1.5">📮 快递单号：{shipment.tracking_number || '-'}</div>
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">⏱️ 送达日期：{shipment.delivered_at || '-'}</div>
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">🎬 内容进度：{shipment.completed_at ? '已完成' : shipment.progress_status || '-'}</div>
                         </div>
                         {shipment.shipping_details && <p className="mt-2 text-xs text-gray-500 bg-white/70 rounded-lg px-2 py-1.5">📍 {shipment.shipping_details}</p>}
-                        {shipment.notes && <p className="mt-2 text-[11px] text-gray-400 border-t border-orange-100 pt-2">备注：{shipment.notes}</p>}
+                        {shipment.notes && <p className="mt-2 text-[11px] text-gray-400 border-t border-orange-100 pt-2">物流备注：{shipment.notes}</p>}
+                        {shipment.progress_notes && <p className="mt-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5">进度备注：{shipment.progress_notes}</p>}
                       </div>
                     ))}
                   </div>
@@ -330,7 +402,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
 
             <div className="space-y-6">
               <SectionCard icon="📩" title="邀约记录" accent="border-l-purple-500" bg="bg-white"
-                action={<button onClick={() => setShowInvModal(true)} className="text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium">+ 发起邀约</button>}
+                action={<button onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} className="text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium">+ 发起邀约</button>}
               >
                 {loadingSub ? (
                   <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-12 bg-purple-50 rounded-lg animate-pulse" />) }</div>
@@ -346,11 +418,12 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
                         <span className="text-gray-600 text-xs flex-1 truncate">{inv.notes || '-'}</span>
                         {invReplyBadge(inv)}
                         {!inv.replied && (
-                          <select value="" onChange={e => { if (e.target.value) handleReplyUpdate(inv, e.target.value) }} className="text-[10px] border border-purple-200 rounded px-1 py-0.5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
+                          <select value="" onChange={e => { if (e.target.value) handleReplyUpdate(inv, e.target.value) }} className="text-xs border border-purple-200 rounded px-1 py-0.5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
                             <option value="">标记</option><option value="同意合作">同意</option><option value="拒绝合作">拒绝</option><option value="未回复">未回复</option>
                           </select>
                         )}
-                        <button onClick={() => handleDeleteInvitation(inv.id)} className="opacity-0 group-hover:opacity-100 text-[10px] text-red-400 hover:text-red-600 transition-all shrink-0">删除</button>
+                        <button onClick={() => { setEditingInvitation(inv); setShowInvModal(true) }} className="opacity-0 group-hover:opacity-100 text-xs text-purple-500 hover:text-purple-700 transition-all shrink-0">编辑</button>
+                        <button onClick={() => handleDeleteInvitation(inv.id)} className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 transition-all shrink-0">删除</button>
                       </div>
                     ))}
                   </div>
@@ -358,7 +431,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
               </SectionCard>
 
               <SectionCard icon="📊" title="合作历史" accent="border-l-teal-500" bg="bg-white"
-                action={<button onClick={() => setShowColModal(true)} className="text-xs px-3 py-1.5 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 transition-colors font-medium">+ 添加合作</button>}
+                action={<button onClick={() => { setEditingCollaboration(null); setShowColModal(true) }} className="text-xs px-3 py-1.5 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 transition-colors font-medium">+ 添加合作</button>}
               >
                 {loadingSub ? (
                   <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-16 bg-teal-50 rounded-lg animate-pulse" />) }</div>
@@ -371,8 +444,9 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="font-semibold text-teal-700 text-sm">{col.product}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-gray-400">{col.publish_date || col.cooperation_date}</span>
-                            <button onClick={() => handleDeleteCollaboration(col.id)} className="opacity-0 group-hover:opacity-100 text-[10px] text-red-400 hover:text-red-600 transition-all">删除</button>
+                            <span className="text-xs text-gray-400">{col.publish_date || col.cooperation_date}</span>
+                            <button onClick={() => { setEditingCollaboration(col); setShowColModal(true) }} className="opacity-0 group-hover:opacity-100 text-xs text-teal-600 hover:text-teal-800 transition-all">编辑</button>
+                            <button onClick={() => handleDeleteCollaboration(col.id)} className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 transition-all">删除</button>
                           </div>
                         </div>
                         <div className="flex gap-3 text-xs text-gray-600 mb-1 flex-wrap">
@@ -402,8 +476,8 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
         {toast && <div className="fixed bottom-6 right-6 z-[60] px-5 py-2.5 bg-gray-900 text-white text-sm rounded-xl shadow-lg">{toast}</div>}
       </div>
 
-      {showInvModal && <AddInvitationModal kolId={kol.id} onClose={() => setShowInvModal(false)} onSubmit={handleAddInvitation} />}
-      {showColModal && <AddCollaborationModal kolId={kol.id} onClose={() => setShowColModal(false)} onSubmit={handleAddCollaboration} />}
+      {showInvModal && <AddInvitationModal kolId={kol.id} invitation={editingInvitation} onClose={() => { setShowInvModal(false); setEditingInvitation(null) }} onSubmit={handleAddInvitation} />}
+      {showColModal && <AddCollaborationModal kolId={kol.id} collaboration={editingCollaboration} onClose={() => { setShowColModal(false); setEditingCollaboration(null) }} onSubmit={handleAddCollaboration} />}
       {showShipmentModal && <AddShipmentModal kolId={kol.id} shipment={editingShipment} onClose={() => { setShowShipmentModal(false); setEditingShipment(null) }} onSubmit={handleSaveShipment} />}
     </div>
   )

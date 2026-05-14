@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { KOL, Invitation, STATUSES, PLATFORMS } from '../types'
+import { useState, useMemo, useEffect } from 'react'
+import { Collaboration, KOL, Invitation, STATUSES, PLATFORMS, TAGS } from '../types'
 import { createInvitation } from '../services/invitationService'
 import { updateKOL } from '../services/kolService'
 import AddKolModal, { KolFormData } from './AddKolModal'
@@ -7,6 +7,7 @@ import AddKolModal, { KolFormData } from './AddKolModal'
 interface Props {
   kols: KOL[]
   invitations: Record<string, Invitation[]>
+  collaborationsByKol: Record<string, Collaboration[]>
   loading: boolean
   onSelect: (kol: KOL) => void
   selectedId: string | null
@@ -15,10 +16,11 @@ interface Props {
   onRefresh: () => void
 }
 
-export default function KolTable({ kols, invitations, loading, onSelect, selectedId, onCreate, onDelete, onRefresh }: Props) {
+export default function KolTable({ kols, invitations, collaborationsByKol, loading, onSelect, selectedId, onCreate, onDelete, onRefresh }: Props) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterPlatform, setFilterPlatform] = useState('')
+  const [filterTag, setFilterTag] = useState('')
   const [filterInvProduct, setFilterInvProduct] = useState('')
   const [filterInvStatus, setFilterInvStatus] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
@@ -27,6 +29,8 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
   const [batchProduct, setBatchProduct] = useState('')
   const [batchSending, setBatchSending] = useState(false)
   const [batchDone, setBatchDone] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   const getLatestInv = (kolId: string): Invitation | null => {
     const invs = invitations[kolId] || []
@@ -35,6 +39,13 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
   }
 
   // Get all unique products across all invitations for filtering
+  const allTags = useMemo(() => {
+    const set = new Set<string>()
+    TAGS.forEach(tag => set.add(tag))
+    kols.forEach(kol => (kol.tags || []).forEach(tag => tag && set.add(tag)))
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [kols])
+
   const allInvProducts = useMemo(() => {
     const set = new Set<string>()
     Object.values(invitations).forEach(invs => invs.forEach(inv => set.add(inv.product)))
@@ -42,14 +53,20 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
   }, [invitations])
 
   const filtered = useMemo(() => {
+    const text = (value: unknown) => String(value ?? '').toLowerCase()
     return kols.filter(kol => {
-      const q = search.toLowerCase()
+      const q = search.trim().toLowerCase()
       const matchSearch = !q ||
-        kol.name.toLowerCase().includes(q) ||
-        kol.email.toLowerCase().includes(q) ||
-        kol.homepage_url.toLowerCase().includes(q)
+        text(kol.name).includes(q) ||
+        text(kol.email).includes(q) ||
+        text(kol.homepage_url).includes(q) ||
+        text(kol.platform).includes(q) ||
+        text(kol.country).includes(q) ||
+        text(kol.followers).includes(q) ||
+        (kol.tags || []).some(tag => text(tag).includes(q))
       const matchStatus = !filterStatus || kol.status === filterStatus
       const matchPlatform = !filterPlatform || kol.platform === filterPlatform
+      const matchTag = !filterTag || (kol.tags || []).some(t => text(t) === filterTag.toLowerCase())
 
       let matchInvProduct = true
       if (filterInvProduct) {
@@ -66,15 +83,30 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
         else if (filterInvStatus === 'rejected') matchInvStatus = latest.replied && latest.reply_result.includes('拒绝')
       }
 
-      return matchSearch && matchStatus && matchPlatform && matchInvProduct && matchInvStatus
+      return matchSearch && matchStatus && matchPlatform && matchTag && matchInvProduct && matchInvStatus
     })
-  }, [kols, search, filterStatus, filterPlatform, filterInvProduct, filterInvStatus, invitations])
+  }, [kols, search, filterStatus, filterPlatform, filterTag, filterInvProduct, filterInvStatus, invitations])
+
+  useEffect(() => {
+    setPage(1)
+    setSelectedIds(new Set())
+  }, [search, filterStatus, filterPlatform, filterTag, filterInvProduct, filterInvStatus, pageSize])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const pageStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
+  const pageEnd = Math.min(safePage * pageSize, filtered.length)
+  const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+  const collaborationCount = (kolId: string) => collaborationsByKol[kolId]?.length || 0
 
   const statusColor = (s: string) => {
     const map: Record<string, string> = {
       '已邀约': 'bg-purple-100 text-purple-700',
       '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
-      '已签收': 'bg-teal-100 text-teal-700', '合作完成': 'bg-green-100 text-green-700',
+      '已签收': 'bg-teal-100 text-teal-700', '待制作': 'bg-amber-100 text-amber-700',
+      '制作中': 'bg-sky-100 text-sky-700', '待发布': 'bg-cyan-100 text-cyan-700',
+      '进度异常': 'bg-red-100 text-red-700', '合作完成': 'bg-green-100 text-green-700',
       '拒绝合作': 'bg-red-100 text-red-700',
     }
     return map[s] || 'bg-gray-100 text-gray-600'
@@ -92,8 +124,8 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
     const label = !inv.replied ? '未回复' : inv.reply_result.includes('同意') ? '已同意' : inv.reply_result.includes('拒绝') ? '已拒绝' : inv.reply_result
     return (
       <div className="flex items-center gap-1.5">
-        <span className="text-[10px] font-medium text-purple-600">{inv.product}</span>
-        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${color}`}>{label}</span>
+        <span className="text-xs font-medium text-purple-600">{inv.product}</span>
+        <span className={`text-xs px-1.5 py-0.5 rounded border ${color}`}>{label}</span>
       </div>
     )
   }
@@ -109,10 +141,10 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
   }
 
   const toggleAll = () => {
-    if (selectedIds.size === filtered.length) {
+    if (selectedIds.size === paged.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(filtered.map(k => k.id)))
+      setSelectedIds(new Set(paged.map(k => k.id)))
     }
   }
 
@@ -124,7 +156,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
     if (kol.status === '待寄出') return `待寄 ${kol.sample_date}`
     if (kol.status === '运输中') return `已发出 ${kol.sample_date}`
     if (kol.status === '已签收') return `已签收 ${kol.sample_date}`
-    if (kol.status === '合作完成') return `合作完成 ${kol.sample_date}`
+    if (kol.status === '合作完成') return `最近寄样 ${kol.sample_date}`
     return `寄样日期 ${kol.sample_date}`
   }
 
@@ -171,7 +203,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-semibold text-gray-900">KOL 资源池</h1>
+            <h1 className="text-xl font-semibold text-gray-900">KOL 资源池</h1>
             <div className="flex items-center gap-2">
               {selectedIds.size > 0 && (
                 <button
@@ -197,6 +229,10 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
                 <option value="">全部平台</option>
                 {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
+              <select value={filterTag} onChange={e => setFilterTag(e.target.value)} className="px-3 py-1.5 text-sm border border-emerald-200 rounded-lg text-emerald-700 bg-emerald-50/40">
+                <option value="">全部分类</option>
+                {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
               <button onClick={() => setShowAddModal(true)} className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-sm transition-all shrink-0">
                 + 新增 KOL
               </button>
@@ -218,13 +254,13 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-[15px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <th className="px-3 py-3 w-[40px]">
                   <input
                     type="checkbox"
-                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    checked={paged.length > 0 && selectedIds.size === paged.length && paged.every(k => selectedIds.has(k.id))}
                     onChange={toggleAll}
                     className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                   />
@@ -233,8 +269,9 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
                 <th className="text-left px-4 py-3 font-medium text-gray-500 w-[8%]">平台</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 w-[7%]">粉丝</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 w-[9%]">状态</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[13%]">最近邀约</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[17%]">联系邮箱</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[10%]">最近邀约</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[9%]">合作次数</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[16%]">联系邮箱</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 w-[7%]">国家</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 w-[9%]">标签</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 w-[8%]">寄样</th>
@@ -245,7 +282,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
-                    {Array.from({ length: 11 }).map((_, j) => (
+                    {Array.from({ length: 12 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-gray-100 rounded animate-pulse" style={{ width: `${60 + Math.random() * 30}%` }} />
                       </td>
@@ -254,7 +291,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-16 text-gray-400">
+                  <td colSpan={12} className="text-center py-16 text-gray-400">
                     {kols.length === 0 ? (
                       <div className="space-y-2">
                         <p className="text-sm">还没有任何 KOL 数据</p>
@@ -264,7 +301,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
                   </td>
                 </tr>
               ) : (
-                filtered.map(kol => (
+                paged.map(kol => (
                   <tr key={kol.id} className={`border-b border-gray-50 cursor-pointer transition-colors hover:bg-blue-50/50 ${selectedId === kol.id ? 'bg-blue-50' : ''} ${selectedIds.has(kol.id) ? 'bg-purple-50/40' : ''}`}>
                     <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                       <input
@@ -278,35 +315,52 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
                     <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-700">{kol.platform}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-700">{kol.followers}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${statusColor(kol.status)}`}>{kol.status}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor(kol.status)}`}>{kol.status}</span>
                     </td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3">{invMiniBadge(getLatestInv(kol.id))}</td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-500 text-xs">{kol.email}</td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-600 text-xs">{kol.country}</td>
+                    <td onClick={() => onSelect(kol)} className="px-4 py-3">
+                      {collaborationCount(kol.id) > 0 ? (
+                        <span className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-100 rounded-full text-xs font-semibold">合作 {collaborationCount(kol.id)} 次</span>
+                      ) : <span className="text-xs text-gray-300">-</span>}
+                    </td>
+                    <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-500 text-sm">{kol.email}</td>
+                    <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-600 text-sm">{kol.country}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
-                        {kol.tags.slice(0, 2).map(t => <span key={t} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px]">{t}</span>)}
-                        {kol.tags.length > 2 && <span className="text-[10px] text-gray-400">+{kol.tags.length - 2}</span>}
+                        {(kol.tags || []).slice(0, 2).map(t => <span key={t} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{t}</span>)}
+                        {(kol.tags || []).length > 2 && <span className="text-xs text-gray-400">+{kol.tags.length - 2}</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       {kol.sample_product || kol.sample_date ? (
                         <div className="space-y-0.5">
-                          {kol.sample_product && <div className="text-[10px] font-medium text-orange-600 truncate">{kol.sample_product}</div>}
-                          {kol.sample_date && <div className="text-[10px] text-green-600">{shipmentDateLabel(kol)}</div>}
+                          {kol.sample_product && <div className="text-xs font-medium text-orange-600 truncate">{kol.sample_product}</div>}
+                          {kol.sample_date && <div className="text-xs text-green-600">{shipmentDateLabel(kol)}</div>}
                         </div>
                       ) : (
-                        <span className="text-[10px] text-gray-300">-</span>
+                        <span className="text-xs text-gray-300">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={(e) => { e.stopPropagation(); onDelete(kol.id) }} className="text-[11px] text-red-400 hover:text-red-600 transition-colors font-medium">删除</button>
+                      <button onClick={(e) => { e.stopPropagation(); onDelete(kol.id) }} className="text-xs text-red-400 hover:text-red-600 transition-colors font-medium">删除</button>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/70 text-sm text-gray-600">
+          <div>第 {pageStart}-{pageEnd} 条 / 共 {filtered.length} 条</div>
+          <div className="flex items-center gap-2">
+            <span>每页</span>
+            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="px-2 py-1 border border-gray-200 rounded-lg bg-white">
+              {[25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+            </select>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage <= 1} className="px-3 py-1 border border-gray-200 rounded-lg bg-white disabled:opacity-40">上一页</button>
+            <span className="px-2">{safePage} / {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="px-3 py-1 border border-gray-200 rounded-lg bg-white disabled:opacity-40">下一页</button>
+          </div>
         </div>
       </div>
       {showAddModal && <AddKolModal onClose={() => setShowAddModal(false)} onSubmit={(data) => { onCreate(data); setShowAddModal(false) }} />}

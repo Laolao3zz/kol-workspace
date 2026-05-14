@@ -10,6 +10,10 @@ export interface ShipmentFormData {
   status: string
   notes: string
   delivered_at: string | null
+  progress_status: string
+  progress_notes: string
+  expected_publish_date: string | null
+  completed_at: string | null
 }
 
 interface Props {
@@ -29,6 +33,10 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
     status: '待寄出',
     notes: '',
     delivered_at: null,
+    progress_status: '待制作',
+    progress_notes: '',
+    expected_publish_date: null,
+    completed_at: null,
   })
 
   useEffect(() => {
@@ -42,6 +50,10 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
       status: shipment.status || '待寄出',
       notes: shipment.notes || '',
       delivered_at: shipment.delivered_at || null,
+      progress_status: shipment.progress_status || '待制作',
+      progress_notes: shipment.progress_notes || '',
+      expected_publish_date: shipment.expected_publish_date || null,
+      completed_at: shipment.completed_at || null,
     })
   }, [shipment])
 
@@ -118,12 +130,12 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">备注</label>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">物流/寄样备注</label>
             <textarea
               value={form.notes}
               onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
               rows={2}
-              placeholder="例如：第二次补寄配件 / 等对方确认地址"
+              placeholder="仅记录物流相关信息，如第二次补寄配件 / 等对方确认地址"
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 resize-y"
             />
           </div>

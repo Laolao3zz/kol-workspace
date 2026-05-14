@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 interface Props {
   label: string
   value: string
-  onSave: (value: string) => void
+  onSave: (value: string) => void | Promise<void>
   type?: 'text' | 'select' | 'date' | 'textarea'
   options?: string[]
 }

@@ -51,6 +51,10 @@ export interface Shipment {
   status: string
   notes: string
   delivered_at: string | null
+  progress_status: string
+  progress_notes: string
+  expected_publish_date: string | null
+  completed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -68,9 +72,10 @@ export interface Email {
   message_id: string
 }
 
-export const PLATFORMS = ['YouTube', 'TikTok', 'X', 'Blog', 'Forum', 'Instagram']
-export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '已签收', '合作完成', '拒绝合作']
+export const PLATFORMS = ['YouTube', 'TikTok', 'X', 'Blog', 'Forum', 'Instagram', '网站', 'Discord']
+export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '已签收', '待制作', '制作中', '待发布', '进度异常', '合作完成', '拒绝合作']
 export const SHIPMENT_STATUSES = ['待寄出', '运输中', '已签收']
-export const PRODUCTS = ['BY53', 'BY54', 'K1', 'X1s', 'N1', 'Z1']
-export const TAGS = ['SBC', 'NAS', 'AI', 'Robotics', 'Smart Home', 'Networking', 'Storage']
+export const PROGRESS_STATUSES = ['待制作', '制作中', '待发布', '已完成', '暂停/异常']
+export const PRODUCTS = ['BY53', 'BY54', 'YY3588', 'R1', 'X1', 'X1s', 'K1', 'N1', 'Z1', 'NAS', 'Lora']
+export const TAGS = ['SBC', '科技', 'NAS', '户外装备', '无线电', 'Mini PC', 'AI', 'Robotics', 'Smart Home', 'Networking', 'Storage']
 export const REPLY_RESULTS = ['同意合作', '拒绝合作', '未回复']

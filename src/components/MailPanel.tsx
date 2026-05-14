@@ -51,7 +51,10 @@ export default function MailPanel({ kolEmail: _kolEmail, kolId }: Props) {
             <div key={i} className="h-20 bg-gray-50 rounded-lg animate-pulse" />
           ))
         ) : emails.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-8">暂无邮件记录</p>
+          <div className="text-xs text-gray-400 text-center py-8 space-y-2">
+            <p>暂无邮件记录</p>
+            <p className="max-w-sm mx-auto leading-relaxed">邮件不会自动出现在这里，需要先运行邮件同步，并确认 .env.local 中的 IMAP 配置、发件箱文件夹和 KOL 邮箱匹配正确。</p>
+          </div>
         ) : (
           emails.map(email => (
             <div

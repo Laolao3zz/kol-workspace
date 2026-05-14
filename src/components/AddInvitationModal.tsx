@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { REPLY_RESULTS } from '../types'
+import { Invitation, REPLY_RESULTS } from '../types'
 
 interface Props {
   kolId: string
+  invitation?: Invitation | null
   onClose: () => void
   onSubmit: (data: InvitationFormData) => void
 }
@@ -17,15 +18,16 @@ export interface InvitationFormData {
   notes: string
 }
 
-export default function AddInvitationModal({ kolId, onClose, onSubmit }: Props) {
+export default function AddInvitationModal({ kolId, invitation, onClose, onSubmit }: Props) {
+  const isEditing = Boolean(invitation)
   const [form, setForm] = useState<InvitationFormData>({
     kol_id: kolId,
-    product: '',
-    invited_at: new Date().toISOString().slice(0, 10),
-    email_subject: '',
-    replied: false,
-    reply_result: '',
-    notes: '',
+    product: invitation?.product || '',
+    invited_at: invitation?.invited_at || new Date().toISOString().slice(0, 10),
+    email_subject: invitation?.email_subject || '',
+    replied: invitation?.replied || false,
+    reply_result: invitation?.reply_result || '',
+    notes: invitation?.notes || '',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -38,8 +40,8 @@ export default function AddInvitationModal({ kolId, onClose, onSubmit }: Props) 
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-          <span className="text-xl">📩</span> 添加邀约记录
+        <h2 className="text-xl font-semibold text-gray-900 mb-5 flex items-center gap-2">
+          <span className="text-2xl">📩</span> {isEditing ? '编辑邀约记录' : '添加邀约记录'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -102,7 +104,7 @@ export default function AddInvitationModal({ kolId, onClose, onSubmit }: Props) 
 
           <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">取消</button>
-            <button type="submit" className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">确认添加</button>
+            <button type="submit" className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">{isEditing ? '保存修改' : '确认添加'}</button>
           </div>
         </form>
       </div>

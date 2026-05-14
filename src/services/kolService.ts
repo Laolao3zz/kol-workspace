@@ -28,7 +28,27 @@ export async function updateKOL(
   id: string,
   updates: Partial<KOL>
 ): Promise<KOL> {
-  const { id: _id, created_at: _created_at, ...safeUpdates } = updates
+  const allowedFields: Array<keyof KOL> = [
+    'name',
+    'email',
+    'homepage_url',
+    'platform',
+    'followers',
+    'country',
+    'tags',
+    'status',
+    'sample_product',
+    'sample_date',
+    'tracking_number',
+    'shipping_details',
+  ]
+
+  const safeUpdates = allowedFields.reduce<Partial<KOL>>((payload, field) => {
+    if (field in updates) {
+      payload[field] = updates[field] as never
+    }
+    return payload
+  }, {})
 
   const { data, error } = await getSupabase()
     .from('kols')

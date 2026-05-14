@@ -1,6 +1,16 @@
 import { getSupabase } from '../lib/supabase'
 import type { Collaboration } from '../types'
 
+export async function getCollaborations(): Promise<Collaboration[]> {
+  const { data, error } = await getSupabase()
+    .from('collaborations')
+    .select('*')
+    .order('cooperation_date', { ascending: false })
+
+  if (error) throw error
+  return data as Collaboration[]
+}
+
 export async function getCollaborationsByKOL(kolId: string): Promise<Collaboration[]> {
   const { data, error } = await getSupabase()
     .from('collaborations')
@@ -18,6 +28,23 @@ export async function createCollaboration(
   const { data, error } = await getSupabase()
     .from('collaborations')
     .insert([collab])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Collaboration
+}
+
+export async function updateCollaboration(
+  id: string,
+  updates: Partial<Collaboration>
+): Promise<Collaboration> {
+  const { id: _id, ...safeUpdates } = updates
+
+  const { data, error } = await getSupabase()
+    .from('collaborations')
+    .update(safeUpdates)
+    .eq('id', id)
     .select()
     .single()
 
