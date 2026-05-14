@@ -20,6 +20,30 @@ function App() {
   const [selectedKol, setSelectedKol] = useState<KOL | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
 
+  const latestShipmentByKol = (shipmentList: Shipment[]) => {
+    const map: Record<string, Shipment> = {}
+    shipmentList.forEach(shipment => {
+      const current = map[shipment.kol_id]
+      const shipmentTime = shipment.sample_date || shipment.created_at || ''
+      const currentTime = current ? (current.sample_date || current.created_at || '') : ''
+      if (!current || shipmentTime > currentTime) map[shipment.kol_id] = shipment
+    })
+    return map
+  }
+
+  const normalizeKol = (kol: KOL, latestShipment?: Shipment): KOL => {
+    const normalizedStatus = kol.status === '沟通中' || kol.status === '未回复' ? '已邀约' : kol.status
+    if (!latestShipment) return { ...kol, status: normalizedStatus }
+    return {
+      ...kol,
+      status: normalizedStatus === '沟通中' || normalizedStatus === '未回复' ? '已邀约' : normalizedStatus,
+      sample_product: latestShipment.product || kol.sample_product,
+      sample_date: latestShipment.sample_date || null,
+      tracking_number: latestShipment.tracking_number || '',
+      shipping_details: latestShipment.shipping_details || '',
+    }
+  }
+
   const loadAll = async () => {
     try {
       setLoading(true)
@@ -28,10 +52,12 @@ function App() {
         getKOLs(),
         getShipments(),
       ])
-      setKols(data)
+      const latestMap = latestShipmentByKol(shipmentData)
+      const normalizedKols = data.map(kol => normalizeKol(kol, latestMap[kol.id]))
+      setKols(normalizedKols)
       setShipments(shipmentData)
       const invMap: Record<string, Invitation[]> = {}
-      await Promise.all(data.map(async kol => {
+      await Promise.all(normalizedKols.map(async kol => {
         try {
           invMap[kol.id] = await getInvitationsByKOL(kol.id)
         } catch { invMap[kol.id] = [] }
@@ -91,6 +117,9 @@ function App() {
     try {
       const data = await getShipments()
       setShipments(data)
+      const latestMap = latestShipmentByKol(data)
+      setKols(prev => prev.map(kol => normalizeKol(kol, latestMap[kol.id])))
+      setSelectedKol(prev => prev ? normalizeKol(prev, latestMap[prev.id]) : prev)
     } catch (err) {
       setError(err instanceof Error ? err.message : '寄样记录加载失败')
     }

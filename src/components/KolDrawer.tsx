@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { KOL, Invitation, Collaboration, Shipment } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
 import { getCollaborationsByKOL, createCollaboration, deleteCollaboration } from '../services/collaborationService'
-import { createShipment, updateShipment, deleteShipment } from '../services/shipmentService'
+import { createShipment, updateShipment, deleteShipment, getShipmentsByKOL } from '../services/shipmentService'
 import InlineEdit from './InlineEdit'
 import MailPanel from './MailPanel'
 import AddInvitationModal, { InvitationFormData } from './AddInvitationModal'
@@ -50,7 +50,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
   }
 
   const shipmentStatus = (trackingNumber: string) => trackingNumber.trim() ? '运输中' : '待寄出'
-  const INVITATION_ENTRY_STATUSES = ['未首触', '未回复', '拒绝合作', '']
+  const INVITATION_ENTRY_STATUSES = ['未首触', '未回复', '拒绝合作', '沟通中', '']
 
   const nextKolStatus = (shipment: ShipmentFormData | Shipment) => {
     if (shipment.status === '已签收') return '已签收'
@@ -112,7 +112,6 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
       if (!latestInvitation.replied) fallbackStatus = '已邀约'
       else if (latestInvitation.reply_result.includes('同意')) fallbackStatus = '待寄出'
       else if (latestInvitation.reply_result.includes('拒绝')) fallbackStatus = '拒绝合作'
-      else if (latestInvitation.reply_result === '未回复') fallbackStatus = '未回复'
       else fallbackStatus = '已邀约'
     }
 
@@ -168,8 +167,29 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
     try {
       const saved = await updateInvitation(inv.id, { replied: true, reply_result: result })
       setInvitations(prev => prev.map(i => i.id === inv.id ? saved : i))
-      if (result === '同意合作') pushStatus('待寄出')
-      else if (result === '拒绝合作' || result === '未回复') pushStatus(result === '拒绝合作' ? '拒绝合作' : '未回复')
+      if (result === '同意合作') {
+        const existingShipments = await getShipmentsByKOL(kol.id)
+        const hasSamePendingShipment = existingShipments.some(s =>
+          s.product === inv.product && s.status === '待寄出' && !s.tracking_number?.trim()
+        )
+        if (!hasSamePendingShipment) {
+          const shipment = await createShipment({
+            kol_id: kol.id,
+            product: inv.product,
+            sample_date: null,
+            tracking_number: '',
+            shipping_details: kol.shipping_details || '',
+            status: '待寄出',
+            notes: '邀约同意后自动生成',
+            delivered_at: null,
+          })
+          await syncKolSnapshot(shipment, '待寄出')
+          await onShipmentsChange()
+        } else {
+          pushStatus('待寄出')
+        }
+      } else if (result === '拒绝合作') pushStatus('拒绝合作')
+      else if (result === '未回复') pushStatus('已邀约')
       showToast('回复已更新')
     } catch {
       showToast('更新失败')
@@ -215,7 +235,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onShipmen
       '未首触': 'bg-gray-100 text-gray-600', '已邀约': 'bg-purple-100 text-purple-700',
       '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
       '已签收': 'bg-teal-100 text-teal-700',
-      '合作完成': 'bg-green-100 text-green-700', '拒绝合作': 'bg-red-100 text-red-700', '未回复': 'bg-yellow-100 text-yellow-700',
+      '合作完成': 'bg-green-100 text-green-700', '拒绝合作': 'bg-red-100 text-red-700',
     }
     return `px-2 py-0.5 rounded-full text-[11px] font-medium ${map[s] || 'bg-gray-100 text-gray-600'}`
   }

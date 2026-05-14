@@ -69,8 +69,8 @@ export interface Email {
 }
 
 export const PLATFORMS = ['YouTube', 'TikTok', 'X', 'Blog', 'Forum', 'Instagram']
-export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '已签收', '合作完成', '拒绝合作', '未回复']
+export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '已签收', '合作完成', '拒绝合作']
 export const SHIPMENT_STATUSES = ['待寄出', '运输中', '已签收']
 export const PRODUCTS = ['BY53', 'BY54', 'K1', 'X1s', 'N1', 'Z1']
 export const TAGS = ['SBC', 'NAS', 'AI', 'Robotics', 'Smart Home', 'Networking', 'Storage']
-export const REPLY_RESULTS = ['同意合作', '拒绝合作', '未回复', '考虑中']
+export const REPLY_RESULTS = ['同意合作', '拒绝合作', '未回复']

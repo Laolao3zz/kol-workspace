@@ -75,7 +75,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
       '已邀约': 'bg-purple-100 text-purple-700',
       '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
       '已签收': 'bg-teal-100 text-teal-700', '合作完成': 'bg-green-100 text-green-700',
-      '拒绝合作': 'bg-red-100 text-red-700', '未回复': 'bg-yellow-100 text-yellow-700',
+      '拒绝合作': 'bg-red-100 text-red-700',
     }
     return map[s] || 'bg-gray-100 text-gray-600'
   }
@@ -117,7 +117,7 @@ export default function KolTable({ kols, invitations, loading, onSelect, selecte
   }
 
   const selectedKols = kols.filter(k => selectedIds.has(k.id))
-  const INVITATION_ENTRY_STATUSES = ['未首触', '未回复', '拒绝合作', '']
+  const INVITATION_ENTRY_STATUSES = ['未首触', '拒绝合作', '沟通中', '未回复', '']
 
   const shipmentDateLabel = (kol: KOL) => {
     if (!kol.sample_date) return null
