@@ -5,7 +5,6 @@ import { PROGRESS_STATUSES } from '../types'
 export interface ProgressFormData {
   progress_status: string
   progress_notes: string
-  expected_publish_date: string | null
   completed_at: string | null
 }
 
@@ -19,7 +18,6 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
   const [form, setForm] = useState<ProgressFormData>({
     progress_status: shipment.progress_status || '待制作',
     progress_notes: shipment.progress_notes || '',
-    expected_publish_date: shipment.expected_publish_date || null,
     completed_at: shipment.completed_at || null,
   })
 
@@ -27,7 +25,6 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
     onSubmit({
       progress_status: form.completed_at ? '已完成' : form.progress_status || '待制作',
       progress_notes: form.progress_notes.trim(),
-      expected_publish_date: form.expected_publish_date || null,
       completed_at: form.completed_at || null,
     })
   }
@@ -58,15 +55,6 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">预计发布</label>
-                <input
-                  type="date"
-                  value={form.expected_publish_date || ''}
-                  onChange={e => setForm(prev => ({ ...prev, expected_publish_date: e.target.value || null }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 bg-white"
-                />
-              </div>
-              <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">完成日期</label>
                 <input
                   type="date"
@@ -75,7 +63,7 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 bg-white"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="col-span-2 flex items-end">
                 <button
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, completed_at: new Date().toISOString().slice(0, 10), progress_status: '已完成' }))}

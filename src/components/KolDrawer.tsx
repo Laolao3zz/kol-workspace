@@ -113,7 +113,12 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
 
   const handleSaveShipment = async (data: ShipmentFormData) => {
     try {
-      const payload = { ...data, status: data.status === '已签收' || data.delivered_at ? '已签收' : shipmentStatus(data.tracking_number) }
+      const payload = {
+        ...data,
+        status: data.status === '已签收' ? '已签收' : shipmentStatus(data.tracking_number),
+        delivered_at: data.status === '已签收' ? data.delivered_at : null,
+        expected_publish_date: null,
+      }
       const saved = editingShipment
         ? await updateShipment(editingShipment.id, payload)
         : await createShipment(payload)
@@ -480,7 +485,6 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                             <div className="bg-white/80 rounded-lg px-2 py-1.5">📅 寄样日期：{shipment.sample_date || '-'}</div>
                             <div className="bg-white/80 rounded-lg px-2 py-1.5">📮 快递单号：{shipment.tracking_number || '-'}</div>
                             <div className="bg-white/80 rounded-lg px-2 py-1.5">📍 收件信息：{shipment.shipping_details || '-'}</div>
-                            <div className="bg-white/80 rounded-lg px-2 py-1.5">🗓️ 预计发布：{shipment.expected_publish_date || '-'}</div>
                             <div className="bg-white/80 rounded-lg px-2 py-1.5">📌 内容进度：{contentLabel}</div>
                             <div className="bg-white/80 rounded-lg px-2 py-1.5">✅ 完成日期：{shipment.completed_at || '-'}</div>
                           </div>

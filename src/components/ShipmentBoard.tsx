@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { KOL, PROGRESS_STATUSES, Shipment } from '../types'
 import { createCollaboration } from '../services/collaborationService'
 import { updateShipment } from '../services/shipmentService'
-import AddCollaborationModal, { CollaborationFormData } from './AddCollaborationModal'
 
 interface Props {
   kols: KOL[]
@@ -15,7 +14,6 @@ interface Props {
 type ProgressDraft = {
   progress_status: string
   progress_notes: string
-  expected_publish_date: string
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
@@ -42,21 +40,20 @@ const kolMainStatus = (shipment: Shipment) => {
 }
 
 export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onShipmentsChange }: Props) {
-  const [completingShipment, setCompletingShipment] = useState<Shipment | null>(null)
+  const [completingShipmentId, setCompletingShipmentId] = useState<string | null>(null)
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({})
   const [editingProgressId, setEditingProgressId] = useState<string | null>(null)
   const [boardError, setBoardError] = useState('')
   const [progressDraft, setProgressDraft] = useState<ProgressDraft>({
     progress_status: '待制作',
     progress_notes: '',
-    expected_publish_date: '',
   })
 
   const kolMap = useMemo(() => new Map(kols.map(k => [k.id, k])), [kols])
 
   const columns = useMemo(() => {
-    const pending = shipments.filter(s => s.status === '待寄出')
-    const transit = shipments.filter(s => s.status === '运输中')
+    const pending = shipments.filter(s => s.status === '待寄出' && !s.tracking_number?.trim())
+    const transit = shipments.filter(s => s.status === '运输中' || (s.tracking_number?.trim() && s.status !== '已签收' && !isShipmentCompleted(s)))
     const inProgress = shipments
       .filter(s => s.status === '已签收' && !isShipmentCompleted(s))
       .sort((a, b) => daysSince(b.delivered_at) - daysSince(a.delivered_at))
@@ -115,7 +112,6 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
     setProgressDraft({
       progress_status: shipment.progress_status || '待制作',
       progress_notes: shipment.progress_notes || '',
-      expected_publish_date: shipment.expected_publish_date || '',
     })
   }
 
@@ -125,7 +121,6 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
       const saved = await updateShipment(shipment.id, {
         progress_status: progressDraft.progress_status,
         progress_notes: progressDraft.progress_notes.trim(),
-        expected_publish_date: progressDraft.expected_publish_date || null,
       })
       await syncKolSnapshot(saved, kolMainStatus(saved))
       await onShipmentsChange()
@@ -135,32 +130,36 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
     }
   }
 
-  const handleComplete = async (data: CollaborationFormData) => {
-    if (!completingShipment) return
+  const handleComplete = async (shipment: Shipment) => {
     const completedAt = todayISO()
     try {
       setBoardError('')
+      setCompletingShipmentId(shipment.id)
       await createCollaboration({
-        kol_id: completingShipment.kol_id,
-        product: data.product,
-        cooperation_date: data.cooperation_date,
-        publish_date: data.publish_date || null,
-        work_url: data.work_url || '',
-        views: data.views || null,
-        comments: data.comments || null,
-        likes: data.likes || null,
-        fee: data.fee || '',
-        notes: data.notes || '',
+        kol_id: shipment.kol_id,
+        product: shipment.product,
+        cooperation_date: shipment.delivered_at || shipment.sample_date || completedAt,
+        publish_date: completedAt,
+        work_url: '',
+        views: 0,
+        comments: 0,
+        likes: 0,
+        fee: '',
+        notes: shipment.progress_notes
+          ? `系统归档：合作完成。进度备注：${shipment.progress_notes}`
+          : '系统归档：合作完成，播放数据可后续补填。',
       })
-      const saved = await updateShipment(completingShipment.id, {
+      const saved = await updateShipment(shipment.id, {
+        status: '已签收',
         progress_status: '已完成',
         completed_at: completedAt,
       })
       await syncKolSnapshot(saved, '合作完成')
       await onShipmentsChange()
-      setCompletingShipment(null)
     } catch (err) {
       setBoardError(err instanceof Error ? err.message : '合作完成保存失败，状态未变更')
+    } finally {
+      setCompletingShipmentId(null)
     }
   }
 
@@ -220,7 +219,6 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
                         </div>
                         {shipment.sample_date && <div className="text-[11px] text-gray-500 mb-1">📅 寄样 {shipment.sample_date}</div>}
                         {shipment.tracking_number && <div className="text-[11px] text-gray-500 mb-1">📮 {shipment.tracking_number}</div>}
-                        {shipment.expected_publish_date && <div className="text-[11px] text-cyan-600 mb-1">🗓️ 预计发布 {shipment.expected_publish_date}</div>}
                         {shipment.shipping_details && <div className="text-[11px] text-gray-400 mt-1 line-clamp-2">📍 {shipment.shipping_details}</div>}
                         {shipment.notes && <div className="text-[11px] text-gray-400 mt-1">物流备注：{shipment.notes}</div>}
                         {shipment.progress_notes && <div className="mt-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5">进度备注：{shipment.progress_notes}</div>}
@@ -231,7 +229,6 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
                           <select value={progressDraft.progress_status} onChange={e => setProgressDraft(prev => ({ ...prev, progress_status: e.target.value }))} className="w-full text-xs px-2 py-1.5 border border-rose-200 rounded-lg">
                             {PROGRESS_STATUSES.filter(s => s !== '已完成').map(status => <option key={status} value={status}>{status}</option>)}
                           </select>
-                          <input type="date" value={progressDraft.expected_publish_date} onChange={e => setProgressDraft(prev => ({ ...prev, expected_publish_date: e.target.value }))} className="w-full text-xs px-2 py-1.5 border border-rose-200 rounded-lg" />
                           <textarea value={progressDraft.progress_notes} onChange={e => setProgressDraft(prev => ({ ...prev, progress_notes: e.target.value }))} placeholder="送达后的制作进度、异常原因、下一步跟进..." rows={3} className="w-full text-xs px-2 py-1.5 border border-rose-200 rounded-lg resize-y" />
                           <div className="flex justify-end gap-2">
                             <button onClick={() => setEditingProgressId(null)} className="text-[11px] px-2.5 py-1 text-gray-500 hover:bg-gray-100 rounded-lg">取消</button>
@@ -251,7 +248,13 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
                         {col.key === 'progress' && !isEditing && (
                           <>
                             <button onClick={(e) => { e.stopPropagation(); startEditProgress(shipment) }} className="text-[11px] px-3 py-1.5 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition-colors font-medium">更新进度</button>
-                            <button onClick={(e) => { e.stopPropagation(); setCompletingShipment(shipment) }} className="text-[11px] px-3 py-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium">合作完成</button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleComplete(shipment) }}
+                              disabled={completingShipmentId === shipment.id}
+                              className="text-[11px] px-3 py-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium disabled:opacity-60"
+                            >
+                              {completingShipmentId === shipment.id ? '归档中...' : '合作完成'}
+                            </button>
                           </>
                         )}
                       </div>
@@ -264,7 +267,6 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
         ))}
       </div>
 
-      {completingShipment && <AddCollaborationModal kolId={completingShipment.kol_id} onClose={() => setCompletingShipment(null)} onSubmit={handleComplete} />}
     </>
   )
 }

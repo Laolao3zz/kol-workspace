@@ -61,7 +61,8 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
     const product = form.product.trim()
     if (!product) return
     const tracking = form.tracking_number.trim()
-    const status = form.status === '已签收' ? '已签收' : tracking ? '运输中' : form.status || '待寄出'
+    const status = form.status === '已签收' ? '已签收' : tracking ? '运输中' : '待寄出'
+    const deliveredAt = status === '已签收' ? (form.delivered_at || new Date().toISOString().slice(0, 10)) : null
     onSubmit({
       ...form,
       product,
@@ -69,8 +70,8 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
       tracking_number: tracking,
       shipping_details: form.shipping_details.trim(),
       notes: form.notes.trim(),
-      delivered_at: form.delivered_at || null,
-      expected_publish_date: form.expected_publish_date || null,
+      delivered_at: deliveredAt,
+      expected_publish_date: null,
       completed_at: form.completed_at || null,
       progress_notes: form.progress_notes.trim(),
       status,
@@ -150,15 +151,17 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
               <input
                 type="date"
                 value={form.delivered_at || ''}
-                onChange={e => setForm(p => ({ ...p, delivered_at: e.target.value || null, status: e.target.value ? '已签收' : p.status }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50"
+                disabled={form.status !== '已签收'}
+                onChange={e => setForm(p => ({ ...p, delivered_at: e.target.value || null }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 disabled:bg-gray-50 disabled:text-gray-400"
               />
+              <p className="text-[11px] text-gray-400 mt-1">只有选择已签收时才记录送达日期</p>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">物流状态</label>
               <select
                 value={form.status}
-                onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+                onChange={e => setForm(p => ({ ...p, status: e.target.value, delivered_at: e.target.value === '已签收' ? (p.delivered_at || new Date().toISOString().slice(0, 10)) : null }))}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50"
               >
                 <option value="待寄出">待寄出</option>

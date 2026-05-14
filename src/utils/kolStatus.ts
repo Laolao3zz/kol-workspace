@@ -20,7 +20,8 @@ export function hasRealCollaborationSignal(collaboration: Collaboration): boolea
     collaboration.work_url?.trim() ||
     Number(collaboration.views || 0) > 0 ||
     Number(collaboration.comments || 0) > 0 ||
-    Number(collaboration.likes || 0) > 0
+    Number(collaboration.likes || 0) > 0 ||
+    collaboration.notes?.includes('系统归档')
   )
 }
 
