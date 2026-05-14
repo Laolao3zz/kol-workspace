@@ -61,6 +61,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
     const product = form.product.trim()
     if (!product) return
     const tracking = form.tracking_number.trim()
+    const status = form.status === '已签收' ? '已签收' : tracking ? '运输中' : form.status || '待寄出'
     onSubmit({
       ...form,
       product,
@@ -68,7 +69,11 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
       tracking_number: tracking,
       shipping_details: form.shipping_details.trim(),
       notes: form.notes.trim(),
-      status: tracking ? '运输中' : form.status || '待寄出',
+      delivered_at: form.delivered_at || null,
+      expected_publish_date: form.expected_publish_date || null,
+      completed_at: form.completed_at || null,
+      progress_notes: form.progress_notes.trim(),
+      status,
     })
   }
 
@@ -79,7 +84,6 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
         <div className="flex items-start justify-between mb-5">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{shipment ? '编辑寄样记录' : '新增寄样记录'}</h3>
-            <p className="text-xs text-gray-400 mt-1">每寄一次产品，都在这里新增一条独立记录。</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
         </div>
@@ -139,6 +143,31 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 resize-y"
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">送达日期</label>
+              <input
+                type="date"
+                value={form.delivered_at || ''}
+                onChange={e => setForm(p => ({ ...p, delivered_at: e.target.value || null, status: e.target.value ? '已签收' : p.status }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">物流状态</label>
+              <select
+                value={form.status}
+                onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50"
+              >
+                <option value="待寄出">待寄出</option>
+                <option value="运输中">运输中</option>
+                <option value="已签收">已签收</option>
+              </select>
+            </div>
+          </div>
+
         </div>
 
         <div className="mt-6 flex justify-end gap-2">

@@ -24,6 +24,9 @@ export interface Invitation {
   email_subject: string
   replied: boolean
   reply_result: string
+  quoted_fee: string
+  decision: string
+  decision_reason: string
   notes: string
 }
 
@@ -79,3 +82,5 @@ export const PROGRESS_STATUSES = ['待制作', '制作中', '待发布', '已完
 export const PRODUCTS = ['BY53', 'BY54', 'YY3588', 'R1', 'X1', 'X1s', 'K1', 'N1', 'Z1', 'NAS', 'Lora']
 export const TAGS = ['SBC', '科技', 'NAS', '户外装备', '无线电', 'Mini PC', 'AI', 'Robotics', 'Smart Home', 'Networking', 'Storage']
 export const REPLY_RESULTS = ['同意合作', '拒绝合作', '未回复']
+export const INVITATION_DECISIONS = ['待评估', '继续推进', '我方拒绝']
+export const DECISION_REASONS = ['报价过高', '产品不匹配', '档期不合适', '暂缓推进']

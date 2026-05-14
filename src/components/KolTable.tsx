@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Collaboration, KOL, Invitation, STATUSES, PLATFORMS, TAGS } from '../types'
+import { Collaboration, KOL, Invitation, STATUSES, PLATFORMS } from '../types'
 import { createInvitation } from '../services/invitationService'
 import { updateKOL } from '../services/kolService'
 import AddKolModal, { KolFormData } from './AddKolModal'
@@ -38,10 +38,9 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
     return invs.reduce((latest, inv) => !latest || inv.invited_at > latest.invited_at ? inv : latest)
   }
 
-  // Get all unique products across all invitations for filtering
+  // Get all unique tags from existing KOL data for filtering
   const allTags = useMemo(() => {
     const set = new Set<string>()
-    TAGS.forEach(tag => set.add(tag))
     kols.forEach(kol => (kol.tags || []).forEach(tag => tag && set.add(tag)))
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [kols])
@@ -51,6 +50,15 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
     Object.values(invitations).forEach(invs => invs.forEach(inv => set.add(inv.product)))
     return [...set].sort()
   }, [invitations])
+
+  const allCountries = useMemo(() => {
+    const set = new Set<string>()
+    kols.forEach(kol => {
+      const country = String(kol.country || '').trim()
+      if (country) set.add(country)
+    })
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [kols])
 
   const filtered = useMemo(() => {
     const text = (value: unknown) => String(value ?? '').toLowerCase()
@@ -178,6 +186,9 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
           replied: false,
           reply_result: '',
           notes: '',
+          quoted_fee: '',
+          decision: '待评估',
+          decision_reason: '',
         })
         if (INVITATION_ENTRY_STATUSES.includes(k.status)) {
           await updateKOL(k.id, { status: '已邀约' })
@@ -363,7 +374,7 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
           </div>
         </div>
       </div>
-      {showAddModal && <AddKolModal onClose={() => setShowAddModal(false)} onSubmit={(data) => { onCreate(data); setShowAddModal(false) }} />}
+      {showAddModal && <AddKolModal existingKols={kols} countryOptions={allCountries} onClose={() => setShowAddModal(false)} onSubmit={(data) => { onCreate(data); setShowAddModal(false) }} />}
 
       {/* Batch Invite Modal */}
       {showBatchInvite && (

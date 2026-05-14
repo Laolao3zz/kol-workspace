@@ -39,6 +39,7 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
   const [completingShipment, setCompletingShipment] = useState<Shipment | null>(null)
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({})
   const [editingProgressId, setEditingProgressId] = useState<string | null>(null)
+  const [boardError, setBoardError] = useState('')
   const [progressDraft, setProgressDraft] = useState<ProgressDraft>({
     progress_status: '待制作',
     progress_notes: '',
@@ -89,13 +90,18 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
   }
 
   const handleConfirmDelivered = async (shipment: Shipment) => {
-    const saved = await updateShipment(shipment.id, {
-      status: '已签收',
-      delivered_at: todayISO(),
-      progress_status: shipment.progress_status || '待制作',
-    })
-    await syncKolSnapshot(saved, saved.progress_status || '待制作')
-    await onShipmentsChange()
+    try {
+      setBoardError('')
+      const saved = await updateShipment(shipment.id, {
+        status: '已签收',
+        delivered_at: todayISO(),
+        progress_status: shipment.progress_status || '待制作',
+      })
+      await syncKolSnapshot(saved, saved.progress_status || '待制作')
+      await onShipmentsChange()
+    } catch (err) {
+      setBoardError(err instanceof Error ? err.message : '确认签收失败')
+    }
   }
 
   const startEditProgress = (shipment: Shipment) => {
@@ -108,14 +114,19 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
   }
 
   const saveProgress = async (shipment: Shipment) => {
-    const saved = await updateShipment(shipment.id, {
-      progress_status: progressDraft.progress_status,
-      progress_notes: progressDraft.progress_notes.trim(),
-      expected_publish_date: progressDraft.expected_publish_date || null,
-    })
-    await syncKolSnapshot(saved, progressLabel(saved))
-    await onShipmentsChange()
-    setEditingProgressId(null)
+    try {
+      setBoardError('')
+      const saved = await updateShipment(shipment.id, {
+        progress_status: progressDraft.progress_status,
+        progress_notes: progressDraft.progress_notes.trim(),
+        expected_publish_date: progressDraft.expected_publish_date || null,
+      })
+      await syncKolSnapshot(saved, progressLabel(saved))
+      await onShipmentsChange()
+      setEditingProgressId(null)
+    } catch (err) {
+      setBoardError(err instanceof Error ? err.message : '保存进度失败')
+    }
   }
 
   const handleComplete = async (data: CollaborationFormData) => {
@@ -163,6 +174,12 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
   return (
     <>
       <div className="flex gap-4 h-[calc(100vh-140px)]">
+        {boardError && (
+          <div className="fixed top-20 right-6 z-50 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-2.5 rounded-xl shadow-lg">
+            {boardError}
+            <button onClick={() => setBoardError('')} className="ml-3 font-bold hover:text-red-900">&times;</button>
+          </div>
+        )}
         {columns.map(col => (
           <div key={col.key} className={`flex-1 flex flex-col rounded-2xl border border-gray-200 shadow-sm overflow-hidden ${col.bg} ${col.color} border-l-4`}>
             <div className="shrink-0 px-5 py-3 border-b border-gray-200/80 bg-white/60 backdrop-blur">

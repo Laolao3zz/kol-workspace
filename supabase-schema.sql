@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS invitations (
   email_subject TEXT,
   replied BOOLEAN DEFAULT false,
   reply_result TEXT,
+  quoted_fee TEXT,
+  decision TEXT DEFAULT '待评估',
+  decision_reason TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -128,7 +131,15 @@ CREATE INDEX IF NOT EXISTS idx_shipments_created_at ON shipments (created_at DES
 -- V5 升级：送达后的内容进度跟踪
 -- 如已有旧表请执行：
 -- ============================================================
+-- ============================================================
+-- V6 升级：邀约报价与我方决策；补齐 tags 和内容进度字段
+-- 如已有旧表请执行：
+-- ============================================================
+-- ALTER TABLE invitations ADD COLUMN IF NOT EXISTS quoted_fee TEXT;
+-- ALTER TABLE invitations ADD COLUMN IF NOT EXISTS decision TEXT DEFAULT '待评估';
+-- ALTER TABLE invitations ADD COLUMN IF NOT EXISTS decision_reason TEXT;
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS progress_status TEXT DEFAULT '待制作';
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS progress_notes TEXT;
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS expected_publish_date DATE;
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS completed_at DATE;
+-- ALTER TABLE kols ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';

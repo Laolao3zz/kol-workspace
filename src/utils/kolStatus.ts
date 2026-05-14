@@ -14,13 +14,26 @@ export function getLatestInvitation(invitations: Invitation[] = []): Invitation 
   return invitations.reduce((latest, invitation) => invitationTime(invitation) > invitationTime(latest) ? invitation : latest)
 }
 
+export function hasRealCollaborationSignal(collaboration: Collaboration): boolean {
+  return Boolean(
+    collaboration.cooperation_date?.trim() ||
+    collaboration.publish_date?.trim() ||
+    collaboration.work_url?.trim() ||
+    Number(collaboration.views || 0) > 0 ||
+    Number(collaboration.comments || 0) > 0 ||
+    Number(collaboration.likes || 0) > 0 ||
+    collaboration.fee?.trim()
+  )
+}
+
 export function getLatestCollaboration(collaborations: Collaboration[] = []): Collaboration | null {
-  if (collaborations.length === 0) return null
-  return collaborations.reduce((latest, collaboration) => collaborationTime(collaboration) > collaborationTime(latest) ? collaboration : latest)
+  const realCollaborations = collaborations.filter(hasRealCollaborationSignal)
+  if (realCollaborations.length === 0) return null
+  return realCollaborations.reduce((latest, collaboration) => collaborationTime(collaboration) > collaborationTime(latest) ? collaboration : latest)
 }
 
 export function countCompletedCollaborations(collaborations: Collaboration[] = []): number {
-  return collaborations.length
+  return collaborations.filter(hasRealCollaborationSignal).length
 }
 
 const normalizeProgressStatus = (status?: string | null) => {
@@ -30,6 +43,9 @@ const normalizeProgressStatus = (status?: string | null) => {
   return status
 }
 
+const isShipmentCompleted = (shipment: Shipment) => Boolean(shipment.completed_at) || shipment.progress_status === '已完成'
+const isShipmentActive = (shipment: Shipment) => !isShipmentCompleted(shipment)
+
 export function deriveKolStatus(
   kol: KOL,
   invitations: Invitation[] = [],
@@ -38,14 +54,14 @@ export function deriveKolStatus(
 ): string {
   const latestShipment = getLatestShipment(shipments)
   if (latestShipment) {
-    if (latestShipment.completed_at || latestShipment.progress_status === '已完成') return '合作完成'
+    if (isShipmentCompleted(latestShipment)) return '合作完成'
     if (latestShipment.status === '已签收') return normalizeProgressStatus(latestShipment.progress_status)
-    if (latestShipment.tracking_number?.trim()) return '运输中'
+    if (latestShipment.tracking_number?.trim() || latestShipment.status === '运输中') return '运输中'
     return '待寄出'
   }
 
   const latestCollaboration = getLatestCollaboration(collaborations)
-  if (latestCollaboration) return '合作完成'
+  if (latestCollaboration && !shipments.some(isShipmentActive)) return '合作完成'
 
   const latestInvitation = getLatestInvitation(invitations)
   if (latestInvitation) {

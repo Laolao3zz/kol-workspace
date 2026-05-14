@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { PLATFORMS, TAGS } from '../types'
+import type { KOL } from '../types'
 
 interface Props {
   onClose: () => void
   onSubmit: (data: KolFormData) => void
+  existingKols: KOL[]
+  countryOptions: string[]
 }
 
 export interface KolFormData {
@@ -16,7 +19,34 @@ export interface KolFormData {
   tags: string[]
 }
 
-export default function AddKolModal({ onClose, onSubmit }: Props) {
+type DuplicateMatch = {
+  kol: KOL
+  fields: string[]
+}
+
+const normalizeText = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ')
+const normalizeEmail = (value: string) => value.trim().toLowerCase()
+
+const normalizeChannelUrl = (value: string) => {
+  const raw = value.trim().toLowerCase()
+  if (!raw) return ''
+
+  const parseable = /^https?:\/\//.test(raw) ? raw : `https://${raw}`
+  try {
+    const url = new URL(parseable)
+    const host = url.hostname.replace(/^www\./, '')
+    const path = url.pathname.replace(/\/+$/, '')
+    return `${host}${path}`
+  } catch {
+    return raw
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split(/[?#]/)[0]
+      .replace(/\/+$/, '')
+  }
+}
+
+export default function AddKolModal({ onClose, onSubmit, existingKols, countryOptions }: Props) {
   const [form, setForm] = useState<KolFormData>({
     name: '',
     email: '',
@@ -27,10 +57,31 @@ export default function AddKolModal({ onClose, onSubmit }: Props) {
     tags: [],
   })
   const [tagInput, setTagInput] = useState('')
+  const [customCountry, setCustomCountry] = useState(false)
+
+  const duplicateMatches = useMemo<DuplicateMatch[]>(() => {
+    const name = normalizeText(form.name)
+    const email = normalizeEmail(form.email)
+    const homepage = normalizeChannelUrl(form.homepage_url)
+
+    if (!name && !email && !homepage) return []
+
+    return existingKols.reduce<DuplicateMatch[]>((matches, kol) => {
+      const fields: string[] = []
+      if (name && normalizeText(kol.name || '') === name) fields.push('名称')
+      if (email && normalizeEmail(kol.email || '') === email) fields.push('邮箱')
+      if (homepage && normalizeChannelUrl(kol.homepage_url || '') === homepage) fields.push('主页/频道链接')
+
+      if (fields.length > 0) matches.push({ kol, fields })
+      return matches
+    }, [])
+  }, [existingKols, form.name, form.email, form.homepage_url])
+
+  const hasDuplicate = duplicateMatches.length > 0
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name.trim()) return
+    if (!form.name.trim() || hasDuplicate) return
     onSubmit(form)
   }
 
@@ -60,7 +111,7 @@ export default function AddKolModal({ onClose, onSubmit }: Props) {
               type="text"
               value={form.name}
               onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 ${hasDuplicate ? 'border-red-300 bg-red-50/40 focus:ring-red-400' : 'border-gray-200 focus:ring-blue-400'}`}
               placeholder="必填"
               autoFocus
             />
@@ -73,7 +124,7 @@ export default function AddKolModal({ onClose, onSubmit }: Props) {
                 type="email"
                 value={form.email}
                 onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 ${hasDuplicate ? 'border-red-300 bg-red-50/40 focus:ring-red-400' : 'border-gray-200 focus:ring-blue-400'}`}
               />
             </div>
             <div>
@@ -91,10 +142,11 @@ export default function AddKolModal({ onClose, onSubmit }: Props) {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">主页链接</label>
             <input
-              type="url"
+              type="text"
               value={form.homepage_url}
               onChange={e => setForm(prev => ({ ...prev, homepage_url: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 ${hasDuplicate ? 'border-red-300 bg-red-50/40 focus:ring-red-400' : 'border-gray-200 focus:ring-blue-400'}`}
+              placeholder="可填网站、频道名、主页链接或备注"
             />
           </div>
 
@@ -111,15 +163,60 @@ export default function AddKolModal({ onClose, onSubmit }: Props) {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">国家/地区</label>
-              <input
-                type="text"
-                value={form.country}
-                onChange={e => setForm(prev => ({ ...prev, country: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-                placeholder="如 CN"
-              />
+              {customCountry ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.country}
+                    onChange={e => setForm(prev => ({ ...prev, country: e.target.value }))}
+                    className="min-w-0 flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    placeholder="输入新国家/地区"
+                  />
+                  <button type="button" onClick={() => { setCustomCountry(false); setForm(prev => ({ ...prev, country: '' })) }} className="px-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">下拉</button>
+                </div>
+              ) : (
+                <select
+                  value={form.country}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') {
+                      setCustomCountry(true)
+                      setForm(prev => ({ ...prev, country: '' }))
+                      return
+                    }
+                    setForm(prev => ({ ...prev, country: e.target.value }))
+                  }}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                >
+                  <option value="">选择国家/地区</option>
+                  {countryOptions.map(country => <option key={country} value={country}>{country}</option>)}
+                  <option value="__custom__">+ 自定义输入</option>
+                </select>
+              )}
             </div>
           </div>
+
+          {hasDuplicate && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 shadow-sm">
+              <div className="font-semibold mb-1">检测到可能重复的 KOL，已阻止新增</div>
+              <div className="space-y-1">
+                {duplicateMatches.slice(0, 3).map(match => (
+                  <div key={match.kol.id} className="flex items-start justify-between gap-3 rounded-lg bg-white/70 px-2 py-1.5 border border-red-100">
+                    <div>
+                      <div className="font-medium text-red-800">{match.kol.name}</div>
+                      <div className="text-xs text-red-600">匹配字段：{match.fields.join('、')}</div>
+                    </div>
+                    <div className="text-right text-xs text-red-500 shrink-0">
+                      <div>{match.kol.platform || '-'}</div>
+                      <div>{match.kol.email || match.kol.homepage_url || '-'}</div>
+                    </div>
+                  </div>
+                ))}
+                {duplicateMatches.length > 3 && (
+                  <div className="text-xs text-red-500">还有 {duplicateMatches.length - 3} 条可能重复记录，请先搜索确认。</div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">领域标签</label>
@@ -164,7 +261,7 @@ export default function AddKolModal({ onClose, onSubmit }: Props) {
             </button>
             <button
               type="submit"
-              disabled={!form.name.trim()}
+              disabled={!form.name.trim() || hasDuplicate}
               className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               确认新增

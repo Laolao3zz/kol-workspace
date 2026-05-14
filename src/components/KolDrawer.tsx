@@ -9,6 +9,7 @@ import MailPanel from './MailPanel'
 import AddInvitationModal, { InvitationFormData } from './AddInvitationModal'
 import AddCollaborationModal, { CollaborationFormData } from './AddCollaborationModal'
 import AddShipmentModal, { ShipmentFormData } from './AddShipmentModal'
+import EditProgressModal, { ProgressFormData } from './EditProgressModal'
 
 interface Props {
   kol: KOL
@@ -32,6 +33,7 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
   const [editingInvitation, setEditingInvitation] = useState<Invitation | null>(null)
   const [editingCollaboration, setEditingCollaboration] = useState<Collaboration | null>(null)
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null)
+  const [editingProgress, setEditingProgress] = useState<Shipment | null>(null)
   const [showMail, setShowMail] = useState(false)
 
   const kolShipments = shipments.filter(s => s.kol_id === kol.id)
@@ -59,8 +61,10 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
   const INVITATION_ENTRY_STATUSES = ['未首触', '未回复', '拒绝合作', '沟通中', '']
 
   const nextKolStatus = (shipment: ShipmentFormData | Shipment) => {
-    if (shipment.status === '已签收') return '已签收'
-    if (shipment.tracking_number?.trim()) return '运输中'
+    if ('completed_at' in shipment && shipment.completed_at) return '合作完成'
+    if ('progress_status' in shipment && shipment.progress_status === '已完成') return '合作完成'
+    if (shipment.status === '已签收') return shipment.progress_status || '待制作'
+    if (shipment.tracking_number?.trim() || shipment.status === '运输中') return '运输中'
     return '待寄出'
   }
 
@@ -107,7 +111,7 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
 
   const handleSaveShipment = async (data: ShipmentFormData) => {
     try {
-      const payload = { ...data, status: data.status === '已签收' ? '已签收' : shipmentStatus(data.tracking_number) }
+      const payload = { ...data, status: data.status === '已签收' || data.delivered_at ? '已签收' : shipmentStatus(data.tracking_number) }
       const saved = editingShipment
         ? await updateShipment(editingShipment.id, payload)
         : await createShipment(payload)
@@ -167,12 +171,26 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
       const saved = await updateShipment(shipment.id, {
         status: '已签收',
         delivered_at: new Date().toISOString().slice(0, 10),
+        progress_status: shipment.progress_status || '待制作',
       })
-      await syncKolSnapshot(saved, '已签收')
+      await syncKolSnapshot(saved, saved.progress_status || '待制作')
       await onShipmentsChange()
-      showToast('已确认签收')
-    } catch {
-      showToast('更新失败')
+      showToast('已进入已送达待推进')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '更新失败')
+    }
+  }
+
+  const handleSaveProgress = async (data: ProgressFormData) => {
+    if (!editingProgress) return
+    try {
+      const saved = await updateShipment(editingProgress.id, data)
+      await syncKolSnapshot(saved, nextKolStatus(saved))
+      await onShipmentsChange()
+      setEditingProgress(null)
+      showToast('内容进度已保存')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '内容进度保存失败')
     }
   }
 
@@ -198,7 +216,7 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
       if (INVITATION_ENTRY_STATUSES.includes(kol.status)) pushStatus('已邀约')
       await onInvitationsChange()
       showToast('邀约已添加')
-    } catch { showToast(editingInvitation ? '更新失败' : '添加失败') }
+    } catch (err) { showToast(err instanceof Error ? err.message : editingInvitation ? '更新失败' : '添加失败') }
   }
 
   const handleReplyUpdate = async (inv: Invitation, result: string) => {
@@ -271,7 +289,7 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
       await syncDerivedKolStatus(invitations, kolShipments, next)
       await onCollaborationsChange()
       showToast('合作已添加')
-    } catch { showToast(editingCollaboration ? '更新失败' : '添加失败') }
+    } catch (err) { showToast(err instanceof Error ? err.message : editingCollaboration ? '更新失败' : '添加失败') }
   }
 
   const handleDeleteCollaboration = async (id: string) => {
@@ -353,16 +371,15 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
                 </FieldGrid>
               </SectionCard>
 
-              <SectionCard icon="📦" title="寄样与进度" accent="border-l-orange-500" bg="bg-white"
+              <SectionCard icon="📦" title="样品寄送" accent="border-l-orange-500" bg="bg-white"
                 action={<button onClick={() => { setEditingShipment(null); setShowShipmentModal(true) }} className="text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-medium">+ 新增寄样</button>}
               >
                 {kolShipments.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50/50 px-4 py-6 text-center">
                     <p className="text-sm font-medium text-orange-700">暂无寄样记录</p>
-                    <p className="text-xs text-orange-500 mt-1">点击右上角新增，第二次补寄也会单独成一条记录。</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                     {kolShipments.map(shipment => (
                       <div key={shipment.id} className="rounded-xl border border-orange-100 bg-orange-50/40 p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-3 mb-3">
@@ -377,7 +394,7 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
                             {shipment.status === '运输中' && (
                               <button onClick={() => handleConfirmDelivered(shipment)} className="text-[11px] px-2.5 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600">确认签收</button>
                             )}
-                            <button onClick={() => { setEditingShipment(shipment); setShowShipmentModal(true) }} className="text-[11px] text-orange-600 hover:text-orange-800">编辑</button>
+                            <button onClick={() => { setEditingShipment(shipment); setShowShipmentModal(true) }} className="text-[11px] text-orange-600 hover:text-orange-800">编辑物流</button>
                             <button onClick={() => handleDeleteShipment(shipment)} className="text-[11px] text-red-400 hover:text-red-600">删除</button>
                           </div>
                         </div>
@@ -385,18 +402,47 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
                           <div className="bg-white/70 rounded-lg px-2 py-1.5">📅 寄样日期：{shipment.sample_date || '-'}</div>
                           <div className="bg-white/70 rounded-lg px-2 py-1.5">📮 快递单号：{shipment.tracking_number || '-'}</div>
                           <div className="bg-white/70 rounded-lg px-2 py-1.5">⏱️ 送达日期：{shipment.delivered_at || '-'}</div>
-                          <div className="bg-white/70 rounded-lg px-2 py-1.5">🎬 内容进度：{shipment.completed_at ? '已完成' : shipment.progress_status || '-'}</div>
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">📍 收件信息：{shipment.shipping_details || '-'}</div>
                         </div>
-                        {shipment.shipping_details && <p className="mt-2 text-xs text-gray-500 bg-white/70 rounded-lg px-2 py-1.5">📍 {shipment.shipping_details}</p>}
                         {shipment.notes && <p className="mt-2 text-[11px] text-gray-400 border-t border-orange-100 pt-2">物流备注：{shipment.notes}</p>}
-                        {shipment.progress_notes && <p className="mt-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5">进度备注：{shipment.progress_notes}</p>}
                       </div>
                     ))}
                   </div>
                 )}
-                <div className="mt-3 rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2 text-[11px] text-orange-700">
-                  新规则：每次寄产品都是一条寄样记录；邀约同意后进入待寄出，填快递单号进入运输中，确认签收后进入已签收。
-                </div>
+              </SectionCard>
+
+              <SectionCard icon="🎬" title="内容进度跟进" accent="border-l-rose-500" bg="bg-white">
+                {kolShipments.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-4 text-center">暂无可跟进的寄样记录</p>
+                ) : (
+                  <div className="space-y-3 max-h-[260px] overflow-y-auto pr-1">
+                    {kolShipments.map(shipment => (
+                      <div key={shipment.id} className="rounded-xl border border-rose-100 bg-rose-50/40 p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-gray-900">🎬 {shipment.product}</span>
+                              <span className={statusLabel(shipment.completed_at ? '合作完成' : shipment.progress_status || '待制作')}>{shipment.completed_at ? '合作完成' : shipment.progress_status || '待制作'}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {shipment.status === '运输中' && (
+                              <button onClick={() => handleConfirmDelivered(shipment)} className="text-[11px] px-2.5 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600">确认送达</button>
+                            )}
+                            <button onClick={() => setEditingProgress(shipment)} className="text-[11px] px-2.5 py-1 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 shrink-0">编辑进度</button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">📌 当前进度：{shipment.completed_at ? '已完成' : shipment.progress_status || '-'}</div>
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">🗓️ 预计发布：{shipment.expected_publish_date || '-'}</div>
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">✅ 完成日期：{shipment.completed_at || '-'}</div>
+                          <div className="bg-white/70 rounded-lg px-2 py-1.5">📦 物流状态：{shipment.status || '-'}</div>
+                        </div>
+                        {shipment.progress_notes && <p className="mt-2 text-[11px] text-rose-700 bg-white/70 border border-rose-100 rounded-lg px-2 py-1.5">进度备注：{shipment.progress_notes}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </SectionCard>
             </div>
 
@@ -415,7 +461,11 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
                         <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
                         <span className="text-gray-500 text-xs w-20 shrink-0">{inv.invited_at}</span>
                         <span className="font-semibold text-purple-700 text-xs w-12 shrink-0">{inv.product}</span>
-                        <span className="text-gray-600 text-xs flex-1 truncate">{inv.notes || '-'}</span>
+                        <span className="text-gray-600 text-xs flex-1 truncate">
+                          {inv.quoted_fee ? `报价 ${inv.quoted_fee}` : inv.notes || '-'}
+                          {inv.decision && inv.decision !== '待评估' ? ` · ${inv.decision}` : ''}
+                          {inv.decision_reason ? `（${inv.decision_reason}）` : ''}
+                        </span>
                         {invReplyBadge(inv)}
                         {!inv.replied && (
                           <select value="" onChange={e => { if (e.target.value) handleReplyUpdate(inv, e.target.value) }} className="text-xs border border-purple-200 rounded px-1 py-0.5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
@@ -449,11 +499,11 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
                             <button onClick={() => handleDeleteCollaboration(col.id)} className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 transition-all">删除</button>
                           </div>
                         </div>
-                        <div className="flex gap-3 text-xs text-gray-600 mb-1 flex-wrap">
-                          {col.views ? <span className="bg-teal-100 px-1.5 py-0.5 rounded text-[10px]">▶ {fmt(col.views)}</span> : null}
-                          {col.comments ? <span className="bg-teal-100 px-1.5 py-0.5 rounded text-[10px]">💬 {fmt(col.comments)}</span> : null}
-                          {col.likes ? <span className="bg-teal-100 px-1.5 py-0.5 rounded text-[10px]">❤️ {fmt(col.likes)}</span> : null}
-                          {col.fee ? <span className="bg-teal-100 px-1.5 py-0.5 rounded text-[10px]">💰 {col.fee}</span> : null}
+                        <div className="flex gap-2 text-sm text-gray-700 mb-2 flex-wrap">
+                          {col.views ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">▶</span>{fmt(col.views)}</span> : null}
+                          {col.comments ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💬</span>{fmt(col.comments)}</span> : null}
+                          {col.likes ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">❤️</span>{fmt(col.likes)}</span> : null}
+                          {col.fee ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💰</span>{col.fee}</span> : null}
                         </div>
                         {col.work_url && <a href={col.work_url} target="_blank" rel="noreferrer" className="text-[11px] text-blue-500 hover:underline block truncate">{col.work_url}</a>}
                         {col.notes && <p className="text-[11px] text-gray-400 mt-1 border-t border-teal-100 pt-1">{col.notes}</p>}
@@ -479,6 +529,7 @@ export default function KolDrawer({ kol, shipments, collaborationCount, onClose,
       {showInvModal && <AddInvitationModal kolId={kol.id} invitation={editingInvitation} onClose={() => { setShowInvModal(false); setEditingInvitation(null) }} onSubmit={handleAddInvitation} />}
       {showColModal && <AddCollaborationModal kolId={kol.id} collaboration={editingCollaboration} onClose={() => { setShowColModal(false); setEditingCollaboration(null) }} onSubmit={handleAddCollaboration} />}
       {showShipmentModal && <AddShipmentModal kolId={kol.id} shipment={editingShipment} onClose={() => { setShowShipmentModal(false); setEditingShipment(null) }} onSubmit={handleSaveShipment} />}
+      {editingProgress && <EditProgressModal shipment={editingProgress} onClose={() => setEditingProgress(null)} onSubmit={handleSaveProgress} />}
     </div>
   )
 }
