@@ -76,7 +76,7 @@ export interface Email {
 }
 
 export const PLATFORMS = ['YouTube', 'TikTok', 'X', 'Blog', 'Forum', 'Instagram', '网站', 'Discord']
-export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '已签收', '待制作', '制作中', '待发布', '进度异常', '合作完成', '拒绝合作']
+export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '内容跟进', '合作完成', '拒绝合作', '异常']
 export const SHIPMENT_STATUSES = ['待寄出', '运输中', '已签收']
 export const PROGRESS_STATUSES = ['待制作', '制作中', '待发布', '已完成', '暂停/异常']
 export const PRODUCTS = ['BY53', 'BY54', 'YY3588', 'R1', 'X1', 'X1s', 'K1', 'N1', 'Z1', 'NAS', 'Lora']

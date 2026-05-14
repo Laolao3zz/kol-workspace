@@ -35,6 +35,12 @@ const progressLabel = (shipment: Shipment) => {
   return shipment.status
 }
 
+const kolMainStatus = (shipment: Shipment) => {
+  if (isShipmentCompleted(shipment)) return '合作完成'
+  if (shipment.status === '已签收') return shipment.progress_status === '暂停/异常' ? '异常' : '内容跟进'
+  return shipment.status
+}
+
 export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onShipmentsChange }: Props) {
   const [completingShipment, setCompletingShipment] = useState<Shipment | null>(null)
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({})
@@ -97,7 +103,7 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
         delivered_at: todayISO(),
         progress_status: shipment.progress_status || '待制作',
       })
-      await syncKolSnapshot(saved, saved.progress_status || '待制作')
+      await syncKolSnapshot(saved, kolMainStatus(saved))
       await onShipmentsChange()
     } catch (err) {
       setBoardError(err instanceof Error ? err.message : '确认签收失败')
@@ -121,7 +127,7 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
         progress_notes: progressDraft.progress_notes.trim(),
         expected_publish_date: progressDraft.expected_publish_date || null,
       })
-      await syncKolSnapshot(saved, progressLabel(saved))
+      await syncKolSnapshot(saved, kolMainStatus(saved))
       await onShipmentsChange()
       setEditingProgressId(null)
     } catch (err) {
@@ -131,9 +137,9 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
 
   const handleComplete = async (data: CollaborationFormData) => {
     if (!completingShipment) return
-    const kol = kolMap.get(completingShipment.kol_id)
     const completedAt = todayISO()
     try {
+      setBoardError('')
       await createCollaboration({
         kol_id: completingShipment.kol_id,
         product: data.product,
@@ -151,20 +157,19 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
         completed_at: completedAt,
       })
       await syncKolSnapshot(saved, '合作完成')
-      if (kol) await onUpdate({ ...kol, status: '合作完成', updated_at: new Date().toISOString() })
       await onShipmentsChange()
-    } catch {
-      if (kol) await onUpdate({ ...kol, status: '合作完成', updated_at: new Date().toISOString() })
-      await onShipmentsChange()
+      setCompletingShipment(null)
+    } catch (err) {
+      setBoardError(err instanceof Error ? err.message : '合作完成保存失败，状态未变更')
     }
-    setCompletingShipment(null)
   }
 
   const statusBadge = (s: string) => {
     const map: Record<string, string> = {
       '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
-      '已签收': 'bg-teal-100 text-teal-700', '待制作': 'bg-amber-100 text-amber-700',
-      '制作中': 'bg-sky-100 text-sky-700', '待发布': 'bg-cyan-100 text-cyan-700',
+      '已签收': 'bg-teal-100 text-teal-700', '内容跟进': 'bg-rose-100 text-rose-700',
+      '待制作': 'bg-amber-100 text-amber-700', '制作中': 'bg-sky-100 text-sky-700',
+      '待发布': 'bg-cyan-100 text-cyan-700', '异常': 'bg-red-100 text-red-700',
       '暂停/异常': 'bg-red-100 text-red-700', '进度异常': 'bg-red-100 text-red-700',
       '合作完成': 'bg-green-100 text-green-700', '已完成': 'bg-green-100 text-green-700',
     }

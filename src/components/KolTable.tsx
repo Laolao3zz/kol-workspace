@@ -3,6 +3,7 @@ import { Collaboration, KOL, Invitation, STATUSES, PLATFORMS } from '../types'
 import { createInvitation } from '../services/invitationService'
 import { updateKOL } from '../services/kolService'
 import AddKolModal, { KolFormData } from './AddKolModal'
+import { countCompletedCollaborations } from '../utils/kolStatus'
 
 interface Props {
   kols: KOL[]
@@ -106,12 +107,13 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
   const pageEnd = Math.min(safePage * pageSize, filtered.length)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
 
-  const collaborationCount = (kolId: string) => collaborationsByKol[kolId]?.length || 0
+  const collaborationCount = (kolId: string) => countCompletedCollaborations(collaborationsByKol[kolId] || [])
 
   const statusColor = (s: string) => {
     const map: Record<string, string> = {
       '已邀约': 'bg-purple-100 text-purple-700',
       '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
+      '内容跟进': 'bg-rose-100 text-rose-700', '异常': 'bg-red-100 text-red-700',
       '已签收': 'bg-teal-100 text-teal-700', '待制作': 'bg-amber-100 text-amber-700',
       '制作中': 'bg-sky-100 text-sky-700', '待发布': 'bg-cyan-100 text-cyan-700',
       '进度异常': 'bg-red-100 text-red-700', '合作完成': 'bg-green-100 text-green-700',

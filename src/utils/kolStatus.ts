@@ -16,13 +16,11 @@ export function getLatestInvitation(invitations: Invitation[] = []): Invitation 
 
 export function hasRealCollaborationSignal(collaboration: Collaboration): boolean {
   return Boolean(
-    collaboration.cooperation_date?.trim() ||
     collaboration.publish_date?.trim() ||
     collaboration.work_url?.trim() ||
     Number(collaboration.views || 0) > 0 ||
     Number(collaboration.comments || 0) > 0 ||
-    Number(collaboration.likes || 0) > 0 ||
-    collaboration.fee?.trim()
+    Number(collaboration.likes || 0) > 0
   )
 }
 
@@ -36,12 +34,15 @@ export function countCompletedCollaborations(collaborations: Collaboration[] = [
   return collaborations.filter(hasRealCollaborationSignal).length
 }
 
-const normalizeProgressStatus = (status?: string | null) => {
-  if (!status || status === '已签收') return '待制作'
-  if (status === '暂停/异常') return '进度异常'
-  if (status === '已完成') return '合作完成'
+const normalizeLegacyStatus = (status?: string | null) => {
+  if (!status) return '未首触'
+  if (status === '沟通中' || status === '未回复') return '已邀约'
+  if (status === '已签收' || status === '待制作' || status === '制作中' || status === '待发布') return '内容跟进'
+  if (status === '暂停/异常' || status === '进度异常') return '异常'
   return status
 }
+
+const isProgressAbnormal = (status?: string | null) => status === '暂停/异常' || status === '进度异常'
 
 const isShipmentCompleted = (shipment: Shipment) => Boolean(shipment.completed_at) || shipment.progress_status === '已完成'
 const isShipmentActive = (shipment: Shipment) => !isShipmentCompleted(shipment)
@@ -55,7 +56,7 @@ export function deriveKolStatus(
   const latestShipment = getLatestShipment(shipments)
   if (latestShipment) {
     if (isShipmentCompleted(latestShipment)) return '合作完成'
-    if (latestShipment.status === '已签收') return normalizeProgressStatus(latestShipment.progress_status)
+    if (latestShipment.status === '已签收') return isProgressAbnormal(latestShipment.progress_status) ? '异常' : '内容跟进'
     if (latestShipment.tracking_number?.trim() || latestShipment.status === '运输中') return '运输中'
     return '待寄出'
   }
@@ -71,9 +72,7 @@ export function deriveKolStatus(
     return '已邀约'
   }
 
-  if (kol.status === '沟通中' || kol.status === '未回复') return '已邀约'
-  if (kol.status === '合作完成') return '未首触'
-  return kol.status || '未首触'
+  return normalizeLegacyStatus(kol.status)
 }
 
 export function applyKolSnapshot(

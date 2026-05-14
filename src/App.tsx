@@ -4,7 +4,7 @@ import { getKOLs, createKOL, updateKOL, deleteKOL } from './services/kolService'
 import { getInvitationsByKOL } from './services/invitationService'
 import { getShipments } from './services/shipmentService'
 import { getCollaborations } from './services/collaborationService'
-import { applyKolSnapshot } from './utils/kolStatus'
+import { applyKolSnapshot, countCompletedCollaborations } from './utils/kolStatus'
 import KolTable from './components/KolTable'
 import KolDrawer from './components/KolDrawer'
 import ShipmentBoard from './components/ShipmentBoard'
@@ -205,7 +205,7 @@ function App() {
           <KolDrawer
             kol={selectedKol}
             shipments={shipments}
-            collaborationCount={collaborationsByKol[selectedKol.id]?.length || 0}
+            collaborationCount={countCompletedCollaborations(collaborationsByKol[selectedKol.id] || [])}
             onClose={() => {
               setSelectedKol(null)
               refreshInvitations(selectedKol.id)
