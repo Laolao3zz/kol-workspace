@@ -3,6 +3,7 @@ import type { Collaboration, Invitation, KOL, Shipment } from '../types'
 const shipmentTime = (shipment: Shipment) => shipment.sample_date || shipment.delivered_at || shipment.created_at || ''
 const invitationTime = (invitation: Invitation) => invitation.invited_at || ''
 const collaborationTime = (collaboration: Collaboration) => collaboration.publish_date || ''
+const positiveNumber = (value: unknown) => Number(value || 0) > 0
 
 export function getLatestShipment(shipments: Shipment[] = []): Shipment | null {
   if (shipments.length === 0) return null
@@ -18,10 +19,20 @@ export function hasRealCollaborationSignal(collaboration: Collaboration): boolea
   return Boolean(
     collaboration.publish_date?.trim() ||
     collaboration.work_url?.trim() ||
-    Number(collaboration.views || 0) > 0 ||
-    Number(collaboration.comments || 0) > 0 ||
-    Number(collaboration.likes || 0) > 0 ||
+    positiveNumber(collaboration.views) ||
+    positiveNumber(collaboration.comments) ||
+    positiveNumber(collaboration.likes) ||
     collaboration.notes?.includes('系统归档')
+  )
+}
+
+export function hasPublishReadyCollaborationSignal(collaboration: Collaboration): boolean {
+  return Boolean(
+    collaboration.publish_date?.trim() ||
+    collaboration.work_url?.trim() ||
+    positiveNumber(collaboration.views) ||
+    positiveNumber(collaboration.comments) ||
+    positiveNumber(collaboration.likes)
   )
 }
 

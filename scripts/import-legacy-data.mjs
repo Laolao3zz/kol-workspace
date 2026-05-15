@@ -158,7 +158,6 @@ async function main() {
   const collaborationsPayload = collaborationsCsv.map(row => ({
     kol_id: idByLegacyKey.get(row.legacy_kol_key),
     product: nullIfEmpty(row.product),
-    cooperation_date: dateOrNull(row.cooperation_date),
     publish_date: dateOrNull(row.publish_date),
     work_url: nullIfEmpty(row.post_url),
     views: numberOrNull(row.views),

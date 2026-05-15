@@ -21,7 +21,6 @@ function normalizeCollaborationPayload(
   if ('kol_id' in collab) payload.kol_id = collab.kol_id
   if ('product' in collab) payload.product = collab.product?.trim() || ''
   if ('publish_date' in collab) payload.publish_date = nullableDate(collab.publish_date)
-  if ('cooperation_date' in collab) payload.cooperation_date = nullableDate(collab.cooperation_date)
   if ('work_url' in collab) payload.work_url = collab.work_url?.trim() || ''
   if ('views' in collab) payload.views = numberOrZero(collab.views)
   if ('comments' in collab) payload.comments = numberOrZero(collab.comments)
@@ -36,7 +35,8 @@ export async function getCollaborations(): Promise<Collaboration[]> {
   const { data, error } = await getSupabase()
     .from('collaborations')
     .select('*')
-    .order('publish_date', { ascending: false })
+    .order('publish_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
 
   if (error) throw error
   return data as Collaboration[]
@@ -47,7 +47,8 @@ export async function getCollaborationsByKOL(kolId: string): Promise<Collaborati
     .from('collaborations')
     .select('*')
     .eq('kol_id', kolId)
-    .order('publish_date', { ascending: false })
+    .order('publish_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
 
   if (error) throw error
   return data as Collaboration[]

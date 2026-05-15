@@ -35,7 +35,6 @@ export interface Collaboration {
   kol_id: string
   product: string
   publish_date: string | null
-  cooperation_date?: string | null
   work_url: string
   views: number | null
   comments: number | null

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { KOL, Invitation, Collaboration, Shipment } from '../types'
+import { KOL, Invitation, Collaboration, Shipment, PLATFORMS } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
 import { getCollaborationsByKOL, createCollaboration, deleteCollaboration, updateCollaboration } from '../services/collaborationService'
 import { createShipment, updateShipment, deleteShipment, getShipmentsByKOL } from '../services/shipmentService'
-import { applyKolSnapshot, countCompletedCollaborations, deriveKolStatus, hasRealCollaborationSignal } from '../utils/kolStatus'
+import { applyKolSnapshot, countCompletedCollaborations, deriveKolStatus, hasPublishReadyCollaborationSignal, hasRealCollaborationSignal } from '../utils/kolStatus'
 import InlineEdit from './InlineEdit'
 import MailPanel from './MailPanel'
 import AddInvitationModal, { InvitationFormData } from './AddInvitationModal'
@@ -38,6 +38,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
 
   const kolShipments = shipments.filter(s => s.kol_id === kol.id)
   const completedCollaborations = collaborations.filter(hasRealCollaborationSignal)
+  const publishReadyCollaborations = collaborations.filter(hasPublishReadyCollaborationSignal)
   const completedCollaborationCount = countCompletedCollaborations(collaborations)
 
   useEffect(() => { loadSubData() }, [kol.id])
@@ -51,7 +52,9 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
       ])
       setInvitations(invData)
       setCollaborations(colData)
-    } catch {} finally { setLoadingSub(false) }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '加载详情数据失败')
+    } finally { setLoadingSub(false) }
   }
 
   const showToast = (msg: string) => {
@@ -137,7 +140,12 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
 
   const resetKolAfterShipmentDelete = async (deletedShipmentId: string) => {
     const remaining = kolShipments.filter(s => s.id !== deletedShipmentId)
-    const latest = remaining[0]
+    const latest = remaining.reduce<Shipment | null>((current, shipment) => {
+      if (!current) return shipment
+      const shipmentTime = shipment.sample_date || shipment.delivered_at || shipment.created_at || ''
+      const currentTime = current.sample_date || current.delivered_at || current.created_at || ''
+      return shipmentTime > currentTime ? shipment : current
+    }, null)
 
     if (latest) {
       await syncKolSnapshot(latest)
@@ -275,7 +283,9 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
       await syncDerivedKolStatus(next)
       await onInvitationsChange()
       showToast('邀约已删除')
-    } catch {}
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '删除失败')
+    }
   }
 
   const handleAddCollaboration = async (data: CollaborationFormData) => {
@@ -413,7 +423,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                 <FieldGrid>
                   <InlineEdit label="博主名称" value={kol.name} onSave={v => save('name', v)} />
                   <InlineEdit label="联系邮箱" value={kol.email} onSave={v => save('email', v)} />
-                  <InlineEdit label="核心平台" value={kol.platform} onSave={v => save('platform', v)} type="select" options={['YouTube','TikTok','X','Blog','Forum','Instagram']} />
+                  <InlineEdit label="核心平台" value={kol.platform} onSave={v => save('platform', v)} type="select" options={PLATFORMS} />
                   <InlineEdit label="主页链接" value={kol.homepage_url} onSave={v => save('homepage_url', v)} />
                   <InlineEdit label="粉丝量级" value={kol.followers} onSave={v => save('followers', v)} />
                   <InlineEdit label="国家/地区" value={kol.country} onSave={v => save('country', v)} />
@@ -544,7 +554,12 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                   <p className="text-xs text-gray-400 py-4 text-center">暂无已完成合作记录</p>
                 ) : (
                   <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                    {completedCollaborations.map(col => (
+                    {publishReadyCollaborations.length === 0 && completedCollaborations.some(col => col.notes?.includes('系统归档')) && (
+                      <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                        已有系统归档记录，但缺少发布日期、作品链接或播放数据。请在进度看板完成归档后补填作品信息，补齐后会出现在合作历史列表。
+                      </div>
+                    )}
+                    {publishReadyCollaborations.map(col => (
                       <div key={col.id} className="p-3 bg-teal-50/50 rounded-lg border border-teal-100 hover:border-teal-200 transition-colors group">
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="font-semibold text-teal-700 text-sm">{col.product}</span>

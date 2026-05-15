@@ -35,7 +35,6 @@ function isTargetProduct(product) {
 
 function hasRealCollaborationSignal(row) {
   return Boolean(
-    text(row.cooperation_date) ||
     text(row.publish_date) ||
     text(row.work_url) ||
     Number(row.views || 0) > 0 ||

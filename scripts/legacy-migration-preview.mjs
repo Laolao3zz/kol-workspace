@@ -427,7 +427,6 @@ function main() {
         legacy_kol_key: currentKolKey,
         kol_name: kolsByKey.get(currentKolKey)?.name || '',
         product,
-        cooperation_date: '',
         publish_date: '',
         post_url: postUrl,
         views: parseNumberLike(views),
@@ -504,7 +503,6 @@ function main() {
         legacy_kol_key: key,
         kol_name: kolsByKey.get(key)?.name || displayName,
         product,
-        cooperation_date: sampleDate,
         publish_date: publishDate,
         post_url: looksLikeUrl ? contentProgress : '',
         views: parseNumberLike(effect),
@@ -553,7 +551,7 @@ function main() {
 
   writeCsv('clean_kols.csv', kols, ['legacy_key', 'name', 'email', 'homepage_url', 'platform', 'followers', 'country', 'tags', 'status', 'sample_product', 'sample_date', 'tracking_number', 'shipping_details', 'source', 'review_note'])
   writeCsv('clean_shipments.csv', shipments, ['legacy_kol_key', 'kol_name', 'product', 'sample_date', 'tracking_number', 'shipping_details', 'status', 'raw_logistics_status', 'notes', 'delivered_at', 'source', 'review_note'])
-  writeCsv('clean_collaborations.csv', collaborations, ['legacy_kol_key', 'kol_name', 'product', 'cooperation_date', 'publish_date', 'post_url', 'views', 'comments', 'likes', 'fee', 'notes', 'source', 'review_note'])
+  writeCsv('clean_collaborations.csv', collaborations, ['legacy_kol_key', 'kol_name', 'product', 'publish_date', 'post_url', 'views', 'comments', 'likes', 'fee', 'notes', 'source', 'review_note'])
 
   const statusCount = kols.reduce((acc, k) => (acc[k.status] = (acc[k.status] || 0) + 1, acc), {})
   const shipmentStatusCount = shipments.reduce((acc, s) => (acc[s.status] = (acc[s.status] || 0) + 1, acc), {})

@@ -37,7 +37,6 @@ export async function updateKOL(
     'country',
     'tags',
     'status',
-    'sample_product',
     'sample_date',
     'tracking_number',
     'shipping_details',

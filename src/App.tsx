@@ -89,8 +89,8 @@ function App() {
   const handleUpdateKol = async (updated: KOL) => {
     try {
       const result = await updateKOL(updated.id, updated)
-      setKols(prev => prev.map(k => k.id === result.id ? result : k))
-      setSelectedKol(result)
+      setKols(prev => prev.map(k => k.id === result.id ? applyKolSnapshot(result, invitations[result.id] || [], shipments.filter(s => s.kol_id === result.id), collaborationsByKol[result.id] || []) : k))
+      setSelectedKol(prev => prev?.id === result.id ? applyKolSnapshot(result, invitations[result.id] || [], shipments.filter(s => s.kol_id === result.id), collaborationsByKol[result.id] || []) : prev)
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
     }
@@ -117,7 +117,9 @@ function App() {
       setInvitations(nextInvitations)
       setKols(prev => normalizeKols(prev, shipments, nextInvitations, collaborationsByKol))
       setSelectedKol(prev => prev ? applyKolSnapshot(prev, data, shipments.filter(s => s.kol_id === kolId), collaborationsByKol[kolId] || []) : prev)
-    } catch {}
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '邀约记录加载失败')
+    }
   }
 
   const refreshShipments = async () => {
@@ -208,7 +210,6 @@ function App() {
             collaborationCount={countCompletedCollaborations(collaborationsByKol[selectedKol.id] || [])}
             onClose={() => {
               setSelectedKol(null)
-              refreshInvitations(selectedKol.id)
             }}
             onUpdate={handleUpdateKol}
             onInvitationsChange={() => refreshInvitations(selectedKol.id)}

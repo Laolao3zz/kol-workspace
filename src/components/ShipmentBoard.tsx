@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { KOL, PROGRESS_STATUSES, Shipment } from '../types'
-import { createCollaboration } from '../services/collaborationService'
+import { KOL, PROGRESS_STATUSES, Shipment, Collaboration } from '../types'
+import { createCollaboration, getCollaborationsByKOL } from '../services/collaborationService'
 import { updateShipment } from '../services/shipmentService'
 
 interface Props {
@@ -26,6 +26,16 @@ const daysSince = (date?: string | null) => {
 }
 
 const isShipmentCompleted = (shipment: Shipment) => shipment.progress_status === '已完成' || Boolean(shipment.completed_at)
+
+const hasPublishReadyCollaborationSignal = (collaboration: Collaboration) => {
+  return Boolean(
+    collaboration.publish_date?.trim() ||
+    collaboration.work_url?.trim() ||
+    Number(collaboration.views || 0) > 0 ||
+    Number(collaboration.comments || 0) > 0 ||
+    Number(collaboration.likes || 0) > 0
+  )
+}
 
 const progressLabel = (shipment: Shipment) => {
   if (isShipmentCompleted(shipment)) return '合作完成'
@@ -58,7 +68,7 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
       .filter(s => s.status === '已签收' && !isShipmentCompleted(s))
       .sort((a, b) => daysSince(b.delivered_at) - daysSince(a.delivered_at))
     const completed = shipments
-      .filter(s => s.status === '已签收' && isShipmentCompleted(s))
+      .filter(s => isShipmentCompleted(s))
       .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''))
 
     return [
@@ -135,19 +145,25 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
     try {
       setBoardError('')
       setCompletingShipmentId(shipment.id)
-      await createCollaboration({
-        kol_id: shipment.kol_id,
-        product: shipment.product,
-        publish_date: completedAt,
-        work_url: '',
-        views: 0,
-        comments: 0,
-        likes: 0,
-        fee: '',
-        notes: shipment.progress_notes
-          ? `系统归档：合作完成。进度备注：${shipment.progress_notes}`
-          : '系统归档：合作完成，播放数据可后续补填。',
-      })
+      const existingCollaborations = await getCollaborationsByKOL(shipment.kol_id)
+      const existingCompleted = existingCollaborations.some(col =>
+        col.product === shipment.product && hasPublishReadyCollaborationSignal(col)
+      )
+      if (!existingCompleted) {
+        await createCollaboration({
+          kol_id: shipment.kol_id,
+          product: shipment.product,
+          publish_date: completedAt,
+          work_url: '',
+          views: 0,
+          comments: 0,
+          likes: 0,
+          fee: '',
+          notes: shipment.progress_notes
+            ? `系统归档：合作完成。进度备注：${shipment.progress_notes}`
+            : '系统归档：合作完成，播放数据可后续补填。',
+        })
+      }
       const saved = await updateShipment(shipment.id, {
         status: '已签收',
         progress_status: '已完成',
@@ -247,14 +263,16 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
                         {col.key === 'progress' && !isEditing && (
                           <>
                             <button onClick={(e) => { e.stopPropagation(); startEditProgress(shipment) }} className="text-[11px] px-3 py-1.5 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition-colors font-medium">更新进度</button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleComplete(shipment) }}
-                              disabled={completingShipmentId === shipment.id}
-                              className="text-[11px] px-3 py-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium disabled:opacity-60"
-                            >
-                              {completingShipmentId === shipment.id ? '归档中...' : '合作完成'}
-                            </button>
                           </>
+                        )}
+                        {col.key !== 'completed' && !isShipmentCompleted(shipment) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleComplete(shipment) }}
+                            disabled={completingShipmentId === shipment.id}
+                            className="text-[11px] px-3 py-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium disabled:opacity-60"
+                          >
+                            {completingShipmentId === shipment.id ? '归档中...' : '归档完成'}
+                          </button>
                         )}
                       </div>
                     </div>
