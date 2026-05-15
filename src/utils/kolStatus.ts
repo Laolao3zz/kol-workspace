@@ -2,7 +2,7 @@ import type { Collaboration, Invitation, KOL, Shipment } from '../types'
 
 const shipmentTime = (shipment: Shipment) => shipment.sample_date || shipment.delivered_at || shipment.created_at || ''
 const invitationTime = (invitation: Invitation) => invitation.invited_at || ''
-const collaborationTime = (collaboration: Collaboration) => collaboration.publish_date || collaboration.cooperation_date || ''
+const collaborationTime = (collaboration: Collaboration) => collaboration.publish_date || ''
 
 export function getLatestShipment(shipments: Shipment[] = []): Shipment | null {
   if (shipments.length === 0) return null

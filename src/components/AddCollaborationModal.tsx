@@ -11,7 +11,6 @@ interface Props {
 export interface CollaborationFormData {
   kol_id: string
   product: string
-  cooperation_date: string
   publish_date: string
   work_url: string
   views: number
@@ -26,7 +25,6 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
   const [form, setForm] = useState<CollaborationFormData>({
     kol_id: kolId,
     product: collaboration?.product || '',
-    cooperation_date: collaboration?.cooperation_date || '',
     publish_date: collaboration?.publish_date || '',
     work_url: collaboration?.work_url || '',
     views: collaboration?.views || 0,
@@ -38,8 +36,8 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.product.trim()) return
-    onSubmit({ ...form, product: form.product.trim() })
+    if (!form.product.trim() || !form.publish_date.trim()) return
+    onSubmit({ ...form, product: form.product.trim(), publish_date: form.publish_date.trim() })
   }
 
   return (
@@ -62,34 +60,12 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">合作日期</label>
-              <input
-                type="date"
-                value={form.cooperation_date}
-                onChange={e => setForm(p => ({ ...p, cooperation_date: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">发布日期</label>
               <input
                 type="date"
                 value={form.publish_date}
                 onChange={e => setForm(p => ({ ...p, publish_date: e.target.value }))}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">合作费用</label>
-              <input
-                type="text"
-                value={form.fee}
-                onChange={e => setForm(p => ({ ...p, fee: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="如 $500"
               />
             </div>
           </div>

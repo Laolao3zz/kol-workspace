@@ -44,8 +44,16 @@ export async function updateKOL(
   ]
 
   const safeUpdates = allowedFields.reduce<Partial<KOL>>((payload, field) => {
-    if (field in updates) {
-      payload[field] = updates[field] as never
+    if (!(field in updates)) return payload
+
+    const value = updates[field]
+    if (field === 'tags') {
+      payload.tags = Array.isArray(value) ? value : []
+      return payload
+    }
+
+    if (value !== undefined) {
+      payload[field] = value as never
     }
     return payload
   }, {})

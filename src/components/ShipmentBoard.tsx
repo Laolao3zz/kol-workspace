@@ -138,7 +138,6 @@ export default function ShipmentBoard({ kols, shipments, onSelect, onUpdate, onS
       await createCollaboration({
         kol_id: shipment.kol_id,
         product: shipment.product,
-        cooperation_date: shipment.delivered_at || shipment.sample_date || completedAt,
         publish_date: completedAt,
         work_url: '',
         views: 0,

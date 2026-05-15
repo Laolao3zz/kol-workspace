@@ -98,7 +98,10 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
 
   const save = async (field: keyof KOL, value: string | string[]) => {
     try {
-      const updated = { ...kol, [field]: value, updated_at: new Date().toISOString() }
+      const normalizedValue = field === 'tags'
+        ? (Array.isArray(value) ? value : [])
+        : value
+      const updated = { ...kol, [field]: normalizedValue, updated_at: new Date().toISOString() }
       await onUpdate(updated)
       showToast('已保存')
     } catch (err) {
@@ -546,15 +549,15 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="font-semibold text-teal-700 text-sm">{col.product}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400">{col.publish_date || col.cooperation_date}</span>
+                            <span className="text-xs text-gray-400">{col.publish_date}</span>
                             <button onClick={() => { setEditingCollaboration(col); setShowColModal(true) }} className="opacity-0 group-hover:opacity-100 text-xs text-teal-600 hover:text-teal-800 transition-all">编辑</button>
                             <button onClick={() => handleDeleteCollaboration(col.id)} className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 transition-all">删除</button>
                           </div>
                         </div>
                         <div className="flex gap-2 text-sm text-gray-700 mb-2 flex-wrap">
-                          {col.views ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">▶</span>{fmt(col.views)}</span> : null}
-                          {col.comments ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💬</span>{fmt(col.comments)}</span> : null}
-                          {col.likes ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">❤️</span>{fmt(col.likes)}</span> : null}
+                          {col.views !== null && col.views !== undefined ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">▶</span>{fmt(col.views)}</span> : null}
+                          {col.comments !== null && col.comments !== undefined ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💬</span>{fmt(col.comments)}</span> : null}
+                          {col.likes !== null && col.likes !== undefined ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">❤️</span>{fmt(col.likes)}</span> : null}
                           {col.fee ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💰</span>{col.fee}</span> : null}
                         </div>
                         {col.work_url && <a href={col.work_url} target="_blank" rel="noreferrer" className="text-[11px] text-blue-500 hover:underline block truncate">{col.work_url}</a>}

@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS collaborations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   kol_id UUID REFERENCES kols(id) ON DELETE CASCADE,
   product TEXT,
-  cooperation_date DATE,
   publish_date DATE,
   work_url TEXT,
   views INTEGER DEFAULT 0,
