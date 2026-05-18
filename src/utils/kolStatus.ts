@@ -46,25 +46,17 @@ export function countCompletedCollaborations(collaborations: Collaboration[] = [
   return collaborations.filter(hasRealCollaborationSignal).length
 }
 
-const normalizeLegacyStatus = (status?: string | null) => {
-  if (!status) return '未首触'
-  if (status === '沟通中' || status === '未回复') return '已邀约'
-  if (status === '已签收' || status === '待制作' || status === '制作中' || status === '待发布') return '内容跟进'
-  if (status === '暂停/异常' || status === '进度异常') return '异常'
-  return status
-}
-
 const isProgressAbnormal = (status?: string | null) => status === '暂停/异常' || status === '进度异常'
 
 const isInvitationApproved = (invitation: Invitation) => invitation.reply_result?.includes('同意') && invitation.decision === '继续推进'
-const isInvitationRejected = (invitation: Invitation) => invitation.reply_result?.includes('拒绝')
+const isInvitationDeclinedByCreator = (invitation: Invitation) => invitation.reply_result?.includes('拒绝')
 const isInvitationDeclinedByUs = (invitation: Invitation) => invitation.decision === '我方拒绝'
 
 const isShipmentCompleted = (shipment: Shipment) => Boolean(shipment.completed_at) || shipment.progress_status === '已完成'
 const isShipmentActive = (shipment: Shipment) => !isShipmentCompleted(shipment)
 
 export function deriveKolStatus(
-  kol: KOL,
+  _kol: KOL,
   invitations: Invitation[] = [],
   shipments: Shipment[] = [],
   collaborations: Collaboration[] = []
@@ -85,11 +77,11 @@ export function deriveKolStatus(
     if (!latestInvitation.replied || latestInvitation.reply_result === '未回复') return '已邀约'
     if (isInvitationApproved(latestInvitation)) return '待寄出'
     if (isInvitationDeclinedByUs(latestInvitation)) return '我方拒绝'
-    if (isInvitationRejected(latestInvitation)) return '拒绝合作'
+    if (isInvitationDeclinedByCreator(latestInvitation)) return '拒绝合作'
     return '已邀约'
   }
 
-  return normalizeLegacyStatus(kol.status)
+  return '未首触'
 }
 
 export function applyKolSnapshot(

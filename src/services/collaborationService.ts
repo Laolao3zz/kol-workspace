@@ -7,10 +7,10 @@ const nullableDate = (value: unknown): string | null => {
   return trimmed ? trimmed : null
 }
 
-const numberOrZero = (value: unknown): number => {
-  if (value === null || value === undefined || value === '') return 0
+const nullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null
   const numeric = Number(value)
-  return Number.isFinite(numeric) ? numeric : 0
+  return Number.isFinite(numeric) ? numeric : null
 }
 
 function normalizeCollaborationPayload(
@@ -22,9 +22,9 @@ function normalizeCollaborationPayload(
   if ('product' in collab) payload.product = collab.product?.trim() || ''
   if ('publish_date' in collab) payload.publish_date = nullableDate(collab.publish_date)
   if ('work_url' in collab) payload.work_url = collab.work_url?.trim() || ''
-  if ('views' in collab) payload.views = numberOrZero(collab.views)
-  if ('comments' in collab) payload.comments = numberOrZero(collab.comments)
-  if ('likes' in collab) payload.likes = numberOrZero(collab.likes)
+  if ('views' in collab) payload.views = nullableNumber(collab.views)
+  if ('comments' in collab) payload.comments = nullableNumber(collab.comments)
+  if ('likes' in collab) payload.likes = nullableNumber(collab.likes)
   if ('fee' in collab) payload.fee = collab.fee?.trim() || ''
   if ('notes' in collab) payload.notes = collab.notes?.trim() || ''
 

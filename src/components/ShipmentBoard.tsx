@@ -172,16 +172,22 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
     if (!archivingShipment) return
     try {
       setBoardError('')
+      const collaborationPayload = {
+        ...data,
+        publish_date: data.publish_date || archivingShipment.completed_at || todayISO(),
+        notes: data.notes || '系统归档',
+      }
       if (archiveExistingCollaboration) {
-        await updateCollaboration(archiveExistingCollaboration.id, data)
+        await updateCollaboration(archiveExistingCollaboration.id, collaborationPayload)
       } else {
         await createCollaboration({
           kol_id: archivingShipment.kol_id,
           product: archivingShipment.product,
-          ...data,
+          ...collaborationPayload,
         })
       }
-      await updateShipment(archivingShipment.id, { archived_at: new Date().toISOString() })
+      const archived = await updateShipment(archivingShipment.id, { archived_at: new Date().toISOString() })
+      await syncKolSnapshot(archived, '合作完成')
       await onShipmentsChange()
       setArchivingShipment(null)
       setArchiveExistingCollaboration(null)
