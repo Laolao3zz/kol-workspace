@@ -28,17 +28,21 @@ function normalizeInvitationPayload(invitation: Partial<Invitation>): Partial<In
 
 export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> {
   try {
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('invitations')
-        .select('*')
-        .eq('kol_id', kolId)
-        .order('invited_at', { ascending: false }),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('invitations')
+          .select('*')
+          .eq('kol_id', kolId)
+          .order('invited_at', { ascending: false })
+
+        if (error) throw error
+        return data
+      },
       { maxRetries: 2 }
     )
 
-    if (error) throw error
-    return data as Invitation[]
+    return result as Invitation[]
   } catch (error) {
     logError('getInvitationsByKOL', error, { kolId })
     throw error
@@ -47,17 +51,21 @@ export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> 
 
 export async function createInvitation(inv: Omit<Invitation, 'id'>): Promise<Invitation> {
   try {
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('invitations')
-        .insert([normalizeInvitationPayload(inv)])
-        .select()
-        .single(),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('invitations')
+          .insert([normalizeInvitationPayload(inv)])
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      },
       { maxRetries: 2 }
     )
 
-    if (error) throw error
-    return data as Invitation
+    return result as Invitation
   } catch (error) {
     logError('createInvitation', error, { inv })
     throw error
@@ -66,12 +74,14 @@ export async function createInvitation(inv: Omit<Invitation, 'id'>): Promise<Inv
 
 export async function deleteInvitation(id: string): Promise<void> {
   try {
-    const { error } = await retryOperation(
-      () => getSupabase().from('invitations').delete().eq('id', id),
+    await retryOperation(
+      async () => {
+        const { error } = await getSupabase().from('invitations').delete().eq('id', id)
+        if (error) throw error
+        return true
+      },
       { maxRetries: 2 }
     )
-
-    if (error) throw error
   } catch (error) {
     logError('deleteInvitation', error, { id })
     throw error
@@ -80,18 +90,22 @@ export async function deleteInvitation(id: string): Promise<void> {
 
 export async function updateInvitation(id: string, updates: Partial<Invitation>): Promise<Invitation> {
   try {
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('invitations')
-        .update(normalizeInvitationPayload(updates))
-        .eq('id', id)
-        .select()
-        .single(),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('invitations')
+          .update(normalizeInvitationPayload(updates))
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      },
       { maxRetries: 2 }
     )
 
-    if (error) throw error
-    return data as Invitation
+    return result as Invitation
   } catch (error) {
     logError('updateInvitation', error, { id, updates })
     throw error

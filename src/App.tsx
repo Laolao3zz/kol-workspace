@@ -49,7 +49,7 @@ function App() {
 
   const handleCreateKol = async (data: KolFormData) => {
     try {
-      const newKol = await createKOL(data)
+      await createKOL(data)
       await refreshAll()
       setError(null)
     } catch (err) {
