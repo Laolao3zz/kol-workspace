@@ -276,9 +276,16 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
       await deleteInvitation(id)
       const next = invitations.filter(i => i.id !== id)
       setInvitations(next)
-      await onInvitationsChange()
+
+      // 重新获取最新的 shipments 数据
       const latestShipments = await getShipmentsByKOL(kol.id)
+
+      // 重新计算并更新 KOL 状态
       await syncDerivedKolStatus(next, latestShipments, collaborations)
+
+      // 通知父组件刷新邀约数据
+      await onInvitationsChange()
+
       showToast('邀约已删除')
     } catch (err) {
       showToast(err instanceof Error ? err.message : '删除失败')

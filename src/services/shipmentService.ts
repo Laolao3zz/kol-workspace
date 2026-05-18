@@ -1,5 +1,7 @@
 import { getSupabase } from '../lib/supabase'
 import type { Shipment } from '../types'
+import { retryOperation } from '../utils/retry'
+import { logError, logWarning } from '../utils/logger'
 
 export type ShipmentInput = Omit<Shipment, 'id' | 'created_at' | 'updated_at'>
 
@@ -7,6 +9,28 @@ const nullableDate = (value: unknown): string | null => {
   if (typeof value !== 'string') return value == null ? null : String(value)
   const trimmed = value.trim()
   return trimmed ? trimmed : null
+}
+
+function validateShipment(shipment: Partial<Shipment>): string[] {
+  const errors: string[] = []
+
+  if ('product' in shipment && !shipment.product?.trim()) {
+    errors.push('产品名称不能为空')
+  }
+
+  if (shipment.status === '运输中' && !shipment.tracking_number?.trim()) {
+    errors.push('运输中状态必须填写快递单号')
+  }
+
+  if (shipment.status === '已签收' && !shipment.delivered_at) {
+    errors.push('已签收状态必须填写签收日期')
+  }
+
+  if (shipment.completed_at && !shipment.progress_status) {
+    errors.push('完成状态必须选择内容进度')
+  }
+
+  return errors
 }
 
 function normalizeShipmentPayload(shipment: Partial<Shipment>): Partial<Shipment> {
@@ -30,59 +54,119 @@ function normalizeShipmentPayload(shipment: Partial<Shipment>): Partial<Shipment
 }
 
 export async function getShipments(): Promise<Shipment[]> {
-  const { data, error } = await getSupabase()
-    .from('shipments')
-    .select('*')
-    .order('created_at', { ascending: false })
+  try {
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('shipments')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      { maxRetries: 2 }
+    )
 
-  if (error) throw error
-  return data as Shipment[]
+    if (error) throw error
+    return data as Shipment[]
+  } catch (error) {
+    logError('getShipments', error)
+    throw error
+  }
 }
 
 export async function getShipmentsByKOL(kolId: string): Promise<Shipment[]> {
-  const { data, error } = await getSupabase()
-    .from('shipments')
-    .select('*')
-    .eq('kol_id', kolId)
-    .order('created_at', { ascending: false })
+  try {
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('shipments')
+        .select('*')
+        .eq('kol_id', kolId)
+        .order('created_at', { ascending: false }),
+      { maxRetries: 2 }
+    )
 
-  if (error) throw error
-  return data as Shipment[]
+    if (error) throw error
+    return data as Shipment[]
+  } catch (error) {
+    logError('getShipmentsByKOL', error, { kolId })
+    throw error
+  }
 }
 
 export async function createShipment(shipment: ShipmentInput): Promise<Shipment> {
-  const { data, error } = await getSupabase()
-    .from('shipments')
-    .insert([normalizeShipmentPayload(shipment)])
-    .select()
-    .single()
+  try {
+    // 验证数据
+    const errors = validateShipment(shipment)
+    if (errors.length > 0) {
+      throw new Error(`数据验证失败：${errors.join(', ')}`)
+    }
 
-  if (error) throw error
-  return data as Shipment
+    const payload = normalizeShipmentPayload(shipment)
+
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('shipments')
+        .insert([payload])
+        .select()
+        .single(),
+      { maxRetries: 2 }
+    )
+
+    if (error) throw error
+    return data as Shipment
+  } catch (error) {
+    logError('createShipment', error, { shipment })
+    throw error
+  }
 }
 
 export async function updateShipment(
   id: string,
   updates: Partial<Shipment>
 ): Promise<Shipment> {
-  const safeUpdates = normalizeShipmentPayload(updates)
+  try {
+    // 验证数据
+    const errors = validateShipment(updates)
+    if (errors.length > 0) {
+      logWarning('updateShipment', '数据验证警告', { errors, updates })
+      throw new Error(`数据验证失败：${errors.join(', ')}`)
+    }
 
-  const { data, error } = await getSupabase()
-    .from('shipments')
-    .update({ ...safeUpdates, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single()
+    const safeUpdates = normalizeShipmentPayload(updates)
 
-  if (error) throw error
-  return data as Shipment
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('shipments')
+        .update({ ...safeUpdates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single(),
+      {
+        maxRetries: 3,
+        onRetry: (attempt) => {
+          logWarning('updateShipment', `重试第 ${attempt} 次`, { id, updates })
+        }
+      }
+    )
+
+    if (error) throw error
+    return data as Shipment
+  } catch (error) {
+    logError('updateShipment', error, { id, updates })
+    throw error
+  }
 }
 
 export async function deleteShipment(id: string): Promise<void> {
-  const { error } = await getSupabase()
-    .from('shipments')
-    .delete()
-    .eq('id', id)
+  try {
+    const { error } = await retryOperation(
+      () => getSupabase()
+        .from('shipments')
+        .delete()
+        .eq('id', id),
+      { maxRetries: 2 }
+    )
 
-  if (error) throw error
+    if (error) throw error
+  } catch (error) {
+    logError('deleteShipment', error, { id })
+    throw error
+  }
 }

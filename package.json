@@ -1,7 +1,7 @@
 {
   "name": "kol-workspace",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,9 @@
     "sync-emails": "node --env-file=.env.local scripts/sync-emails.mjs",
     "sync-emails:debug": "node --env-file=.env.local scripts/sync-emails.mjs",
     "repair:collaborations": "node scripts/repair-misclassified-collaborations.mjs --apply",
-    "repair:collaborations:dry": "node scripts/repair-misclassified-collaborations.mjs"
+    "repair:collaborations:dry": "node scripts/repair-misclassified-collaborations.mjs",
+    "health-check": "node scripts/health-check.mjs",
+    "health-fix": "node scripts/health-check.mjs fix"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

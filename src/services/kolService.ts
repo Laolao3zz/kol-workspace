@@ -1,84 +1,135 @@
 import { getSupabase } from '../lib/supabase'
 import type { KOL } from '../types'
+import { retryOperation } from '../utils/retry'
+import { logError, logWarning } from '../utils/logger'
 
 export async function getKOLs(): Promise<KOL[]> {
-  const { data, error } = await getSupabase()
-    .from('kols')
-    .select('*')
-    .order('created_at', { ascending: false })
+  try {
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('kols')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      { maxRetries: 2 }
+    )
 
-  if (error) throw error
-  return data as KOL[]
+    if (error) throw error
+    return data as KOL[]
+  } catch (error) {
+    logError('getKOLs', error)
+    throw error
+  }
 }
 
 export async function createKOL(
   kol: Partial<KOL> & Pick<KOL, 'name'>
 ): Promise<KOL> {
-  const { data, error } = await getSupabase()
-    .from('kols')
-    .insert([kol])
-    .select()
-    .single()
+  try {
+    // 数据验证
+    if (!kol.name?.trim()) {
+      throw new Error('KOL 名称不能为空')
+    }
 
-  if (error) throw error
-  return data as KOL
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('kols')
+        .insert([kol])
+        .select()
+        .single(),
+      { maxRetries: 2 }
+    )
+
+    if (error) throw error
+    return data as KOL
+  } catch (error) {
+    logError('createKOL', error, { kol })
+    throw error
+  }
 }
 
 export async function updateKOL(
   id: string,
   updates: Partial<KOL>
 ): Promise<KOL> {
-  const allowedFields: Array<keyof KOL> = [
-    'name',
-    'email',
-    'homepage_url',
-    'platform',
-    'followers',
-    'country',
-    'tags',
-    'status',
-    'sample_date',
-    'tracking_number',
-    'shipping_details',
-  ]
+  try {
+    const allowedFields: Array<keyof KOL> = [
+      'name',
+      'email',
+      'homepage_url',
+      'platform',
+      'followers',
+      'country',
+      'tags',
+      'status',
+      'sample_date',
+      'tracking_number',
+      'shipping_details',
+    ]
 
-  const safeUpdates = allowedFields.reduce<Partial<KOL>>((payload, field) => {
-    if (!(field in updates)) return payload
+    const safeUpdates = allowedFields.reduce<Partial<KOL>>((payload, field) => {
+      if (!(field in updates)) return payload
 
-    const value = updates[field]
-    if (field === 'tags') {
-      payload.tags = Array.isArray(value) ? value : []
+      const value = updates[field]
+      if (field === 'tags') {
+        payload.tags = Array.isArray(value) ? value : []
+        return payload
+      }
+
+      if (value !== undefined) {
+        payload[field] = value as never
+      }
       return payload
+    }, {})
+
+    if (Object.keys(safeUpdates).length === 0) {
+      logWarning('updateKOL', '没有可保存的字段', { id, updates })
+      throw new Error('没有可保存的 KOL 字段')
     }
 
-    if (value !== undefined) {
-      payload[field] = value as never
+    // 添加 updated_at 时间戳
+    const payload = {
+      ...safeUpdates,
+      updated_at: new Date().toISOString()
     }
-    return payload
-  }, {})
 
-  if (Object.keys(safeUpdates).length === 0) {
-    throw new Error('没有可保存的 KOL 字段')
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('kols')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single(),
+      {
+        maxRetries: 3,
+        onRetry: (attempt) => {
+          logWarning('updateKOL', `重试第 ${attempt} 次`, { id, updates })
+        }
+      }
+    )
+
+    if (error) {
+      throw new Error(`KOL 保存失败：${error.message}`)
+    }
+    return data as KOL
+  } catch (error) {
+    logError('updateKOL', error, { id, updates })
+    throw error
   }
-
-  const { data, error } = await getSupabase()
-    .from('kols')
-    .update(safeUpdates)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    throw new Error(`KOL 保存失败：${error.message}`)
-  }
-  return data as KOL
 }
 
 export async function deleteKOL(id: string): Promise<void> {
-  const { error } = await getSupabase()
-    .from('kols')
-    .delete()
-    .eq('id', id)
+  try {
+    const { error } = await retryOperation(
+      () => getSupabase()
+        .from('kols')
+        .delete()
+        .eq('id', id),
+      { maxRetries: 2 }
+    )
 
-  if (error) throw error
+    if (error) throw error
+  } catch (error) {
+    logError('deleteKOL', error, { id })
+    throw error
+  }
 }

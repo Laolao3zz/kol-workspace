@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
-import { KOL, Invitation, Shipment, Collaboration } from './types'
-import { getKOLs, createKOL, updateKOL, deleteKOL } from './services/kolService'
-import { getInvitationsByKOL } from './services/invitationService'
-import { getShipments } from './services/shipmentService'
-import { getCollaborations } from './services/collaborationService'
-import { applyKolSnapshot, countCompletedCollaborations } from './utils/kolStatus'
+import { KOL } from './types'
+import { createKOL, deleteKOL } from './services/kolService'
+import { countCompletedCollaborations } from './utils/kolStatus'
+import { useKolData } from './hooks/useKolData'
 import KolTable from './components/KolTable'
 import KolDrawer from './components/KolDrawer'
 import ShipmentBoard from './components/ShipmentBoard'
@@ -12,97 +10,57 @@ import ErrorBoundary from './components/ErrorBoundary'
 import type { KolFormData } from './components/AddKolModal'
 
 type ViewMode = 'table' | 'progress'
-type KolUpdatePayload = Partial<KOL>
 
 function App() {
-  const [kols, setKols] = useState<KOL[]>([])
-  const [invitations, setInvitations] = useState<Record<string, Invitation[]>>({})
-  const [shipments, setShipments] = useState<Shipment[]>([])
-  const [collaborationsByKol, setCollaborationsByKol] = useState<Record<string, Collaboration[]>>({})
-  const [loading, setLoading] = useState(true)
+  const {
+    kols,
+    invitations,
+    shipments,
+    collaborationsByKol,
+    loading,
+    error: dataError,
+    refreshAll,
+    refreshInvitations,
+    refreshShipments,
+    refreshCollaborations,
+    updateKolOptimistic,
+  } = useKolData()
+
   const [error, setError] = useState<string | null>(null)
   const [selectedKol, setSelectedKol] = useState<KOL | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
 
-  const groupShipmentsByKol = (shipmentList: Shipment[]) => {
-    return shipmentList.reduce<Record<string, Shipment[]>>((map, shipment) => {
-      map[shipment.kol_id] = [...(map[shipment.kol_id] || []), shipment]
-      return map
-    }, {})
-  }
-
-  const groupCollaborationsByKol = (collaborationList: Collaboration[]) => {
-    return collaborationList.reduce<Record<string, Collaboration[]>>((map, collaboration) => {
-      map[collaboration.kol_id] = [...(map[collaboration.kol_id] || []), collaboration]
-      return map
-    }, {})
-  }
-
-  const normalizeKols = (
-    kolList: KOL[],
-    shipmentList: Shipment[],
-    invMap: Record<string, Invitation[]>,
-    colMap: Record<string, Collaboration[]>
-  ) => {
-    const shipmentMap = groupShipmentsByKol(shipmentList)
-    return kolList.map(kol => applyKolSnapshot(kol, invMap[kol.id] || [], shipmentMap[kol.id] || [], colMap[kol.id] || []))
-  }
-
-  const applyResultToState = (result: KOL) => {
-    const nextKol = applyKolSnapshot(
-      result,
-      invitations[result.id] || [],
-      shipments.filter(s => s.kol_id === result.id),
-      collaborationsByKol[result.id] || []
-    )
-
-    setKols(prev => prev.map(k => k.id === result.id ? nextKol : k))
-    setSelectedKol(prev => prev?.id === result.id ? nextKol : prev)
-  }
-
-  const loadAll = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const [data, shipmentData, collaborationData] = await Promise.all([
-        getKOLs(),
-        getShipments(),
-        getCollaborations(),
-      ])
-      const colMap = groupCollaborationsByKol(collaborationData)
-      const invMap: Record<string, Invitation[]> = {}
-      await Promise.all(data.map(async kol => {
-        try {
-          invMap[kol.id] = await getInvitationsByKOL(kol.id)
-        } catch { invMap[kol.id] = [] }
-      }))
-      setInvitations(invMap)
-      setShipments(shipmentData)
-      setCollaborationsByKol(colMap)
-      setKols(normalizeKols(data, shipmentData, invMap, colMap))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载数据失败')
-    } finally {
-      setLoading(false)
+  // 同步数据加载错误到本地状态
+  useEffect(() => {
+    if (dataError) {
+      setError(dataError)
     }
-  }
+  }, [dataError])
 
-  useEffect(() => { loadAll() }, [])
+  // 当 kols 更新时，同步更新 selectedKol
+  useEffect(() => {
+    if (selectedKol) {
+      const updated = kols.find(k => k.id === selectedKol.id)
+      if (updated) {
+        setSelectedKol(updated)
+      }
+    }
+  }, [kols, selectedKol])
 
   const handleCreateKol = async (data: KolFormData) => {
     try {
       const newKol = await createKOL(data)
-      setKols(prev => [newKol, ...prev])
-      setInvitations(prev => ({ ...prev, [newKol.id]: [] }))
+      await refreshAll()
+      setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建失败')
     }
   }
 
-  const handleUpdateKol = async (id: string, updates: KolUpdatePayload) => {
+  const handleUpdateKol = async (id: string, updates: Partial<KOL>) => {
     try {
-      const result = await updateKOL(id, updates)
-      applyResultToState(result)
+      const result = await updateKolOptimistic(id, updates)
+      setError(null)
       return result
     } catch (err) {
       const message = err instanceof Error ? err.message : '保存失败'
@@ -115,48 +73,11 @@ function App() {
     if (!confirm('确定要删除该 KOL 及其所有关联数据？此操作不可撤销。')) return
     try {
       await deleteKOL(id)
-      setKols(prev => prev.filter(k => k.id !== id))
-      const newInv = { ...invitations }
-      delete newInv[id]
-      setInvitations(newInv)
+      await refreshAll()
       if (selectedKol?.id === id) setSelectedKol(null)
+      setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败')
-    }
-  }
-
-  const refreshInvitations = async (kolId: string) => {
-    try {
-      const data = await getInvitationsByKOL(kolId)
-      const nextInvitations = { ...invitations, [kolId]: data }
-      setInvitations(nextInvitations)
-      setKols(prev => normalizeKols(prev, shipments, nextInvitations, collaborationsByKol))
-      setSelectedKol(prev => prev ? applyKolSnapshot(prev, data, shipments.filter(s => s.kol_id === kolId), collaborationsByKol[kolId] || []) : prev)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '邀约记录加载失败')
-    }
-  }
-
-  const refreshShipments = async () => {
-    try {
-      const data = await getShipments()
-      setShipments(data)
-      setKols(prev => normalizeKols(prev, data, invitations, collaborationsByKol))
-      setSelectedKol(prev => prev ? applyKolSnapshot(prev, invitations[prev.id] || [], data.filter(s => s.kol_id === prev.id), collaborationsByKol[prev.id] || []) : prev)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '寄样记录加载失败')
-    }
-  }
-
-  const refreshCollaborations = async () => {
-    try {
-      const data = await getCollaborations()
-      const colMap = groupCollaborationsByKol(data)
-      setCollaborationsByKol(colMap)
-      setKols(prev => normalizeKols(prev, shipments, invitations, colMap))
-      setSelectedKol(prev => prev ? applyKolSnapshot(prev, invitations[prev.id] || [], shipments.filter(s => s.kol_id === prev.id), colMap[prev.id] || []) : prev)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '合作记录加载失败')
     }
   }
 
@@ -205,7 +126,7 @@ function App() {
               selectedId={selectedKol?.id || null}
               onCreate={handleCreateKol}
               onDelete={handleDeleteKol}
-              onRefresh={loadAll}
+              onRefresh={refreshAll}
             />
           ) : (
             <ShipmentBoard

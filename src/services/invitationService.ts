@@ -1,5 +1,7 @@
 import { getSupabase } from '../lib/supabase'
 import type { Invitation } from '../types'
+import { retryOperation } from '../utils/retry'
+import { logError } from '../utils/logger'
 
 const nullableDate = (value: unknown): string | null => {
   if (typeof value !== 'string') return value == null ? null : String(value)
@@ -25,40 +27,73 @@ function normalizeInvitationPayload(invitation: Partial<Invitation>): Partial<In
 }
 
 export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> {
-  const { data, error } = await getSupabase()
-    .from('invitations')
-    .select('*')
-    .eq('kol_id', kolId)
-    .order('invited_at', { ascending: false })
+  try {
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('invitations')
+        .select('*')
+        .eq('kol_id', kolId)
+        .order('invited_at', { ascending: false }),
+      { maxRetries: 2 }
+    )
 
-  if (error) throw error
-  return data as Invitation[]
+    if (error) throw error
+    return data as Invitation[]
+  } catch (error) {
+    logError('getInvitationsByKOL', error, { kolId })
+    throw error
+  }
 }
 
 export async function createInvitation(inv: Omit<Invitation, 'id'>): Promise<Invitation> {
-  const { data, error } = await getSupabase()
-    .from('invitations')
-    .insert([normalizeInvitationPayload(inv)])
-    .select()
-    .single()
+  try {
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('invitations')
+        .insert([normalizeInvitationPayload(inv)])
+        .select()
+        .single(),
+      { maxRetries: 2 }
+    )
 
-  if (error) throw error
-  return data as Invitation
+    if (error) throw error
+    return data as Invitation
+  } catch (error) {
+    logError('createInvitation', error, { inv })
+    throw error
+  }
 }
 
 export async function deleteInvitation(id: string): Promise<void> {
-  const { error } = await getSupabase().from('invitations').delete().eq('id', id)
-  if (error) throw error
+  try {
+    const { error } = await retryOperation(
+      () => getSupabase().from('invitations').delete().eq('id', id),
+      { maxRetries: 2 }
+    )
+
+    if (error) throw error
+  } catch (error) {
+    logError('deleteInvitation', error, { id })
+    throw error
+  }
 }
 
 export async function updateInvitation(id: string, updates: Partial<Invitation>): Promise<Invitation> {
-  const { data, error } = await getSupabase()
-    .from('invitations')
-    .update(normalizeInvitationPayload(updates))
-    .eq('id', id)
-    .select()
-    .single()
+  try {
+    const { data, error } = await retryOperation(
+      () => getSupabase()
+        .from('invitations')
+        .update(normalizeInvitationPayload(updates))
+        .eq('id', id)
+        .select()
+        .single(),
+      { maxRetries: 2 }
+    )
 
-  if (error) throw error
-  return data as Invitation
+    if (error) throw error
+    return data as Invitation
+  } catch (error) {
+    logError('updateInvitation', error, { id, updates })
+    throw error
+  }
 }
