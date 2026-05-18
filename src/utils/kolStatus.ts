@@ -57,7 +57,8 @@ const normalizeLegacyStatus = (status?: string | null) => {
 const isProgressAbnormal = (status?: string | null) => status === '暂停/异常' || status === '进度异常'
 
 const isInvitationApproved = (invitation: Invitation) => invitation.reply_result?.includes('同意') && invitation.decision === '继续推进'
-const isInvitationRejected = (invitation: Invitation) => invitation.reply_result?.includes('拒绝') || invitation.decision === '我方拒绝'
+const isInvitationRejected = (invitation: Invitation) => invitation.reply_result?.includes('拒绝')
+const isInvitationDeclinedByUs = (invitation: Invitation) => invitation.decision === '我方拒绝'
 
 const isShipmentCompleted = (shipment: Shipment) => Boolean(shipment.completed_at) || shipment.progress_status === '已完成'
 const isShipmentActive = (shipment: Shipment) => !isShipmentCompleted(shipment)
@@ -83,6 +84,7 @@ export function deriveKolStatus(
   if (latestInvitation) {
     if (!latestInvitation.replied || latestInvitation.reply_result === '未回复') return '已邀约'
     if (isInvitationApproved(latestInvitation)) return '待寄出'
+    if (isInvitationDeclinedByUs(latestInvitation)) return '我方拒绝'
     if (isInvitationRejected(latestInvitation)) return '拒绝合作'
     return '已邀约'
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { KOL, Invitation, Collaboration, Shipment, PLATFORMS } from '../types'
+import { KOL, Invitation, Collaboration, Shipment, PLATFORMS, STATUSES } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
 import { getCollaborationsByKOL, createCollaboration, deleteCollaboration, updateCollaboration } from '../services/collaborationService'
 import { createShipment, updateShipment, deleteShipment, getShipmentsByKOL } from '../services/shipmentService'
@@ -113,7 +113,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
   }
 
   const shouldCreateShipmentFromInvitation = (invitation: Invitation) => {
-    return invitation.replied && invitation.reply_result === '同意合作' && invitation.decision === '继续推进'
+    return invitation.reply_result === '同意合作' && invitation.decision === '继续推进'
   }
 
   const ensureShipmentForInvitation = async (invitation: Invitation) => {
@@ -147,10 +147,11 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
 
   const syncInvitationWorkflow = async (savedInvitation: Invitation, nextInvitations: Invitation[]) => {
     const createdShipment = await ensureShipmentForInvitation(savedInvitation)
+    const nextShipments = createdShipment ? await getShipmentsByKOL(kol.id) : kolShipments
     if (createdShipment) {
       await onShipmentsChange()
     }
-    await syncDerivedKolStatus(nextInvitations)
+    await syncDerivedKolStatus(nextInvitations, nextShipments)
   }
 
   const handleSaveShipment = async (data: ShipmentFormData) => {
@@ -269,13 +270,40 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
     } catch (err) { showToast(err instanceof Error ? err.message : editingInvitation ? '更新失败' : '添加失败') }
   }
 
-  const handleReplyUpdate = async (inv: Invitation, result: string) => {
+  const handleQuickInvitationAction = async (inv: Invitation, action: 'approve_and_ship' | 'creator_reject' | 'reject_by_us' | 'mark_unreplied') => {
+    const payloadByAction: Record<typeof action, Partial<Invitation>> = {
+      approve_and_ship: {
+        replied: true,
+        reply_result: '同意合作',
+        decision: '继续推进',
+        decision_reason: '',
+      },
+      creator_reject: {
+        replied: true,
+        reply_result: '拒绝合作',
+        decision: '待评估',
+        decision_reason: '',
+      },
+      reject_by_us: {
+        replied: true,
+        reply_result: inv.reply_result?.trim() || '同意合作',
+        decision: '我方拒绝',
+        decision_reason: inv.decision_reason || '',
+      },
+      mark_unreplied: {
+        replied: false,
+        reply_result: '未回复',
+        decision: '待评估',
+        decision_reason: '',
+      },
+    }
+
     try {
-      const saved = await updateInvitation(inv.id, { replied: true, reply_result: result })
+      const saved = await updateInvitation(inv.id, payloadByAction[action])
       const next = invitations.map(i => i.id === saved.id ? saved : i)
       setInvitations(next)
       await syncInvitationWorkflow(saved, next)
-      showToast('回复已更新')
+      showToast('邀约状态已更新')
     } catch (err) {
       showToast(err instanceof Error ? err.message : '更新失败')
     }
@@ -287,7 +315,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
       await deleteInvitation(id)
       const next = invitations.filter(i => i.id !== id)
       setInvitations(next)
-      await syncDerivedKolStatus(next)
+      await syncDerivedKolStatus(next, kolShipments, collaborations)
       await onInvitationsChange()
       showToast('邀约已删除')
     } catch (err) {
@@ -350,6 +378,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
       '待发布': 'bg-cyan-100 text-cyan-700', '进度异常': 'bg-red-100 text-red-700',
       '异常': 'bg-red-100 text-red-700', '暂停/异常': 'bg-red-100 text-red-700',
       '合作完成': 'bg-green-100 text-green-700', '拒绝合作': 'bg-red-100 text-red-700',
+      '我方拒绝': 'bg-red-100 text-red-700',
     }
     return `px-2 py-0.5 rounded-full text-[11px] font-medium ${map[s] || 'bg-gray-100 text-gray-600'}`
   }
@@ -411,7 +440,14 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold tracking-tight">{kol.name}</h2>
-              <span className={statusLabel(kol.status)}>{kol.status}</span>
+              <select
+                value={kol.status}
+                onChange={e => save('status', e.target.value)}
+                className="min-w-[110px] rounded-full border border-white/35 bg-white/16 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur transition hover:bg-white/22 focus:outline-none focus:ring-2 focus:ring-white/60"
+                title="手动修正 KOL 状态"
+              >
+                {STATUSES.map(status => <option key={status} value={status} className="text-gray-800">{status}</option>)}
+              </select>
               {completedCollaborationCount > 0 && <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/25">合作过 {completedCollaborationCount} 次</span>}
             </div>
             <div className="flex items-center gap-3 mt-1 text-purple-200 text-sm">
@@ -539,11 +575,13 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                           {inv.decision_reason ? `（${inv.decision_reason}）` : ''}
                         </span>
                         {invReplyBadge(inv)}
-                        {!inv.replied && (
-                          <select value="" onChange={e => { if (e.target.value) handleReplyUpdate(inv, e.target.value) }} className="text-xs border border-purple-200 rounded px-1 py-0.5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
-                            <option value="">标记</option><option value="同意合作">同意</option><option value="拒绝合作">拒绝</option><option value="未回复">未回复</option>
-                          </select>
-                        )}
+                        <select value="" onChange={e => { if (e.target.value) handleQuickInvitationAction(inv, e.target.value as 'approve_and_ship' | 'creator_reject' | 'reject_by_us' | 'mark_unreplied') }} className="text-xs border border-purple-200 rounded-lg px-2 py-1 text-purple-700 bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 shadow-sm" onClick={e => e.stopPropagation()}>
+                          <option value="">快捷处理</option>
+                          <option value="approve_and_ship">同意并继续推进</option>
+                          <option value="creator_reject">博主拒绝</option>
+                          <option value="reject_by_us">我方拒绝</option>
+                          <option value="mark_unreplied">标记未回复</option>
+                        </select>
                         <button onClick={() => { setEditingInvitation(inv); setShowInvModal(true) }} className="opacity-0 group-hover:opacity-100 text-xs text-purple-500 hover:text-purple-700 transition-all shrink-0">编辑</button>
                         <button onClick={() => handleDeleteInvitation(inv.id)} className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 transition-all shrink-0">删除</button>
                       </div>

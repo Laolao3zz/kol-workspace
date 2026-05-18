@@ -280,7 +280,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
                         {col.key === 'progress' && !isEditing && (
                           <button onClick={(e) => { e.stopPropagation(); startEditProgress(shipment) }} className="text-[11px] px-3 py-1.5 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition-colors font-medium">更新进度</button>
                         )}
-                        {col.key !== 'completed' && !isShipmentCompleted(shipment) && (
+                        {col.key === 'progress' && !isShipmentCompleted(shipment) && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleComplete(shipment) }}
                             disabled={completingShipmentId === shipment.id}
