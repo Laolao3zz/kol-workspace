@@ -117,45 +117,92 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
   }
 
   const ensureShipmentForInvitation = async (invitation: Invitation) => {
-    if (!shouldCreateShipmentFromInvitation(invitation)) return false
+    if (!shouldCreateShipmentFromInvitation(invitation)) {
+      console.log('⏭️ 跳过自动创建寄样记录:', {
+        reply_result: invitation.reply_result,
+        decision: invitation.decision,
+        需要: '同意合作 + 继续推进'
+      })
+      return false
+    }
 
     const existingShipments = await getShipmentsByKOL(kol.id)
     const hasSamePendingShipment = existingShipments.some(s =>
       s.product === invitation.product && s.status === '待寄出' && !s.tracking_number?.trim()
     )
 
-    if (hasSamePendingShipment) return false
+    if (hasSamePendingShipment) {
+      console.log('⏭️ 已存在相同产品的待寄出记录，跳过创建')
+      return false
+    }
 
-    await createShipment({
-      kol_id: kol.id,
-      product: invitation.product,
-      sample_date: null,
-      tracking_number: '',
-      shipping_details: kol.shipping_details || '',
-      status: '待寄出',
-      notes: '邀约同意且我方继续推进后自动生成',
-      delivered_at: null,
-      progress_status: '待制作',
-      progress_notes: '',
-      expected_publish_date: null,
-      completed_at: null,
-      archived_at: null,
-    })
+    console.log('✨ 自动创建寄样记录:', { product: invitation.product })
 
-    return true
+    try {
+      await createShipment({
+        kol_id: kol.id,
+        product: invitation.product,
+        sample_date: null,
+        tracking_number: '',
+        shipping_details: kol.shipping_details || '',
+        status: '待寄出',
+        notes: '邀约同意且我方继续推进后自动生成',
+        delivered_at: null,
+        progress_status: '待制作',
+        progress_notes: '',
+        expected_publish_date: null,
+        completed_at: null,
+        archived_at: null,
+      })
+      console.log('✅ 寄样记录创建成功')
+      return true
+    } catch (error) {
+      console.error('❌ 寄样记录创建失败:', error)
+      throw error
+    }
   }
 
   const syncInvitationWorkflow = async (savedInvitation: Invitation, nextInvitations: Invitation[]) => {
+    console.log('🔄 syncInvitationWorkflow 开始', {
+      invitation: savedInvitation,
+      reply_result: savedInvitation.reply_result,
+      decision: savedInvitation.decision,
+      shouldCreate: shouldCreateShipmentFromInvitation(savedInvitation)
+    })
+
     const createdShipment = await ensureShipmentForInvitation(savedInvitation)
+    console.log('📦 寄样记录创建结果:', createdShipment ? '已创建' : '未创建')
+
     const nextShipments = createdShipment ? await getShipmentsByKOL(kol.id) : kolShipments
     if (createdShipment) {
       await onShipmentsChange()
     }
+
+    const oldStatus = kol.status
     await syncDerivedKolStatus(nextInvitations, nextShipments)
+    console.log('✅ KOL 状态更新:', { 旧状态: oldStatus, 新状态: deriveKolStatus(kol, nextInvitations, nextShipments, collaborations) })
   }
 
   const handleSaveShipment = async (data: ShipmentFormData) => {
+    console.log('💾 保存寄样记录:', { data, isEditing: !!editingShipment })
+
     try {
+      // 前端验证
+      if (!data.product?.trim()) {
+        showToast('❌ 产品名称不能为空')
+        return
+      }
+
+      if (data.status === '运输中' && !data.tracking_number?.trim()) {
+        showToast('❌ 运输中状态必须填写快递单号')
+        return
+      }
+
+      if (data.status === '已签收' && !data.delivered_at) {
+        showToast('❌ 已签收状态必须填写签收日期')
+        return
+      }
+
       const payload = {
         ...data,
         status: data.status === '已签收' ? '已签收' : shipmentStatus(data.tracking_number),
@@ -163,16 +210,24 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
         expected_publish_date: null,
         archived_at: editingShipment?.archived_at ?? null,
       }
+
+      console.log('📤 提交数据:', payload)
+
       const saved = editingShipment
         ? await updateShipment(editingShipment.id, payload)
         : await createShipment(payload)
+
+      console.log('✅ 寄样记录保存成功:', saved)
+
       await syncKolSnapshot(saved)
       await onShipmentsChange()
       setShowShipmentModal(false)
       setEditingShipment(null)
       showToast(editingShipment ? '寄样已更新' : '寄样已新增')
     } catch (err) {
-      showToast(err instanceof Error ? err.message : '寄样保存失败')
+      console.error('❌ 寄样保存失败:', err)
+      const errorMsg = err instanceof Error ? err.message : '寄样保存失败'
+      showToast(`❌ ${errorMsg}`)
     }
   }
 
