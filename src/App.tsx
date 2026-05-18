@@ -12,6 +12,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import type { KolFormData } from './components/AddKolModal'
 
 type ViewMode = 'table' | 'progress'
+type KolUpdatePayload = Partial<KOL>
 
 function App() {
   const [kols, setKols] = useState<KOL[]>([])
@@ -45,6 +46,18 @@ function App() {
   ) => {
     const shipmentMap = groupShipmentsByKol(shipmentList)
     return kolList.map(kol => applyKolSnapshot(kol, invMap[kol.id] || [], shipmentMap[kol.id] || [], colMap[kol.id] || []))
+  }
+
+  const applyResultToState = (result: KOL) => {
+    const nextKol = applyKolSnapshot(
+      result,
+      invitations[result.id] || [],
+      shipments.filter(s => s.kol_id === result.id),
+      collaborationsByKol[result.id] || []
+    )
+
+    setKols(prev => prev.map(k => k.id === result.id ? nextKol : k))
+    setSelectedKol(prev => prev?.id === result.id ? nextKol : prev)
   }
 
   const loadAll = async () => {
@@ -86,13 +99,15 @@ function App() {
     }
   }
 
-  const handleUpdateKol = async (updated: KOL) => {
+  const handleUpdateKol = async (id: string, updates: KolUpdatePayload) => {
     try {
-      const result = await updateKOL(updated.id, updated)
-      setKols(prev => prev.map(k => k.id === result.id ? applyKolSnapshot(result, invitations[result.id] || [], shipments.filter(s => s.kol_id === result.id), collaborationsByKol[result.id] || []) : k))
-      setSelectedKol(prev => prev?.id === result.id ? applyKolSnapshot(result, invitations[result.id] || [], shipments.filter(s => s.kol_id === result.id), collaborationsByKol[result.id] || []) : prev)
+      const result = await updateKOL(id, updates)
+      applyResultToState(result)
+      return result
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败')
+      const message = err instanceof Error ? err.message : '保存失败'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
     }
   }
 
@@ -195,6 +210,7 @@ function App() {
           ) : (
             <ShipmentBoard
               kols={kols}
+              invitations={invitations}
               shipments={shipments}
               onSelect={setSelectedKol}
               onUpdate={handleUpdateKol}

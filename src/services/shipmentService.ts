@@ -24,6 +24,7 @@ function normalizeShipmentPayload(shipment: Partial<Shipment>): Partial<Shipment
   if ('progress_notes' in shipment) payload.progress_notes = shipment.progress_notes?.trim() || ''
   if ('expected_publish_date' in shipment) payload.expected_publish_date = nullableDate(shipment.expected_publish_date)
   if ('completed_at' in shipment) payload.completed_at = nullableDate(shipment.completed_at)
+  if ('archived_at' in shipment) payload.archived_at = nullableDate(shipment.archived_at)
 
   return payload
 }

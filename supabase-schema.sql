@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   progress_notes TEXT,
   expected_publish_date DATE,
   completed_at DATE,
+  archived_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -141,4 +142,5 @@ CREATE INDEX IF NOT EXISTS idx_shipments_created_at ON shipments (created_at DES
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS progress_notes TEXT;
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS expected_publish_date DATE;
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS completed_at DATE;
+-- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 -- ALTER TABLE kols ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';

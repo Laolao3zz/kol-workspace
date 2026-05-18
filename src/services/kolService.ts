@@ -57,14 +57,20 @@ export async function updateKOL(
     return payload
   }, {})
 
+  if (Object.keys(safeUpdates).length === 0) {
+    throw new Error('没有可保存的 KOL 字段')
+  }
+
   const { data, error } = await getSupabase()
     .from('kols')
-    .update({ ...safeUpdates, updated_at: new Date().toISOString() })
+    .update(safeUpdates)
     .eq('id', id)
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    throw new Error(`KOL 保存失败：${error.message}`)
+  }
   return data as KOL
 }
 

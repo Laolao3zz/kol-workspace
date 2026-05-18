@@ -3,7 +3,7 @@ import { KOL, Invitation, Collaboration, Shipment, PLATFORMS } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
 import { getCollaborationsByKOL, createCollaboration, deleteCollaboration, updateCollaboration } from '../services/collaborationService'
 import { createShipment, updateShipment, deleteShipment, getShipmentsByKOL } from '../services/shipmentService'
-import { applyKolSnapshot, countCompletedCollaborations, deriveKolStatus, hasPublishReadyCollaborationSignal, hasRealCollaborationSignal } from '../utils/kolStatus'
+import { countCompletedCollaborations, deriveKolStatus, hasPublishReadyCollaborationSignal, hasRealCollaborationSignal } from '../utils/kolStatus'
 import InlineEdit from './InlineEdit'
 import MailPanel from './MailPanel'
 import AddInvitationModal, { InvitationFormData } from './AddInvitationModal'
@@ -16,7 +16,7 @@ interface Props {
   shipments: Shipment[]
   collaborationCount: number
   onClose: () => void
-  onUpdate: (kol: KOL) => Promise<void> | void
+  onUpdate: (id: string, updates: Partial<KOL>) => Promise<KOL> | KOL
   onInvitationsChange: () => Promise<void> | void
   onCollaborationsChange: () => Promise<void> | void
   onShipmentsChange: () => Promise<void> | void
@@ -74,14 +74,11 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
   }
 
   const syncKolSnapshot = async (shipment: ShipmentFormData | Shipment, status?: string) => {
-    await onUpdate({
-      ...kol,
-      sample_product: shipment.product,
+    await onUpdate(kol.id, {
       sample_date: shipment.sample_date || null,
       tracking_number: shipment.tracking_number || '',
       shipping_details: shipment.shipping_details || '',
       status: status || nextKolStatus(shipment),
-      updated_at: new Date().toISOString(),
     })
   }
 
@@ -91,12 +88,11 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
     nextCollaborations: Collaboration[] = collaborations
   ) => {
     const nextStatus = deriveKolStatus(kol, nextInvitations, nextShipments, nextCollaborations)
-    await onUpdate(applyKolSnapshot({ ...kol, status: nextStatus }, nextInvitations, nextShipments, nextCollaborations))
+    await onUpdate(kol.id, { status: nextStatus })
   }
 
-  const pushStatus = (newStatus: string) => {
-    const updated = { ...kol, status: newStatus, updated_at: new Date().toISOString() }
-    onUpdate(updated)
+  const pushStatus = async (newStatus: string) => {
+    await onUpdate(kol.id, { status: newStatus })
   }
 
   const save = async (field: keyof KOL, value: string | string[]) => {
@@ -104,8 +100,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
       const normalizedValue = field === 'tags'
         ? (Array.isArray(value) ? value : [])
         : value
-      const updated = { ...kol, [field]: normalizedValue, updated_at: new Date().toISOString() }
-      await onUpdate(updated)
+      await onUpdate(kol.id, { [field]: normalizedValue } as Partial<KOL>)
       showToast('已保存')
     } catch (err) {
       showToast(err instanceof Error ? err.message : '保存失败')
@@ -117,6 +112,47 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
     await save('tags', tags)
   }
 
+  const shouldCreateShipmentFromInvitation = (invitation: Invitation) => {
+    return invitation.replied && invitation.reply_result === '同意合作' && invitation.decision === '继续推进'
+  }
+
+  const ensureShipmentForInvitation = async (invitation: Invitation) => {
+    if (!shouldCreateShipmentFromInvitation(invitation)) return false
+
+    const existingShipments = await getShipmentsByKOL(kol.id)
+    const hasSamePendingShipment = existingShipments.some(s =>
+      s.product === invitation.product && s.status === '待寄出' && !s.tracking_number?.trim()
+    )
+
+    if (hasSamePendingShipment) return false
+
+    await createShipment({
+      kol_id: kol.id,
+      product: invitation.product,
+      sample_date: null,
+      tracking_number: '',
+      shipping_details: kol.shipping_details || '',
+      status: '待寄出',
+      notes: '邀约同意且我方继续推进后自动生成',
+      delivered_at: null,
+      progress_status: '待制作',
+      progress_notes: '',
+      expected_publish_date: null,
+      completed_at: null,
+      archived_at: null,
+    })
+
+    return true
+  }
+
+  const syncInvitationWorkflow = async (savedInvitation: Invitation, nextInvitations: Invitation[]) => {
+    const createdShipment = await ensureShipmentForInvitation(savedInvitation)
+    if (createdShipment) {
+      await onShipmentsChange()
+    }
+    await syncDerivedKolStatus(nextInvitations)
+  }
+
   const handleSaveShipment = async (data: ShipmentFormData) => {
     try {
       const payload = {
@@ -124,6 +160,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
         status: data.status === '已签收' ? '已签收' : shipmentStatus(data.tracking_number),
         delivered_at: data.status === '已签收' ? data.delivered_at : null,
         expected_publish_date: null,
+        archived_at: editingShipment?.archived_at ?? null,
       }
       const saved = editingShipment
         ? await updateShipment(editingShipment.id, payload)
@@ -153,22 +190,15 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
     }
 
     const latestInvitation = invitations[0]
-    let fallbackStatus = '未首触'
-    if (latestInvitation) {
-      if (!latestInvitation.replied) fallbackStatus = '已邀约'
-      else if (latestInvitation.reply_result.includes('同意')) fallbackStatus = '待寄出'
-      else if (latestInvitation.reply_result.includes('拒绝')) fallbackStatus = '拒绝合作'
-      else fallbackStatus = '已邀约'
-    }
+    const fallbackStatus = latestInvitation
+      ? deriveKolStatus(kol, [latestInvitation], [], collaborations)
+      : '未首触'
 
-    await onUpdate({
-      ...kol,
-      sample_product: '',
+    await onUpdate(kol.id, {
       sample_date: null,
       tracking_number: '',
       shipping_details: '',
       status: fallbackStatus,
-      updated_at: new Date().toISOString(),
     })
   }
 
@@ -220,7 +250,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
         setInvitations(next)
         setShowInvModal(false)
         setEditingInvitation(null)
-        await syncDerivedKolStatus(next)
+        await syncInvitationWorkflow(saved, next)
         await onInvitationsChange()
         showToast('邀约已更新')
         return
@@ -230,8 +260,10 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
       const updated = [inv, ...invitations]
       setInvitations(updated)
       setShowInvModal(false)
-      await syncDerivedKolStatus(updated)
-      if (INVITATION_ENTRY_STATUSES.includes(kol.status)) pushStatus('已邀约')
+      await syncInvitationWorkflow(inv, updated)
+      if (INVITATION_ENTRY_STATUSES.includes(kol.status) && (!inv.replied || inv.reply_result === '未回复')) {
+        await pushStatus('已邀约')
+      }
       await onInvitationsChange()
       showToast('邀约已添加')
     } catch (err) { showToast(err instanceof Error ? err.message : editingInvitation ? '更新失败' : '添加失败') }
@@ -240,37 +272,12 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
   const handleReplyUpdate = async (inv: Invitation, result: string) => {
     try {
       const saved = await updateInvitation(inv.id, { replied: true, reply_result: result })
-      setInvitations(prev => prev.map(i => i.id === inv.id ? saved : i))
-      if (result === '同意合作') {
-        const existingShipments = await getShipmentsByKOL(kol.id)
-        const hasSamePendingShipment = existingShipments.some(s =>
-          s.product === inv.product && s.status === '待寄出' && !s.tracking_number?.trim()
-        )
-        if (!hasSamePendingShipment) {
-          const shipment = await createShipment({
-            kol_id: kol.id,
-            product: inv.product,
-            sample_date: null,
-            tracking_number: '',
-            shipping_details: kol.shipping_details || '',
-            status: '待寄出',
-            notes: '邀约同意后自动生成',
-            delivered_at: null,
-            progress_status: '待制作',
-            progress_notes: '',
-            expected_publish_date: null,
-            completed_at: null,
-          })
-          await syncKolSnapshot(shipment, '待寄出')
-          await onShipmentsChange()
-        } else {
-          pushStatus('待寄出')
-        }
-      } else if (result === '拒绝合作') pushStatus('拒绝合作')
-      else if (result === '未回复') pushStatus('已邀约')
+      const next = invitations.map(i => i.id === saved.id ? saved : i)
+      setInvitations(next)
+      await syncInvitationWorkflow(saved, next)
       showToast('回复已更新')
-    } catch {
-      showToast('更新失败')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '更新失败')
     }
   }
 
