@@ -5,16 +5,20 @@ import { logError, logWarning } from '../utils/logger'
 
 export async function getKOLs(): Promise<KOL[]> {
   try {
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('kols')
-        .select('*')
-        .order('created_at', { ascending: false }),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('kols')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        return data
+      },
       { maxRetries: 2 }
     )
 
-    if (error) throw error
-    return data as KOL[]
+    return result as KOL[]
   } catch (error) {
     logError('getKOLs', error)
     throw error
@@ -30,17 +34,21 @@ export async function createKOL(
       throw new Error('KOL 名称不能为空')
     }
 
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('kols')
-        .insert([kol])
-        .select()
-        .single(),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('kols')
+          .insert([kol])
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      },
       { maxRetries: 2 }
     )
 
-    if (error) throw error
-    return data as KOL
+    return result as KOL
   } catch (error) {
     logError('createKOL', error, { kol })
     throw error
@@ -92,13 +100,20 @@ export async function updateKOL(
       updated_at: new Date().toISOString()
     }
 
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('kols')
-        .update(payload)
-        .eq('id', id)
-        .select()
-        .single(),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('kols')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (error) {
+          throw new Error(`KOL 保存失败：${error.message}`)
+        }
+        return data
+      },
       {
         maxRetries: 3,
         onRetry: (attempt) => {
@@ -107,10 +122,7 @@ export async function updateKOL(
       }
     )
 
-    if (error) {
-      throw new Error(`KOL 保存失败：${error.message}`)
-    }
-    return data as KOL
+    return result as KOL
   } catch (error) {
     logError('updateKOL', error, { id, updates })
     throw error
@@ -119,15 +131,18 @@ export async function updateKOL(
 
 export async function deleteKOL(id: string): Promise<void> {
   try {
-    const { error } = await retryOperation(
-      () => getSupabase()
-        .from('kols')
-        .delete()
-        .eq('id', id),
+    await retryOperation(
+      async () => {
+        const { error } = await getSupabase()
+          .from('kols')
+          .delete()
+          .eq('id', id)
+
+        if (error) throw error
+        return true
+      },
       { maxRetries: 2 }
     )
-
-    if (error) throw error
   } catch (error) {
     logError('deleteKOL', error, { id })
     throw error

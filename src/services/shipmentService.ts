@@ -55,16 +55,20 @@ function normalizeShipmentPayload(shipment: Partial<Shipment>): Partial<Shipment
 
 export async function getShipments(): Promise<Shipment[]> {
   try {
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('shipments')
-        .select('*')
-        .order('created_at', { ascending: false }),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('shipments')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        return data
+      },
       { maxRetries: 2 }
     )
 
-    if (error) throw error
-    return data as Shipment[]
+    return result as Shipment[]
   } catch (error) {
     logError('getShipments', error)
     throw error
@@ -73,17 +77,21 @@ export async function getShipments(): Promise<Shipment[]> {
 
 export async function getShipmentsByKOL(kolId: string): Promise<Shipment[]> {
   try {
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('shipments')
-        .select('*')
-        .eq('kol_id', kolId)
-        .order('created_at', { ascending: false }),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('shipments')
+          .select('*')
+          .eq('kol_id', kolId)
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        return data
+      },
       { maxRetries: 2 }
     )
 
-    if (error) throw error
-    return data as Shipment[]
+    return result as Shipment[]
   } catch (error) {
     logError('getShipmentsByKOL', error, { kolId })
     throw error
@@ -100,17 +108,21 @@ export async function createShipment(shipment: ShipmentInput): Promise<Shipment>
 
     const payload = normalizeShipmentPayload(shipment)
 
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('shipments')
-        .insert([payload])
-        .select()
-        .single(),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('shipments')
+          .insert([payload])
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      },
       { maxRetries: 2 }
     )
 
-    if (error) throw error
-    return data as Shipment
+    return result as Shipment
   } catch (error) {
     logError('createShipment', error, { shipment })
     throw error
@@ -131,13 +143,18 @@ export async function updateShipment(
 
     const safeUpdates = normalizeShipmentPayload(updates)
 
-    const { data, error } = await retryOperation(
-      () => getSupabase()
-        .from('shipments')
-        .update({ ...safeUpdates, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .select()
-        .single(),
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('shipments')
+          .update({ ...safeUpdates, updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      },
       {
         maxRetries: 3,
         onRetry: (attempt) => {
@@ -146,8 +163,7 @@ export async function updateShipment(
       }
     )
 
-    if (error) throw error
-    return data as Shipment
+    return result as Shipment
   } catch (error) {
     logError('updateShipment', error, { id, updates })
     throw error
@@ -156,15 +172,18 @@ export async function updateShipment(
 
 export async function deleteShipment(id: string): Promise<void> {
   try {
-    const { error } = await retryOperation(
-      () => getSupabase()
-        .from('shipments')
-        .delete()
-        .eq('id', id),
+    await retryOperation(
+      async () => {
+        const { error } = await getSupabase()
+          .from('shipments')
+          .delete()
+          .eq('id', id)
+
+        if (error) throw error
+        return true
+      },
       { maxRetries: 2 }
     )
-
-    if (error) throw error
   } catch (error) {
     logError('deleteShipment', error, { id })
     throw error
