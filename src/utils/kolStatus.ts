@@ -86,14 +86,16 @@ export function deriveKolStatus(
 
 export function applyKolSnapshot(
   kol: KOL,
-  invitations: Invitation[] = [],
+  _invitations: Invitation[] = [],
   shipments: Shipment[] = [],
-  collaborations: Collaboration[] = []
+  _collaborations: Collaboration[] = []
 ): KOL {
+  // status 字段以数据库为准，由副作用代码（邀约/寄样/合作的增删改）通过
+  // deriveKolStatus + updateKOL 主动写库。这里不再覆盖，避免手动设置和
+  // 已写入的自动化状态被推导值反弹。
   const latestShipment = getLatestShipment(shipments)
   return {
     ...kol,
-    status: deriveKolStatus(kol, invitations, shipments, collaborations),
     sample_product: latestShipment?.product || kol.sample_product || '',
     sample_date: latestShipment?.sample_date || null,
     tracking_number: latestShipment?.tracking_number || '',
