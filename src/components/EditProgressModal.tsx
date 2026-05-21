@@ -42,14 +42,14 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4">
+          <div className="rounded-xl border border-clay-100 bg-clay-50/60 p-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">进度状态</label>
                 <select
                   value={form.progress_status}
                   onChange={e => setForm(prev => ({ ...prev, progress_status: e.target.value, completed_at: e.target.value === '已完成' ? prev.completed_at : null }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 bg-white"
+                  className="w-full px-3 py-2 text-sm border border-canvas-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-clay-300 bg-white"
                 >
                   {PROGRESS_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                 </select>
@@ -60,14 +60,14 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
                   type="date"
                   value={form.completed_at || ''}
                   onChange={e => setForm(prev => ({ ...prev, completed_at: e.target.value || null, progress_status: e.target.value ? '已完成' : prev.progress_status }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 bg-white"
+                  className="w-full px-3 py-2 text-sm border border-canvas-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-clay-300 bg-white"
                 />
               </div>
               <div className="col-span-2 flex items-end">
                 <button
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, completed_at: new Date().toISOString().slice(0, 10), progress_status: '已完成' }))}
-                  className="w-full px-3 py-2 text-sm bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                  className="w-full px-3 py-2 text-sm bg-sage-500 text-white rounded-lg hover:bg-sage-600 transition-colors"
                 >
                   标记今天完成
                 </button>
@@ -82,16 +82,16 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
               onChange={e => setForm(prev => ({ ...prev, progress_notes: e.target.value }))}
               rows={4}
               placeholder="例如：已签收待制作 / 已催发布日期 / 内容卡住原因"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 resize-y"
+              className="w-full px-3 py-2 text-sm border border-canvas-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-clay-300 resize-y"
             />
           </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-canvas-100 rounded-lg transition-colors">取消</button>
           <button
             onClick={submit}
-            className="px-5 py-2 text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-lg hover:from-rose-600 hover:to-pink-600 shadow-sm transition-all font-medium"
+            className="px-5 py-2 text-sm bg-clay-400 text-white rounded-lg hover:bg-clay-500 shadow-soft transition-all font-medium"
           >
             保存进度
           </button>

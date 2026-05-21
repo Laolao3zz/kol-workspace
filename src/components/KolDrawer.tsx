@@ -386,25 +386,32 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
   }
 
   const invReplyBadge = (inv: Invitation) => {
-    if (!inv.replied) return <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-medium">未回复</span>
-    if (inv.reply_result.includes('同意')) return <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-medium">已同意</span>
-    if (inv.reply_result.includes('拒绝')) return <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-medium">已拒绝</span>
-    if (inv.reply_result === '未回复') return <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-medium">未回复</span>
-    return <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-medium">{inv.reply_result}</span>
+    if (!inv.replied) return <span className="px-2 py-0.5 bg-cream-50 text-cream-500 rounded-full text-[10px] font-medium">未回复</span>
+    if (inv.reply_result.includes('同意')) return <span className="px-2 py-0.5 bg-sage-50 text-sage-700 rounded-full text-[10px] font-medium">已同意</span>
+    if (inv.reply_result.includes('拒绝')) return <span className="px-2 py-0.5 bg-clay-50 text-clay-500 rounded-full text-[10px] font-medium">已拒绝</span>
+    if (inv.reply_result === '未回复') return <span className="px-2 py-0.5 bg-cream-50 text-cream-500 rounded-full text-[10px] font-medium">未回复</span>
+    return <span className="px-2 py-0.5 bg-canvas-100 text-gray-600 rounded-full text-[10px] font-medium">{inv.reply_result}</span>
   }
 
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
-      '未首触': 'bg-gray-100 text-gray-600', '已邀约': 'bg-purple-100 text-purple-700',
-      '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
-      '已签收': 'bg-teal-100 text-teal-700', '内容跟进': 'bg-rose-100 text-rose-700',
-      '待制作': 'bg-amber-100 text-amber-700', '制作中': 'bg-sky-100 text-sky-700',
-      '待发布': 'bg-cyan-100 text-cyan-700', '进度异常': 'bg-red-100 text-red-700',
-      '异常': 'bg-red-100 text-red-700', '暂停/异常': 'bg-red-100 text-red-700',
-      '合作完成': 'bg-green-100 text-green-700', '拒绝合作': 'bg-red-100 text-red-700',
-      '我方拒绝': 'bg-red-100 text-red-700',
+      '未首触': 'bg-canvas-100 text-gray-600',
+      '已邀约': 'bg-mist-50 text-mist-700',
+      '待寄出': 'bg-cream-50 text-cream-500',
+      '运输中': 'bg-mist-100 text-mist-700',
+      '已签收': 'bg-sage-50 text-sage-700',
+      '内容跟进': 'bg-clay-50 text-clay-500',
+      '待制作': 'bg-cream-50 text-cream-500',
+      '制作中': 'bg-mist-50 text-mist-700',
+      '待发布': 'bg-mist-50 text-mist-700',
+      '进度异常': 'bg-clay-100 text-clay-500',
+      '异常': 'bg-clay-100 text-clay-500',
+      '暂停/异常': 'bg-clay-100 text-clay-500',
+      '合作完成': 'bg-sage-100 text-sage-700',
+      '拒绝合作': 'bg-clay-50 text-clay-500',
+      '我方拒绝': 'bg-canvas-100 text-gray-600',
     }
-    return `px-2 py-0.5 rounded-full text-[11px] font-medium ${map[s] || 'bg-gray-100 text-gray-600'}`
+    return `px-2 py-0.5 rounded-full text-[11px] font-medium ${map[s] || 'bg-canvas-100 text-gray-600'}`
   }
 
   const fmt = (n: number | null) => {
@@ -446,9 +453,9 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
   }
 
   const stepClass = (state: string) => {
-    if (state === 'done') return 'bg-emerald-500 text-white border-emerald-500'
-    if (state === 'current') return 'bg-rose-500 text-white border-rose-500 shadow-sm shadow-rose-100'
-    return 'bg-gray-50 text-gray-400 border-gray-200'
+    if (state === 'done') return 'bg-sage-500 text-white border-sage-500'
+    if (state === 'current') return 'bg-cream-300 text-gray-900 border-cream-300 shadow-sm'
+    return 'bg-canvas-50 text-gray-400 border-canvas-200'
   }
 
   const latestInvitation = invitations[0]
@@ -456,25 +463,25 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="ml-auto relative w-[90%] max-w-[1400px] bg-white shadow-2xl overflow-hidden flex flex-col">
-        <div className="shrink-0 px-8 py-5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white flex items-center gap-5">
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white font-bold text-lg shadow-inner">
+      <div className="ml-auto relative w-[90%] max-w-[1400px] bg-canvas-50 shadow-2xl overflow-hidden flex flex-col">
+        <div className="shrink-0 px-8 py-5 bg-gradient-to-r from-sage-700 via-sage-600 to-mist-600 text-white flex items-center gap-5">
+          <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center text-white font-semibold text-lg shadow-inner ring-1 ring-white/10">
             {kol.name.slice(0, 2).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold tracking-tight">{kol.name}</h2>
+              <h2 className="text-xl font-semibold tracking-tight">{kol.name}</h2>
               <select
                 value={kol.status}
                 onChange={e => save('status', e.target.value)}
-                className="min-w-[128px] rounded-full border border-white/30 bg-slate-900/20 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur appearance-none transition hover:bg-slate-900/30 focus:outline-none focus:ring-2 focus:ring-white/60"
+                className="min-w-[128px] rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium text-white shadow-sm backdrop-blur appearance-none transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/40"
                 title="手动修正 KOL 状态"
               >
                 {STATUSES.map(status => <option key={status} value={status} className="bg-white text-gray-800">{status}</option>)}
               </select>
-              {completedCollaborationCount > 0 && <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/25">合作过 {completedCollaborationCount} 次</span>}
+              {completedCollaborationCount > 0 && <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/15 text-white border border-white/20">合作过 {completedCollaborationCount} 次</span>}
             </div>
-            <div className="flex items-center gap-3 mt-1 text-purple-200 text-sm">
+            <div className="flex items-center gap-3 mt-1 text-white/75 text-sm">
               <span>{kol.platform}</span><span className="opacity-40">|</span>
               <span>{kol.followers}</span><span className="opacity-40">|</span>
               <span>{kol.country}</span>
@@ -483,10 +490,10 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
           <button onClick={onClose} className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors text-lg">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 bg-gray-50/50">
+        <div className="flex-1 overflow-y-auto p-8 bg-canvas-50">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <div className="space-y-6">
-              <SectionCard icon="👤" title="基础身份" accent="border-l-indigo-500" bg="bg-white">
+              <SectionCard icon="👤" title="基础身份" accent="border-l-sage-500" bg="bg-white">
                 <FieldGrid>
                   <InlineEdit label="博主名称" value={kol.name} onSave={v => save('name', v)} />
                   <InlineEdit label="联系邮箱" value={kol.email} onSave={v => save('email', v)} />
@@ -498,17 +505,17 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                 </FieldGrid>
               </SectionCard>
 
-              <SectionCard icon="🧭" title="当前合作链路" accent="border-l-rose-500" bg="bg-white"
-                action={<button onClick={() => { setEditingShipment(null); setShowShipmentModal(true) }} className="text-xs px-3 py-1.5 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition-colors font-medium">+ 新增寄样</button>}
+              <SectionCard icon="🧭" title="当前合作链路" accent="border-l-clay-300" bg="bg-white"
+                action={<button onClick={() => { setEditingShipment(null); setShowShipmentModal(true) }} className="text-xs px-3 py-1.5 bg-clay-50 text-clay-500 rounded-lg hover:bg-clay-100 transition-colors font-medium">+ 新增寄样</button>}
               >
                 {kolShipments.length === 0 ? (
                   <div className="space-y-3">
-                    <div className="rounded-xl border border-dashed border-rose-200 bg-rose-50/50 px-4 py-6 text-center">
-                      <p className="text-sm font-medium text-rose-700">暂无进行中的合作链路</p>
+                    <div className="rounded-xl border border-dashed border-clay-200 bg-clay-50/60 px-4 py-6 text-center">
+                      <p className="text-sm font-medium text-clay-500">暂无进行中的合作链路</p>
                       <p className="text-xs text-gray-400 mt-1">邀约同意后会自动生成待寄出记录，也可以手动新增寄样。</p>
                     </div>
                     {latestInvitation && (
-                      <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3 text-xs text-purple-700">
+                      <div className="rounded-xl border border-sage-100 bg-sage-50/60 p-3 text-xs text-sage-700">
                         最近邀约：{latestInvitation.product} · {latestInvitation.replied ? latestInvitation.reply_result : '未回复'} · {latestInvitation.invited_at}
                       </div>
                     )}
@@ -526,7 +533,7 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                       ] as const
 
                       return (
-                        <div key={shipment.id} className="rounded-2xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/40 p-4 shadow-sm">
+                        <div key={shipment.id} className="rounded-2xl border border-canvas-200 bg-white p-4 shadow-soft">
                           <div className="flex items-start justify-between gap-3 mb-4">
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
@@ -538,11 +545,11 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                             </div>
                             <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                               {shipment.status === '运输中' && (
-                                <button onClick={() => handleConfirmDelivered(shipment)} className="text-[11px] px-2.5 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600">确认签收</button>
+                                <button onClick={() => handleConfirmDelivered(shipment)} className="text-[11px] px-2.5 py-1 bg-mist-500 text-white rounded-lg hover:bg-mist-600">确认签收</button>
                               )}
-                              <button onClick={() => { setEditingShipment(shipment); setShowShipmentModal(true) }} className="text-[11px] px-2.5 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200">编辑物流</button>
-                              <button onClick={() => setEditingProgress(shipment)} className="text-[11px] px-2.5 py-1 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200">编辑进度</button>
-                              <button onClick={() => handleDeleteShipment(shipment)} className="text-[11px] px-2.5 py-1 bg-red-50 text-red-500 rounded-lg hover:bg-red-100">删除</button>
+                              <button onClick={() => { setEditingShipment(shipment); setShowShipmentModal(true) }} className="text-[11px] px-2.5 py-1 bg-cream-50 text-cream-500 rounded-lg hover:bg-cream-100">编辑物流</button>
+                              <button onClick={() => setEditingProgress(shipment)} className="text-[11px] px-2.5 py-1 bg-clay-50 text-clay-500 rounded-lg hover:bg-clay-100">编辑进度</button>
+                              <button onClick={() => handleDeleteShipment(shipment)} className="text-[11px] px-2.5 py-1 bg-canvas-100 text-clay-500 rounded-lg hover:bg-clay-50">删除</button>
                             </div>
                           </div>
 
@@ -562,14 +569,14 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
                           </div>
 
                           <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                            <div className="bg-white/80 rounded-lg px-2 py-1.5">📅 寄样日期：{shipment.sample_date || '-'}</div>
-                            <div className="bg-white/80 rounded-lg px-2 py-1.5">📮 快递单号：{shipment.tracking_number || '-'}</div>
-                            <div className="bg-white/80 rounded-lg px-2 py-1.5">📍 收件信息：{shipment.shipping_details || '-'}</div>
-                            <div className="bg-white/80 rounded-lg px-2 py-1.5">📌 内容进度：{contentLabel}</div>
-                            <div className="bg-white/80 rounded-lg px-2 py-1.5">✅ 完成日期：{shipment.completed_at || '-'}</div>
+                            <div className="bg-canvas-50 rounded-lg px-2 py-1.5">📅 寄样日期：{shipment.sample_date || '-'}</div>
+                            <div className="bg-canvas-50 rounded-lg px-2 py-1.5">📮 快递单号：{shipment.tracking_number || '-'}</div>
+                            <div className="bg-canvas-50 rounded-lg px-2 py-1.5">📍 收件信息：{shipment.shipping_details || '-'}</div>
+                            <div className="bg-canvas-50 rounded-lg px-2 py-1.5">📌 内容进度：{contentLabel}</div>
+                            <div className="bg-canvas-50 rounded-lg px-2 py-1.5">✅ 完成日期：{shipment.completed_at || '-'}</div>
                           </div>
-                          {shipment.notes && <p className="mt-2 text-[11px] text-gray-500 border-t border-rose-100 pt-2">物流备注：{shipment.notes}</p>}
-                          {shipment.progress_notes && <p className="mt-2 text-[11px] text-rose-700 bg-white/70 border border-rose-100 rounded-lg px-2 py-1.5">进度备注：{shipment.progress_notes}</p>}
+                          {shipment.notes && <p className="mt-2 text-[11px] text-gray-500 border-t border-canvas-200 pt-2">物流备注：{shipment.notes}</p>}
+                          {shipment.progress_notes && <p className="mt-2 text-[11px] text-clay-500 bg-clay-50/60 border border-clay-100 rounded-lg px-2 py-1.5">进度备注：{shipment.progress_notes}</p>}
                         </div>
                       )
                     })}
@@ -579,66 +586,66 @@ export default function KolDrawer({ kol, shipments, onClose, onUpdate, onInvitat
             </div>
 
             <div className="space-y-6">
-              <SectionCard icon="📩" title="邀约记录" accent="border-l-purple-500" bg="bg-white"
-                action={<button onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} className="text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium">+ 发起邀约</button>}
+              <SectionCard icon="📩" title="邀约记录" accent="border-l-mist-400" bg="bg-white"
+                action={<button onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} className="text-xs px-3 py-1.5 bg-mist-50 text-mist-700 rounded-lg hover:bg-mist-100 transition-colors font-medium">+ 发起邀约</button>}
               >
                 {loadingSub ? (
-                  <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-12 bg-purple-50 rounded-lg animate-pulse" />) }</div>
+                  <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-12 bg-canvas-100 rounded-lg animate-pulse" />) }</div>
                 ) : invitations.length === 0 ? (
                   <p className="text-xs text-gray-400 py-4 text-center">暂无邀约，点击发起</p>
                 ) : (
                   <div className="space-y-2 max-h-[320px] overflow-y-auto">
                     {invitations.map(inv => (
-                      <div key={inv.id} className="flex items-center gap-3 p-3 bg-purple-50/50 rounded-lg border border-purple-100 hover:border-purple-200 transition-colors group">
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
+                      <div key={inv.id} className="flex items-center gap-3 p-3 bg-mist-50/60 rounded-lg border border-mist-100 hover:border-mist-200 transition-colors group">
+                        <div className="w-1.5 h-1.5 rounded-full bg-mist-400 shrink-0" />
                         <span className="text-gray-500 text-xs w-20 shrink-0">{inv.invited_at}</span>
-                        <span className="font-semibold text-purple-700 text-xs w-12 shrink-0">{inv.product}</span>
+                        <span className="font-semibold text-mist-700 text-xs w-12 shrink-0">{inv.product}</span>
                         <span className="text-gray-600 text-xs flex-1 truncate">
                           {inv.quoted_fee ? `报价 ${inv.quoted_fee}` : inv.notes || '-'}
                           {inv.decision === '我方拒绝' ? ' · 我方不同意' : ''}
                           {inv.reply_result?.includes('拒绝') ? ' · 博主不同意' : ''}
                         </span>
                         {invReplyBadge(inv)}
-                        <button onClick={() => { setEditingInvitation(inv); setShowInvModal(true) }} className="opacity-0 group-hover:opacity-100 text-xs text-purple-500 hover:text-purple-700 transition-all shrink-0">编辑</button>
-                        <button onClick={() => handleDeleteInvitation(inv.id)} className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 transition-all shrink-0">删除</button>
+                        <button onClick={() => { setEditingInvitation(inv); setShowInvModal(true) }} className="opacity-0 group-hover:opacity-100 text-xs text-mist-500 hover:text-mist-700 transition-all shrink-0">编辑</button>
+                        <button onClick={() => handleDeleteInvitation(inv.id)} className="opacity-0 group-hover:opacity-100 text-xs text-clay-400 hover:text-clay-500 transition-all shrink-0">删除</button>
                       </div>
                     ))}
                   </div>
                 )}
               </SectionCard>
 
-              <SectionCard icon="📊" title="合作历史" accent="border-l-teal-500" bg="bg-white"
-                action={<button onClick={() => { setEditingCollaboration(null); setShowColModal(true) }} className="text-xs px-3 py-1.5 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 transition-colors font-medium">+ 添加合作</button>}
+              <SectionCard icon="📊" title="合作历史" accent="border-l-sage-400" bg="bg-white"
+                action={<button onClick={() => { setEditingCollaboration(null); setShowColModal(true) }} className="text-xs px-3 py-1.5 bg-sage-50 text-sage-700 rounded-lg hover:bg-sage-100 transition-colors font-medium">+ 添加合作</button>}
               >
                 {loadingSub ? (
-                  <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-16 bg-teal-50 rounded-lg animate-pulse" />) }</div>
+                  <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-16 bg-canvas-100 rounded-lg animate-pulse" />) }</div>
                 ) : completedCollaborations.length === 0 ? (
                   <p className="text-xs text-gray-400 py-4 text-center">暂无已完成合作记录</p>
                 ) : (
                   <div className="space-y-2 max-h-[320px] overflow-y-auto">
                     {publishReadyCollaborations.length === 0 && completedCollaborations.some(col => col.notes?.includes('系统归档')) && (
-                      <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                      <div className="rounded-xl border border-cream-100 bg-cream-50 px-3 py-2 text-[11px] text-cream-500">
                         已有系统归档记录，但缺少发布日期、作品链接或播放数据。请在进度看板完成归档后补填作品信息，补齐后会出现在合作历史列表。
                       </div>
                     )}
                     {publishReadyCollaborations.map(col => (
-                      <div key={col.id} className="p-3 bg-teal-50/50 rounded-lg border border-teal-100 hover:border-teal-200 transition-colors group">
+                      <div key={col.id} className="p-3 bg-sage-50/60 rounded-lg border border-sage-100 hover:border-sage-200 transition-colors group">
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-semibold text-teal-700 text-sm">{col.product}</span>
+                          <span className="font-semibold text-sage-700 text-sm">{col.product}</span>
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-400">{col.publish_date}</span>
-                            <button onClick={() => { setEditingCollaboration(col); setShowColModal(true) }} className="opacity-0 group-hover:opacity-100 text-xs text-teal-600 hover:text-teal-800 transition-all">编辑</button>
-                            <button onClick={() => handleDeleteCollaboration(col.id)} className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 transition-all">删除</button>
+                            <button onClick={() => { setEditingCollaboration(col); setShowColModal(true) }} className="opacity-0 group-hover:opacity-100 text-xs text-sage-600 hover:text-sage-800 transition-all">编辑</button>
+                            <button onClick={() => handleDeleteCollaboration(col.id)} className="opacity-0 group-hover:opacity-100 text-xs text-clay-400 hover:text-clay-500 transition-all">删除</button>
                           </div>
                         </div>
                         <div className="flex gap-2 text-sm text-gray-700 mb-2 flex-wrap">
-                          {col.views !== null && col.views !== undefined ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">▶</span>{fmt(col.views)}</span> : null}
-                          {col.comments !== null && col.comments !== undefined ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💬</span>{fmt(col.comments)}</span> : null}
-                          {col.likes !== null && col.likes !== undefined ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">❤️</span>{fmt(col.likes)}</span> : null}
-                          {col.fee ? <span className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💰</span>{col.fee}</span> : null}
+                          {col.views !== null && col.views !== undefined ? <span className="inline-flex items-center gap-1.5 bg-sage-100 text-sage-700 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">▶</span>{fmt(col.views)}</span> : null}
+                          {col.comments !== null && col.comments !== undefined ? <span className="inline-flex items-center gap-1.5 bg-sage-100 text-sage-700 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💬</span>{fmt(col.comments)}</span> : null}
+                          {col.likes !== null && col.likes !== undefined ? <span className="inline-flex items-center gap-1.5 bg-sage-100 text-sage-700 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">❤️</span>{fmt(col.likes)}</span> : null}
+                          {col.fee ? <span className="inline-flex items-center gap-1.5 bg-sage-100 text-sage-700 px-2.5 py-1 rounded-full text-xs font-semibold"><span className="text-base leading-none">💰</span>{col.fee}</span> : null}
                         </div>
-                        {col.work_url && <a href={col.work_url} target="_blank" rel="noreferrer" className="text-[11px] text-blue-500 hover:underline block truncate">{col.work_url}</a>}
-                        {col.notes && <p className="text-[11px] text-gray-400 mt-1 border-t border-teal-100 pt-1">{col.notes}</p>}
+                        {col.work_url && <a href={col.work_url} target="_blank" rel="noreferrer" className="text-[11px] text-mist-600 hover:underline block truncate">{col.work_url}</a>}
+                        {col.notes && <p className="text-[11px] text-gray-400 mt-1 border-t border-sage-100 pt-1">{col.notes}</p>}
                       </div>
                     ))}
                   </div>

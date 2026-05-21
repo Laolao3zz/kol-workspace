@@ -69,7 +69,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
                 type="date"
                 value={form.publish_date || ''}
                 onChange={e => setForm(prev => ({ ...prev, publish_date: e.target.value || null }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
             </div>
             <div>
@@ -79,7 +79,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
                 value={form.fee}
                 onChange={e => setForm(prev => ({ ...prev, fee: e.target.value }))}
                 placeholder="例如 ¥3000 / 佣金15% / 免费送样"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
             </div>
           </div>
@@ -91,7 +91,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
               value={form.work_url}
               onChange={e => setForm(prev => ({ ...prev, work_url: e.target.value }))}
               placeholder="https://..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
             />
           </div>
 
@@ -103,7 +103,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
                 min="0"
                 value={parseNumber(form.views)}
                 onChange={e => setForm(prev => ({ ...prev, views: toNullableNumber(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
             </div>
             <div>
@@ -113,7 +113,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
                 min="0"
                 value={parseNumber(form.comments)}
                 onChange={e => setForm(prev => ({ ...prev, comments: toNullableNumber(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
             </div>
             <div>
@@ -123,7 +123,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
                 min="0"
                 value={parseNumber(form.likes)}
                 onChange={e => setForm(prev => ({ ...prev, likes: toNullableNumber(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
             </div>
           </div>
@@ -135,14 +135,14 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
               value={form.notes}
               onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
               placeholder="补充合作表现、复盘结论、后续是否继续合作等"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-y"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 resize-y"
             />
           </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
-          <button onClick={handleSubmit} className="px-5 py-2 text-sm bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium">正式归档</button>
+          <button onClick={handleSubmit} className="px-5 py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors font-medium">正式归档</button>
         </div>
       </div>
     </div>

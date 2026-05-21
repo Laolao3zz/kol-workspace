@@ -24,9 +24,9 @@ export interface InvitationFormData {
 type CooperationOutcome = 'pending' | 'agreed' | 'creator_declined' | 'company_declined'
 
 const OUTCOME_OPTIONS: Array<{ value: CooperationOutcome; label: string; desc: string; tone: string }> = [
-  { value: 'pending', label: '未回复 / 待确认', desc: '只记录已发起邀约，KOL 状态进入已邀约', tone: 'border-amber-200 bg-amber-50 text-amber-700' },
-  { value: 'agreed', label: '同意合作', desc: '会自动进入待寄出，并生成一条待寄出寄样记录', tone: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  { value: 'creator_declined', label: '博主不同意', desc: 'KOL 状态进入拒绝合作', tone: 'border-red-200 bg-red-50 text-red-700' },
+  { value: 'pending', label: '未回复 / 待确认', desc: '只记录已发起邀约，KOL 状态进入已邀约', tone: 'border-cream-200 bg-cream-50 text-cream-500' },
+  { value: 'agreed', label: '同意合作', desc: '会自动进入待寄出，并生成一条待寄出寄样记录', tone: 'border-sage-200 bg-sage-50 text-sage-700' },
+  { value: 'creator_declined', label: '博主不同意', desc: 'KOL 状态进入拒绝合作', tone: 'border-clay-200 bg-clay-50 text-clay-500' },
   { value: 'company_declined', label: '我方不同意', desc: 'KOL 状态进入我方拒绝', tone: 'border-slate-200 bg-slate-50 text-slate-700' },
 ]
 
@@ -100,7 +100,7 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
                 type="text"
                 value={form.product}
                 onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
                 placeholder="手动输入产品名称"
               />
             </div>
@@ -110,7 +110,7 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
                 type="date"
                 value={form.invited_at}
                 onChange={e => setForm(p => ({ ...p, invited_at: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
             </div>
           </div>
@@ -125,7 +125,7 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
                     key={option.value}
                     type="button"
                     onClick={() => updateOutcome(option.value)}
-                    className={`text-left rounded-xl border p-3 transition-all ${active ? `${option.tone} shadow-sm ring-2 ring-purple-100` : 'border-gray-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50/40'}`}
+                    className={`text-left rounded-xl border p-3 transition-all ${active ? `${option.tone} shadow-soft ring-2 ring-sage-100` : 'border-canvas-200 bg-white text-gray-600 hover:border-sage-200 hover:bg-sage-50/40'}`}
                   >
                     <div className="text-sm font-semibold">{option.label}</div>
                     <div className="text-[11px] mt-1 opacity-80 leading-relaxed">{option.desc}</div>
@@ -141,7 +141,7 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
               type="text"
               value={form.quoted_fee}
               onChange={e => setForm(p => ({ ...p, quoted_fee: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400"
               placeholder="例如 $1,500 / 送样免费 / 佣金合作"
             />
           </div>
@@ -153,13 +153,13 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
               onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
               rows={3}
               placeholder="记录关键沟通信息即可，不需要额外维护多套状态。"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400 resize-none"
             />
           </div>
 
           <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">取消</button>
-            <button type="submit" className="px-5 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 shadow-sm">{isEditing ? '保存修改' : '确认添加'}</button>
+            <button type="submit" className="px-5 py-2 bg-sage-600 text-white text-sm rounded-lg hover:bg-sage-700 shadow-soft">{isEditing ? '保存修改' : '确认添加'}</button>
           </div>
         </form>
       </div>

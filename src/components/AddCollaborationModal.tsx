@@ -55,7 +55,7 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
                 type="text"
                 value={form.product}
                 onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400/50"
                 placeholder="手动输入产品名称"
               />
             </div>
@@ -65,7 +65,7 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
                 type="date"
                 value={form.publish_date}
                 onChange={e => setForm(p => ({ ...p, publish_date: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400/50"
               />
             </div>
           </div>
@@ -76,7 +76,7 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
               type="url"
               value={form.work_url}
               onChange={e => setForm(p => ({ ...p, work_url: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400/50"
               placeholder="https://..."
             />
           </div>
@@ -88,7 +88,7 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
                 type="number"
                 value={form.views || ''}
                 onChange={e => setForm(p => ({ ...p, views: Number(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400/50"
               />
             </div>
             <div>
@@ -97,7 +97,7 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
                 type="number"
                 value={form.comments || ''}
                 onChange={e => setForm(p => ({ ...p, comments: Number(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400/50"
               />
             </div>
             <div>
@@ -106,7 +106,7 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
                 type="number"
                 value={form.likes || ''}
                 onChange={e => setForm(p => ({ ...p, likes: Number(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400/50"
               />
             </div>
           </div>
@@ -117,13 +117,13 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
               value={form.notes}
               onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
               rows={2}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400/50 resize-none"
             />
           </div>
 
           <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">取消</button>
-            <button type="submit" className="px-5 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-sm">{isEditing ? '保存修改' : '确认添加'}</button>
+            <button type="submit" className="px-5 py-2 bg-sage-600 text-white text-sm rounded-lg hover:bg-sage-700 shadow-soft">{isEditing ? '保存修改' : '确认添加'}</button>
           </div>
         </form>
       </div>

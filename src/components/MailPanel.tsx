@@ -40,7 +40,7 @@ export default function MailPanel({ kolEmail: _kolEmail, kolId }: Props) {
         <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
           ✉️ 邮件往来
         </h3>
-        <button onClick={loadEmails} className="text-xs text-gray-400 hover:text-blue-500 transition-colors">
+        <button onClick={loadEmails} className="text-xs text-gray-400 hover:text-sage-600 transition-colors">
           刷新
         </button>
       </div>
@@ -60,14 +60,14 @@ export default function MailPanel({ kolEmail: _kolEmail, kolId }: Props) {
             <div
               key={email.id}
               onClick={() => setExpandedId(expandedId === email.id ? null : email.id)}
-              className={`rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm ${
-                email.direction === 'outbound' 
-                  ? 'bg-gradient-to-r from-blue-50 to-blue-100/50 border border-blue-100' 
-                  : 'bg-gray-50 border border-gray-100'
+              className={`rounded-lg p-3 cursor-pointer transition-all hover:shadow-soft ${
+                email.direction === 'outbound'
+                  ? 'bg-mist-50/80 border border-mist-100'
+                  : 'bg-canvas-100 border border-canvas-200'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className={`text-xs font-medium ${email.direction === 'outbound' ? 'text-blue-600' : 'text-gray-700'}`}>
+                <span className={`text-xs font-medium ${email.direction === 'outbound' ? 'text-mist-700' : 'text-gray-700'}`}>
                   {email.direction === 'outbound' ? '我方发出' : email.from_address.split('@')[0]}
                 </span>
                 <span className="text-[11px] text-gray-400">{formatDate(email.sent_at)}</span>
