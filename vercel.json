@@ -4,8 +4,14 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/sync-emails",
+      "schedule": "0 1 * * *"
     }
   ]
 }
