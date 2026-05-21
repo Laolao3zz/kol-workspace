@@ -111,36 +111,30 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
 
   const statusColor = (s: string) => {
     const map: Record<string, string> = {
-      '已邀约': 'bg-mist-50 text-mist-700',
-      '待寄出': 'bg-cream-50 text-cream-500',
-      '运输中': 'bg-mist-100 text-mist-700',
-      '内容跟进': 'bg-clay-50 text-clay-500',
-      '异常': 'bg-clay-100 text-clay-500',
-      '已签收': 'bg-sage-50 text-sage-700',
-      '待制作': 'bg-cream-50 text-cream-500',
-      '制作中': 'bg-mist-50 text-mist-700',
-      '待发布': 'bg-mist-50 text-mist-700',
-      '进度异常': 'bg-clay-100 text-clay-500',
-      '合作完成': 'bg-sage-100 text-sage-700',
-      '拒绝合作': 'bg-clay-50 text-clay-500',
-      '我方拒绝': 'bg-canvas-100 text-gray-600',
+      '已邀约': 'bg-purple-100 text-purple-700',
+      '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
+      '内容跟进': 'bg-rose-100 text-rose-700', '异常': 'bg-red-100 text-red-700',
+      '已签收': 'bg-teal-100 text-teal-700', '待制作': 'bg-amber-100 text-amber-700',
+      '制作中': 'bg-sky-100 text-sky-700', '待发布': 'bg-cyan-100 text-cyan-700',
+      '进度异常': 'bg-red-100 text-red-700', '合作完成': 'bg-green-100 text-green-700',
+      '拒绝合作': 'bg-red-100 text-red-700', '我方拒绝': 'bg-red-100 text-red-700',
     }
-    return map[s] || 'bg-canvas-100 text-gray-600'
+    return map[s] || 'bg-gray-100 text-gray-600'
   }
 
   const invMiniBadge = (inv: Invitation | null) => {
     if (!inv) return <span className="text-[11px] text-gray-300">-</span>
     const color = !inv.replied
-      ? 'bg-cream-50 text-cream-500 border-cream-100'
+      ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
       : inv.reply_result.includes('同意')
-        ? 'bg-sage-50 text-sage-700 border-sage-100'
+        ? 'bg-green-50 text-green-700 border-green-200'
         : inv.reply_result.includes('拒绝')
-          ? 'bg-clay-50 text-clay-500 border-clay-100'
-          : 'bg-cream-50 text-cream-500 border-cream-100'
+          ? 'bg-red-50 text-red-700 border-red-200'
+          : 'bg-yellow-50 text-yellow-700 border-yellow-200'
     const label = !inv.replied ? '未回复' : inv.reply_result.includes('同意') ? '已同意' : inv.reply_result.includes('拒绝') ? '已拒绝' : inv.reply_result
     return (
       <div className="flex items-center gap-1.5">
-        <span className="text-xs font-medium text-mist-700">{inv.product}</span>
+        <span className="text-xs font-medium text-purple-600">{inv.product}</span>
         <span className={`text-xs px-1.5 py-0.5 rounded border ${color}`}>{label}</span>
       </div>
     )
@@ -219,49 +213,49 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-canvas-200 shadow-soft overflow-hidden">
-        <div className="p-4 border-b border-canvas-200">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-gray-100">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-xl font-semibold text-gray-900">KOL 资源池</h1>
             <div className="flex items-center gap-2">
               {selectedIds.size > 0 && (
                 <button
                   onClick={() => { setBatchProduct(''); setShowBatchInvite(true) }}
-                  className="px-4 py-1.5 bg-sage-600 text-white text-sm rounded-lg hover:bg-sage-700 shadow-soft transition-all font-medium"
+                  className="px-4 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm rounded-lg hover:from-purple-600 hover:to-purple-700 shadow-sm transition-all font-medium"
                 >
                   📩 批量邀约 ({selectedIds.size})
                 </button>
               )}
-              <button onClick={onRefresh} className="text-xs text-gray-400 hover:text-sage-600 transition-colors">刷新</button>
-              <span className="text-xs text-gray-400 bg-canvas-100 px-2 py-0.5 rounded-full">{kols.length} 条</span>
+              <button onClick={onRefresh} className="text-xs text-gray-400 hover:text-blue-500 transition-colors">刷新</button>
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{kols.length} 条</span>
             </div>
           </div>
           <div className="space-y-2">
             <div className="flex gap-2 flex-wrap">
               <input type="text" placeholder="搜索名称 / 邮箱 / 主页..." value={search} onChange={e => setSearch(e.target.value)}
-                className="flex-1 min-w-[200px] px-3 py-1.5 text-sm border border-canvas-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-400/50" />
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-canvas-200 rounded-lg">
+                className="flex-1 min-w-[200px] px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50" />
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg">
                 <option value="">全部状态</option>
                 {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <select value={filterPlatform} onChange={e => setFilterPlatform(e.target.value)} className="px-3 py-1.5 text-sm border border-canvas-200 rounded-lg">
+              <select value={filterPlatform} onChange={e => setFilterPlatform(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg">
                 <option value="">全部平台</option>
                 {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-              <select value={filterTag} onChange={e => setFilterTag(e.target.value)} className="px-3 py-1.5 text-sm border border-sage-200 rounded-lg text-sage-700 bg-sage-50/40">
+              <select value={filterTag} onChange={e => setFilterTag(e.target.value)} className="px-3 py-1.5 text-sm border border-emerald-200 rounded-lg text-emerald-700 bg-emerald-50/40">
                 <option value="">全部分类</option>
                 {allTags.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <button onClick={() => setShowAddModal(true)} className="px-4 py-1.5 bg-sage-600 text-white text-sm rounded-lg hover:bg-sage-700 shadow-soft transition-all shrink-0">
+              <button onClick={() => setShowAddModal(true)} className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-sm transition-all shrink-0">
                 + 新增 KOL
               </button>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <select value={filterInvProduct} onChange={e => setFilterInvProduct(e.target.value)} className="px-3 py-1.5 text-xs border border-mist-200 rounded-lg text-mist-700">
+              <select value={filterInvProduct} onChange={e => setFilterInvProduct(e.target.value)} className="px-3 py-1.5 text-xs border border-purple-200 rounded-lg text-purple-700">
                 <option value="">全部邀约产品</option>
                 {allInvProducts.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-              <select value={filterInvStatus} onChange={e => setFilterInvStatus(e.target.value)} className="px-3 py-1.5 text-xs border border-mist-200 rounded-lg text-mist-700">
+              <select value={filterInvStatus} onChange={e => setFilterInvStatus(e.target.value)} className="px-3 py-1.5 text-xs border border-purple-200 rounded-lg text-purple-700">
                 <option value="">全部邀约状态</option>
                 <option value="unreplied">未回复</option>
                 <option value="agreed">已同意</option>
@@ -275,13 +269,13 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
         <div className="overflow-x-auto">
           <table className="w-full text-[15px]">
             <thead>
-              <tr className="border-b border-canvas-200 bg-canvas-100/60">
+              <tr className="border-b border-gray-100 bg-gray-50/50">
                 <th className="px-3 py-3 w-[40px]">
                   <input
                     type="checkbox"
                     checked={paged.length > 0 && selectedIds.size === paged.length && paged.every(k => selectedIds.has(k.id))}
                     onChange={toggleAll}
-                    className="w-4 h-4 rounded border-canvas-200 text-sage-600 focus:ring-sage-400"
+                    className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                   />
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500 w-[12%]">博主名称</th>
@@ -314,23 +308,23 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
                     {kols.length === 0 ? (
                       <div className="space-y-2">
                         <p className="text-sm">还没有任何 KOL 数据</p>
-                        <button onClick={() => setShowAddModal(true)} className="text-sage-600 text-sm">点击新增第一个 KOL</button>
+                        <button onClick={() => setShowAddModal(true)} className="text-blue-500 text-sm">点击新增第一个 KOL</button>
                       </div>
                     ) : <p className="text-sm">无匹配结果</p>}
                   </td>
                 </tr>
               ) : (
                 paged.map(kol => (
-                  <tr key={kol.id} className={`border-b border-canvas-100 cursor-pointer transition-colors hover:bg-canvas-100/60 ${selectedId === kol.id ? 'bg-sage-50/60' : ''} ${selectedIds.has(kol.id) ? 'bg-sage-50/40' : ''}`}>
+                  <tr key={kol.id} className={`border-b border-gray-50 cursor-pointer transition-colors hover:bg-blue-50/50 ${selectedId === kol.id ? 'bg-blue-50' : ''} ${selectedIds.has(kol.id) ? 'bg-purple-50/40' : ''}`}>
                     <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selectedIds.has(kol.id)}
                         onChange={() => toggleSelect(kol.id)}
-                        className="w-4 h-4 rounded border-canvas-200 text-sage-600 focus:ring-sage-400"
+                        className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                       />
                     </td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3 font-semibold text-sage-700">{kol.name}</td>
+                    <td onClick={() => onSelect(kol)} className="px-4 py-3 font-semibold text-blue-600">{kol.name}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-700">{kol.platform}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-700">{kol.followers}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3">
@@ -339,29 +333,29 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
                     <td onClick={() => onSelect(kol)} className="px-4 py-3">{invMiniBadge(getLatestInv(kol.id))}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3">
                       {collaborationCount(kol.id) > 0 ? (
-                        <span className="px-2.5 py-1 bg-sage-50 text-sage-700 border border-sage-100 rounded-full text-xs font-semibold">合作 {collaborationCount(kol.id)} 次</span>
+                        <span className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-100 rounded-full text-xs font-semibold">合作 {collaborationCount(kol.id)} 次</span>
                       ) : <span className="text-xs text-gray-300">-</span>}
                     </td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-500 text-sm">{kol.email}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-600 text-sm">{kol.country}</td>
                     <td onClick={() => onSelect(kol)} className="px-4 py-3">
                       <div className="flex gap-1 flex-wrap">
-                        {(kol.tags || []).slice(0, 2).map(t => <span key={t} className="px-1.5 py-0.5 bg-canvas-100 text-gray-600 rounded text-xs">{t}</span>)}
+                        {(kol.tags || []).slice(0, 2).map(t => <span key={t} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{t}</span>)}
                         {(kol.tags || []).length > 2 && <span className="text-xs text-gray-400">+{kol.tags.length - 2}</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       {kol.sample_product || kol.sample_date ? (
                         <div className="space-y-0.5">
-                          {kol.sample_product && <div className="text-xs font-medium text-cream-500 truncate">{kol.sample_product}</div>}
-                          {kol.sample_date && <div className="text-xs text-sage-700">{shipmentDateLabel(kol)}</div>}
+                          {kol.sample_product && <div className="text-xs font-medium text-orange-600 truncate">{kol.sample_product}</div>}
+                          {kol.sample_date && <div className="text-xs text-green-600">{shipmentDateLabel(kol)}</div>}
                         </div>
                       ) : (
                         <span className="text-xs text-gray-300">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={(e) => { e.stopPropagation(); onDelete(kol.id) }} className="text-xs text-clay-400 hover:text-clay-500 transition-colors font-medium">删除</button>
+                      <button onClick={(e) => { e.stopPropagation(); onDelete(kol.id) }} className="text-xs text-red-400 hover:text-red-600 transition-colors font-medium">删除</button>
                     </td>
                   </tr>
                 ))
@@ -369,16 +363,16 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-canvas-200 bg-canvas-100/50 text-sm text-gray-600">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/70 text-sm text-gray-600">
           <div>第 {pageStart}-{pageEnd} 条 / 共 {filtered.length} 条</div>
           <div className="flex items-center gap-2">
             <span>每页</span>
-            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="px-2 py-1 border border-canvas-200 rounded-lg bg-white">
+            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="px-2 py-1 border border-gray-200 rounded-lg bg-white">
               {[25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
             </select>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage <= 1} className="px-3 py-1 border border-canvas-200 rounded-lg bg-white disabled:opacity-40">上一页</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage <= 1} className="px-3 py-1 border border-gray-200 rounded-lg bg-white disabled:opacity-40">上一页</button>
             <span className="px-2">{safePage} / {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="px-3 py-1 border border-canvas-200 rounded-lg bg-white disabled:opacity-40">下一页</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="px-3 py-1 border border-gray-200 rounded-lg bg-white disabled:opacity-40">下一页</button>
           </div>
         </div>
       </div>
@@ -391,13 +385,13 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
           <div className="relative bg-white rounded-2xl shadow-2xl w-[480px] max-h-[80vh] overflow-y-auto p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">📩 批量邀约</h3>
 
-            <div className="mb-4 p-3 bg-sage-50 rounded-lg border border-sage-100">
-              <p className="text-xs text-sage-700 font-medium mb-1">已选 {selectedKols.length} 位 KOL</p>
+            <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-100">
+              <p className="text-xs text-purple-700 font-medium mb-1">已选 {selectedKols.length} 位 KOL</p>
               <div className="flex flex-wrap gap-1">
                 {selectedKols.slice(0, 8).map(k => (
-                  <span key={k.id} className="text-[10px] px-2 py-0.5 bg-white rounded-full border border-sage-200 text-sage-700">{k.name}</span>
+                  <span key={k.id} className="text-[10px] px-2 py-0.5 bg-white rounded-full border border-purple-200 text-purple-600">{k.name}</span>
                 ))}
-                {selectedKols.length > 8 && <span className="text-[10px] text-sage-400">+{selectedKols.length - 8} 更多</span>}
+                {selectedKols.length > 8 && <span className="text-[10px] text-purple-400">+{selectedKols.length - 8} 更多</span>}
               </div>
             </div>
 
@@ -409,13 +403,13 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
                   value={batchProduct}
                   onChange={e => setBatchProduct(e.target.value)}
                   placeholder="手动输入产品名称，如 BY53"
-                  className="w-full px-3 py-2 text-sm border border-canvas-200 rounded-lg focus:ring-2 focus:ring-sage-400/50 focus:outline-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-400/50 focus:outline-none"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">这里仅记录本次邀约对应的产品，不会自动发送邮件。</p>
               </div>
             </div>
 
-            <div className="mb-4 p-3 bg-canvas-100 rounded-lg border border-canvas-200">
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
               <p className="text-xs text-gray-500 mb-1">点击确认后将：</p>
               <ul className="text-xs text-gray-600 space-y-0.5 list-disc list-inside">
                 <li>复制所有选中 KOL 的邮箱到剪贴板</li>
@@ -426,14 +420,14 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
 
             {batchDone ? (
               <div className="text-center py-3">
-                <p className="text-sage-700 font-medium">✅ 邮箱已复制，邀约记录已创建！</p>
+                <p className="text-green-600 font-medium">✅ 邮箱已复制，邀约记录已创建！</p>
                 <p className="text-xs text-gray-500 mt-1">请前往邮箱客户端粘贴收件人发送邮件</p>
               </div>
             ) : (
               <div className="flex justify-end gap-2">
-                <button onClick={() => setShowBatchInvite(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-canvas-100 rounded-lg transition-colors">取消</button>
+                <button onClick={() => setShowBatchInvite(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
                 <button onClick={handleBatchInvite} disabled={batchSending || !batchProduct.trim()}
-                  className="px-5 py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 shadow-soft transition-all font-medium disabled:opacity-50">
+                  className="px-5 py-2 text-sm bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 shadow-sm transition-all font-medium disabled:opacity-50">
                   {batchSending ? '处理中...' : `确认邀约 (${selectedKols.length} 人)`}
                 </button>
               </div>

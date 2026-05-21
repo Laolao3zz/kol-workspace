@@ -69,10 +69,10 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
       .sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''))
 
     return [
-      { key: 'pending', label: '待寄出', icon: '📋', color: 'border-l-cream-300', bg: 'bg-cream-50/40', shipments: pending },
-      { key: 'transit', label: '运输中', icon: '🚚', color: 'border-l-mist-300', bg: 'bg-mist-50/40', shipments: transit },
-      { key: 'progress', label: '已送达待推进', icon: '⏱️', color: 'border-l-clay-300', bg: 'bg-clay-50/40', shipments: inProgress },
-      { key: 'completed', label: '合作完成', icon: '✅', color: 'border-l-sage-400', bg: 'bg-sage-50/40', shipments: completed },
+      { key: 'pending', label: '待寄出', icon: '📋', color: 'border-l-amber-500', bg: 'bg-amber-50/30', shipments: pending },
+      { key: 'transit', label: '运输中', icon: '🚚', color: 'border-l-blue-500', bg: 'bg-blue-50/30', shipments: transit },
+      { key: 'progress', label: '已送达待推进', icon: '⏱️', color: 'border-l-rose-500', bg: 'bg-rose-50/30', shipments: inProgress },
+      { key: 'completed', label: '合作完成', icon: '✅', color: 'border-l-emerald-500', bg: 'bg-emerald-50/30', shipments: completed },
     ]
   }, [shipments])
 
@@ -198,31 +198,31 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
 
   const statusBadge = (s: string) => {
     const map: Record<string, string> = {
-      '待寄出': 'bg-cream-50 text-cream-500', '运输中': 'bg-mist-100 text-mist-700',
-      '已签收': 'bg-sage-50 text-sage-700', '内容跟进': 'bg-clay-50 text-clay-500',
-      '待制作': 'bg-cream-50 text-cream-500', '制作中': 'bg-mist-50 text-mist-700',
-      '待发布': 'bg-mist-50 text-mist-700', '异常': 'bg-clay-100 text-clay-500',
-      '暂停/异常': 'bg-clay-100 text-clay-500', '进度异常': 'bg-clay-100 text-clay-500',
-      '合作完成': 'bg-sage-100 text-sage-700', '已完成': 'bg-sage-100 text-sage-700',
+      '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
+      '已签收': 'bg-teal-100 text-teal-700', '内容跟进': 'bg-rose-100 text-rose-700',
+      '待制作': 'bg-amber-100 text-amber-700', '制作中': 'bg-sky-100 text-sky-700',
+      '待发布': 'bg-cyan-100 text-cyan-700', '异常': 'bg-red-100 text-red-700',
+      '暂停/异常': 'bg-red-100 text-red-700', '进度异常': 'bg-red-100 text-red-700',
+      '合作完成': 'bg-green-100 text-green-700', '已完成': 'bg-green-100 text-green-700',
     }
-    return map[s] || 'bg-canvas-100 text-gray-600'
+    return map[s] || 'bg-gray-100 text-gray-600'
   }
 
   return (
     <>
       <div className="flex gap-4 h-[calc(100vh-140px)]">
         {boardError && (
-          <div className="fixed top-20 right-6 z-50 bg-clay-50 border border-clay-100 text-clay-500 text-sm px-4 py-2.5 rounded-xl shadow-card">
+          <div className="fixed top-20 right-6 z-50 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-2.5 rounded-xl shadow-lg">
             {boardError}
-            <button onClick={() => setBoardError('')} className="ml-3 font-bold hover:text-clay-700">&times;</button>
+            <button onClick={() => setBoardError('')} className="ml-3 font-bold hover:text-red-900">&times;</button>
           </div>
         )}
         {columns.map(col => (
-          <div key={col.key} className={`flex-1 flex flex-col rounded-2xl border border-canvas-200 shadow-soft overflow-hidden ${col.bg} ${col.color} border-l-4`}>
-            <div className="shrink-0 px-5 py-3 border-b border-canvas-200 bg-white/70 backdrop-blur">
+          <div key={col.key} className={`flex-1 flex flex-col rounded-2xl border border-gray-200 shadow-sm overflow-hidden ${col.bg} ${col.color} border-l-4`}>
+            <div className="shrink-0 px-5 py-3 border-b border-gray-200/80 bg-white/60 backdrop-blur">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2"><span>{col.icon}</span> {col.label}</h3>
-                <span className="text-xs font-medium text-gray-400 bg-white px-2.5 py-0.5 rounded-full border border-canvas-200">{col.shipments.length}</span>
+                <span className="text-xs font-medium text-gray-400 bg-white px-2.5 py-0.5 rounded-full border border-gray-200">{col.shipments.length}</span>
               </div>
             </div>
 
@@ -238,7 +238,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
                   const paymentTerm = getPaymentTerm(shipment)
                   const isEditing = editingProgressId === shipment.id
                   return (
-                    <div key={shipment.id} className={`bg-white rounded-xl p-4 shadow-soft border transition-all ${overdue ? 'border-clay-200 shadow-clay-100' : 'border-canvas-200 hover:shadow-card hover:border-canvas-200'}`}>
+                    <div key={shipment.id} className={`bg-white rounded-xl p-4 shadow-sm border transition-all ${overdue ? 'border-red-200 shadow-red-100' : 'border-gray-100 hover:shadow-md hover:border-gray-200'}`}>
                       <div onClick={() => kol && onSelect(kol)} className="cursor-pointer">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1 min-w-0">
@@ -249,54 +249,54 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
                         </div>
 
                         <div className="flex items-center gap-2 text-[11px] text-gray-600 mb-1 flex-wrap">
-                          <span className="px-1.5 py-0.5 bg-cream-50 text-cream-500 rounded font-medium">📦 {shipment.product}</span>
-                          {paymentTerm && <span className="px-1.5 py-0.5 bg-sage-50 text-sage-700 rounded font-medium">💰 {paymentTerm}</span>}
-                          {shipment.delivered_at && !isShipmentCompleted(shipment) && <span className={`px-1.5 py-0.5 rounded font-medium ${overdue ? 'bg-clay-100 text-clay-500' : 'bg-clay-50 text-clay-500'}`}>送达 {deliveredDays} 天</span>}
-                          {shipment.completed_at && <span className="px-1.5 py-0.5 rounded font-medium bg-sage-100 text-sage-700">完成 {completedDays} 天</span>}
+                          <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">📦 {shipment.product}</span>
+                          {paymentTerm && <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium">💰 {paymentTerm}</span>}
+                          {shipment.delivered_at && !isShipmentCompleted(shipment) && <span className={`px-1.5 py-0.5 rounded font-medium ${overdue ? 'bg-red-100 text-red-700' : 'bg-rose-100 text-rose-700'}`}>送达 {deliveredDays} 天</span>}
+                          {shipment.completed_at && <span className="px-1.5 py-0.5 rounded font-medium bg-green-100 text-green-700">完成 {completedDays} 天</span>}
                         </div>
                         {shipment.sample_date && <div className="text-[11px] text-gray-500 mb-1">📅 寄样 {shipment.sample_date}</div>}
                         {shipment.tracking_number && <div className="text-[11px] text-gray-500 mb-1">📮 {shipment.tracking_number}</div>}
                         {shipment.shipping_details && <div className="text-[11px] text-gray-400 mt-1 line-clamp-2">📍 {shipment.shipping_details}</div>}
                         {shipment.notes && <div className="text-[11px] text-gray-400 mt-1">物流备注：{shipment.notes}</div>}
-                        {shipment.progress_notes && <div className="mt-2 text-[11px] text-clay-500 bg-clay-50/60 border border-clay-100 rounded-lg px-2 py-1.5">进度备注：{shipment.progress_notes}</div>}
-                        {col.key === 'completed' && <div className="mt-2 text-[11px] text-sage-700 bg-sage-50 border border-sage-100 rounded-lg px-2 py-1.5">等待效果数据：补充播放量、评论、点赞、作品链接后可正式归档。</div>}
+                        {shipment.progress_notes && <div className="mt-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5">进度备注：{shipment.progress_notes}</div>}
+                        {col.key === 'completed' && <div className="mt-2 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5">等待效果数据：补充播放量、评论、点赞、作品链接后可正式归档。</div>}
                       </div>
 
                       {isEditing && (
-                        <div className="mt-3 pt-3 border-t border-canvas-200 space-y-2">
-                          <select value={progressDraft.progress_status} onChange={e => setProgressDraft(prev => ({ ...prev, progress_status: e.target.value }))} className="w-full text-xs px-2 py-1.5 border border-clay-200 rounded-lg">
+                        <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                          <select value={progressDraft.progress_status} onChange={e => setProgressDraft(prev => ({ ...prev, progress_status: e.target.value }))} className="w-full text-xs px-2 py-1.5 border border-rose-200 rounded-lg">
                             {PROGRESS_STATUSES.filter(s => s !== '已完成').map(status => <option key={status} value={status}>{status}</option>)}
                           </select>
-                          <textarea value={progressDraft.progress_notes} onChange={e => setProgressDraft(prev => ({ ...prev, progress_notes: e.target.value }))} placeholder="送达后的制作进度、异常原因、下一步跟进..." rows={3} className="w-full text-xs px-2 py-1.5 border border-clay-200 rounded-lg resize-y" />
+                          <textarea value={progressDraft.progress_notes} onChange={e => setProgressDraft(prev => ({ ...prev, progress_notes: e.target.value }))} placeholder="送达后的制作进度、异常原因、下一步跟进..." rows={3} className="w-full text-xs px-2 py-1.5 border border-rose-200 rounded-lg resize-y" />
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => setEditingProgressId(null)} className="text-[11px] px-2.5 py-1 text-gray-500 hover:bg-canvas-100 rounded-lg">取消</button>
-                            <button onClick={() => saveProgress(shipment)} className="text-[11px] px-2.5 py-1 bg-clay-400 text-white rounded-lg hover:bg-clay-500">保存进度</button>
+                            <button onClick={() => setEditingProgressId(null)} className="text-[11px] px-2.5 py-1 text-gray-500 hover:bg-gray-100 rounded-lg">取消</button>
+                            <button onClick={() => saveProgress(shipment)} className="text-[11px] px-2.5 py-1 bg-rose-500 text-white rounded-lg hover:bg-rose-600">保存进度</button>
                           </div>
                         </div>
                       )}
 
-                      <div className="mt-3 pt-3 border-t border-canvas-200 flex justify-end gap-2">
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end gap-2">
                         {col.key === 'pending' && (
                           <div className="flex gap-2 w-full">
-                            <input value={trackingDrafts[shipment.id] || ''} onChange={e => setTrackingDrafts(prev => ({ ...prev, [shipment.id]: e.target.value }))} placeholder="补充快递单号" className="min-w-0 flex-1 text-[11px] px-2 py-1.5 border border-cream-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-cream-300" />
-                            <button onClick={() => handleFillTracking(shipment)} className="text-[11px] px-3 py-1.5 bg-cream-400 text-white rounded-lg hover:bg-cream-500 transition-colors font-medium shrink-0">发出</button>
+                            <input value={trackingDrafts[shipment.id] || ''} onChange={e => setTrackingDrafts(prev => ({ ...prev, [shipment.id]: e.target.value }))} placeholder="补充快递单号" className="min-w-0 flex-1 text-[11px] px-2 py-1.5 border border-amber-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                            <button onClick={() => handleFillTracking(shipment)} className="text-[11px] px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-medium shrink-0">发出</button>
                           </div>
                         )}
-                        {col.key === 'transit' && <button onClick={(e) => { e.stopPropagation(); handleConfirmDelivered(shipment) }} className="text-[11px] px-3 py-1.5 bg-mist-500 text-white rounded-lg hover:bg-mist-600 transition-colors font-medium">确认签收</button>}
+                        {col.key === 'transit' && <button onClick={(e) => { e.stopPropagation(); handleConfirmDelivered(shipment) }} className="text-[11px] px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium">确认签收</button>}
                         {col.key === 'progress' && !isEditing && (
-                          <button onClick={(e) => { e.stopPropagation(); startEditProgress(shipment) }} className="text-[11px] px-3 py-1.5 bg-clay-50 text-clay-500 rounded-lg hover:bg-clay-100 transition-colors font-medium">更新进度</button>
+                          <button onClick={(e) => { e.stopPropagation(); startEditProgress(shipment) }} className="text-[11px] px-3 py-1.5 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 transition-colors font-medium">更新进度</button>
                         )}
                         {col.key === 'progress' && !isShipmentCompleted(shipment) && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleComplete(shipment) }}
                             disabled={completingShipmentId === shipment.id}
-                            className="text-[11px] px-3 py-1.5 bg-sage-500 text-white rounded-lg hover:bg-sage-600 transition-colors font-medium disabled:opacity-60"
+                            className="text-[11px] px-3 py-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium disabled:opacity-60"
                           >
                             {completingShipmentId === shipment.id ? '标记中...' : '标记合作完成'}
                           </button>
                         )}
                         {col.key === 'completed' && (
-                          <button onClick={(e) => { e.stopPropagation(); openArchiveModal(shipment) }} className="text-[11px] px-3 py-1.5 bg-sage-500 text-white rounded-lg hover:bg-sage-600 transition-colors font-medium">补数据并正式归档</button>
+                          <button onClick={(e) => { e.stopPropagation(); openArchiveModal(shipment) }} className="text-[11px] px-3 py-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium">补数据并正式归档</button>
                         )}
                       </div>
                     </div>

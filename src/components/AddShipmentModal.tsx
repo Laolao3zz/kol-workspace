@@ -91,13 +91,13 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
 
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">寄送产品 <span className="text-clay-400">*</span></label>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">寄送产品 <span className="text-red-400">*</span></label>
             <input
               type="text"
               value={form.product}
               onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
               placeholder="手动输入产品名称，如 BY53 / K1"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cream-400/40"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50"
             />
           </div>
 
@@ -108,7 +108,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
                 type="date"
                 value={form.sample_date || ''}
                 onChange={e => setForm(p => ({ ...p, sample_date: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cream-400/40"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50"
               />
             </div>
             <div>
@@ -118,7 +118,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
                 value={form.tracking_number}
                 onChange={e => setForm(p => ({ ...p, tracking_number: e.target.value }))}
                 placeholder="填入后状态进入运输中"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cream-400/40"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50"
               />
             </div>
           </div>
@@ -130,7 +130,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
               onChange={e => setForm(p => ({ ...p, shipping_details: e.target.value }))}
               rows={3}
               placeholder="姓名、电话、地址、收件注意事项"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cream-400/40 resize-y"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 resize-y"
             />
           </div>
 
@@ -141,7 +141,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
               onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
               rows={2}
               placeholder="仅记录物流相关信息，如第二次补寄配件 / 等对方确认地址"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cream-400/40 resize-y"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 resize-y"
             />
           </div>
 
@@ -153,7 +153,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
                 value={form.delivered_at || ''}
                 disabled={form.status !== '已签收'}
                 onChange={e => setForm(p => ({ ...p, delivered_at: e.target.value || null }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cream-400/40 disabled:bg-gray-50 disabled:text-gray-400"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 disabled:bg-gray-50 disabled:text-gray-400"
               />
               <p className="text-[11px] text-gray-400 mt-1">只有选择已签收时才记录送达日期</p>
             </div>
@@ -162,7 +162,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
               <select
                 value={form.status}
                 onChange={e => setForm(p => ({ ...p, status: e.target.value, delivered_at: e.target.value === '已签收' ? (p.delivered_at || new Date().toISOString().slice(0, 10)) : null }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cream-400/40"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50"
               >
                 <option value="待寄出">待寄出</option>
                 <option value="运输中">运输中</option>
@@ -178,7 +178,7 @@ export default function AddShipmentModal({ kolId, shipment, onClose, onSubmit }:
           <button
             onClick={submit}
             disabled={!form.product.trim()}
-            className="px-5 py-2 text-sm bg-cream-400 text-white rounded-lg hover:bg-cream-500 shadow-soft transition-all font-medium disabled:opacity-50"
+            className="px-5 py-2 text-sm bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg hover:from-orange-600 hover:to-amber-600 shadow-sm transition-all font-medium disabled:opacity-50"
           >
             保存寄样
           </button>

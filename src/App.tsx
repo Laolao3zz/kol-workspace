@@ -83,23 +83,23 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-canvas-50">
+      <div className="min-h-screen bg-gray-50">
         {error && (
-          <div className="fixed top-4 right-4 z-[60] bg-clay-50 border border-clay-100 text-clay-500 text-sm px-4 py-3 rounded-lg shadow-card">
+          <div className="fixed top-4 right-4 z-[60] bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg shadow-lg">
             {error}
-            <button onClick={() => setError(null)} className="ml-3 font-bold hover:text-clay-700">&times;</button>
+            <button onClick={() => setError(null)} className="ml-3 font-bold hover:text-red-900">&times;</button>
           </div>
         )}
 
         <div className="max-w-[1600px] mx-auto p-4">
           {/* Tab Bar */}
-          <div className="flex items-center gap-1 mb-4 bg-white rounded-xl p-1 shadow-soft border border-canvas-200 w-fit">
+          <div className="flex items-center gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm border border-gray-200 w-fit">
             <button
               onClick={() => setViewMode('table')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                 viewMode === 'table'
-                  ? 'bg-sage-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-canvas-100'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
                KOL 资源池
@@ -108,8 +108,8 @@ function App() {
               onClick={() => setViewMode('progress')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                 viewMode === 'progress'
-                  ? 'bg-sage-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-canvas-100'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               进度跟踪
