@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
 import { createProduct, updateProduct, type ProductInput } from '../services/productService'
 import { CONTENT_SHAPES } from '../utils/contentShape'
+import { deriveProductDraftsFromHistory } from '../utils/productExtraction'
 import { mergeOpportunityProducts } from '../utils/productMatching'
 import { buildProductOpportunitySummary, type OpportunityStatus } from '../utils/workspaceViews'
 
@@ -235,6 +236,10 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
           </div>
           <ProductLibraryPanel
             products={products}
+            kols={kols}
+            invitations={invitations}
+            shipments={shipments}
+            collaborationsByKol={collaborationsByKol}
             onProductsChange={onProductsChange}
             onSelectProduct={setSelectedProduct}
           />
@@ -246,10 +251,18 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
 
 function ProductLibraryPanel({
   products,
+  kols,
+  invitations,
+  shipments,
+  collaborationsByKol,
   onProductsChange,
   onSelectProduct,
 }: {
   products: Product[]
+  kols: KOL[]
+  invitations: Record<string, Invitation[]>
+  shipments: Shipment[]
+  collaborationsByKol: Record<string, Collaboration[]>
   onProductsChange: () => Promise<void> | void
   onSelectProduct: (productName: string) => void
 }) {
@@ -257,6 +270,13 @@ function ProductLibraryPanel({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const importCandidates = useMemo(() => deriveProductDraftsFromHistory({
+    existingProducts: products,
+    kols,
+    invitations,
+    shipments,
+    collaborationsByKol,
+  }), [products, kols, invitations, shipments, collaborationsByKol])
 
   const resetForm = () => {
     setEditingProduct(null)
@@ -330,6 +350,30 @@ function ProductLibraryPanel({
     }
   }
 
+  const importHistoricalProducts = async () => {
+    if (importCandidates.length === 0) {
+      setMessage('没有可提取的历史产品')
+      return
+    }
+    if (!confirm(`从历史记录提取 ${importCandidates.length} 个产品到产品库？`)) return
+
+    setSaving(true)
+    setMessage('')
+    try {
+      const created: Product[] = []
+      for (const candidate of importCandidates) {
+        created.push(await createProduct(candidate))
+      }
+      await onProductsChange()
+      if (created[0]) onSelectProduct(created[0].name)
+      setMessage(`已提取 ${created.length} 个历史产品`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '提取失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <aside className="flex min-h-0 flex-col overflow-hidden rounded-[16px] border border-black/[0.06] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
       <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3">
@@ -337,15 +381,27 @@ function ProductLibraryPanel({
           <div className="text-sm font-extrabold text-[#1D1D1F]">产品库</div>
           <div className="mt-0.5 text-[11px] font-semibold text-[#86868B]">{products.length} 个产品</div>
         </div>
-        {editingProduct && (
-          <button
-            type="button"
-            onClick={resetForm}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#F5F5F7] px-3 text-[11px] font-bold text-[#6E6E73] transition hover:bg-gray-200"
-          >
-            <X className="h-3.5 w-3.5" /> 取消
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {importCandidates.length > 0 && (
+            <button
+              type="button"
+              onClick={importHistoricalProducts}
+              disabled={saving}
+              className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#F5F5F7] px-3 text-[11px] font-bold text-[#1D1D1F] transition hover:bg-gray-200 disabled:opacity-60"
+            >
+              <Package className="h-3.5 w-3.5" /> 提取 {importCandidates.length}
+            </button>
+          )}
+          {editingProduct && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#F5F5F7] px-3 text-[11px] font-bold text-[#6E6E73] transition hover:bg-gray-200"
+            >
+              <X className="h-3.5 w-3.5" /> 取消
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)]">
@@ -443,6 +499,16 @@ function ProductLibraryPanel({
           <div className="rounded-[14px] border border-dashed border-black/[0.08] bg-[#F5F5F7] px-4 py-6 text-center">
             <Package className="mx-auto mb-2 h-5 w-5 text-[#AEAEB2]" />
             <div className="text-xs font-extrabold text-[#1D1D1F]">暂无产品</div>
+            {importCandidates.length > 0 && (
+              <button
+                type="button"
+                onClick={importHistoricalProducts}
+                disabled={saving}
+                className="mt-3 inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-[#1D1D1F] px-3 text-[11px] font-bold text-white transition disabled:opacity-60"
+              >
+                <Package className="h-3.5 w-3.5" /> 提取历史产品
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">

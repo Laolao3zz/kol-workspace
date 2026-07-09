@@ -250,7 +250,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
         )}
 
         <div className="mb-4 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
-          <BoardMetric label="推进中" value={totalActive} tone="text-[#0066FF]" />
+          <BoardMetric label="未完成" value={totalActive} tone="text-[#0066FF]" />
           <BoardMetric label="待寄出" value={columns[0]?.shipments.length || 0} tone="text-[#FF9F0A]" />
           <BoardMetric label="内容风险" value={overdueCount} tone="text-[#FF3B30]" />
           <BoardMetric label="待归档" value={columns[3]?.shipments.length || 0} tone="text-[#34C759]" />
