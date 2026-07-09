@@ -2,6 +2,14 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 let client: SupabaseClient | null = null
 
+export function hasSupabaseConfig(): boolean {
+  return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
+}
+
+export function isDemoMode(): boolean {
+  return import.meta.env.VITE_USE_DEMO_DATA === 'true' || !hasSupabaseConfig()
+}
+
 export function getSupabase(): SupabaseClient {
   if (client) return client
 

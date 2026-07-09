@@ -1,35 +1,101 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Collaboration, KOL, Invitation, STATUSES, PLATFORMS } from '../types'
+import { ChevronLeft, ChevronRight, MailPlus, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Collaboration, Invitation, KOL, PLATFORMS, Shipment } from '../types'
 import { createInvitation } from '../services/invitationService'
 import { updateKOL } from '../services/kolService'
-import AddKolModal, { KolFormData } from './AddKolModal'
-import { countCompletedCollaborations } from '../utils/kolStatus'
+import { countCompletedCollaborations, deriveKolStatus } from '../utils/kolStatus'
+import { collectProductOptions } from '../utils/productOptions'
+import { CONTENT_SHAPES, getKolContentShape } from '../utils/contentShape'
 
 interface Props {
   kols: KOL[]
   invitations: Record<string, Invitation[]>
+  shipments: Shipment[]
   collaborationsByKol: Record<string, Collaboration[]>
   loading: boolean
   onSelect: (kol: KOL) => void
   selectedId: string | null
-  onCreate: (data: KolFormData) => void
+  productOptions: string[]
+  onAddKol: () => void
   onDelete: (id: string) => void
   onRefresh: () => void
 }
 
-export default function KolTable({ kols, invitations, collaborationsByKol, loading, onSelect, selectedId, onCreate, onDelete, onRefresh }: Props) {
+const statusTone = (status: string) => {
+  const map: Record<string, string> = {
+    未首触: 'bg-gray-100 text-gray-600',
+    已邀约: 'bg-purple-50 text-purple-700',
+    待寄出: 'bg-amber-50 text-amber-700',
+    运输中: 'bg-blue-50 text-blue-700',
+    已签收: 'bg-cyan-50 text-cyan-700',
+    内容跟进: 'bg-rose-50 text-rose-700',
+    待制作: 'bg-amber-50 text-amber-700',
+    制作中: 'bg-sky-50 text-sky-700',
+    待发布: 'bg-indigo-50 text-indigo-700',
+    暂停异常: 'bg-red-50 text-red-700',
+    '暂停/异常': 'bg-red-50 text-red-700',
+    异常: 'bg-red-50 text-red-700',
+    合作完成: 'bg-emerald-50 text-emerald-700',
+    拒绝合作: 'bg-red-50 text-red-700',
+    我方拒绝: 'bg-slate-100 text-slate-600',
+  }
+  return map[status] || 'bg-gray-100 text-gray-600'
+}
+
+const replyTone = (invitation: Invitation | null) => {
+  if (!invitation) return 'bg-gray-100 text-gray-400'
+  if (!invitation.replied || invitation.reply_result === '未回复') return 'bg-amber-50 text-amber-700'
+  if (invitation.decision === '我方拒绝') return 'bg-slate-100 text-slate-600'
+  if (invitation.reply_result.includes('同意')) return 'bg-emerald-50 text-emerald-700'
+  if (invitation.reply_result.includes('拒绝')) return 'bg-red-50 text-red-700'
+  return 'bg-gray-100 text-gray-600'
+}
+
+const replyLabel = (invitation: Invitation | null) => {
+  if (!invitation) return '无邀约'
+  if (!invitation.replied || invitation.reply_result === '未回复') return '未回复'
+  if (invitation.decision === '我方拒绝') return '不推进'
+  if (invitation.reply_result.includes('同意')) return '已同意'
+  if (invitation.reply_result.includes('拒绝')) return '已拒绝'
+  return invitation.reply_result
+}
+
+const shipmentDateLabel = (kol: KOL) => {
+  if (!kol.sample_date) return null
+  if (kol.status === '待寄出') return `待寄 ${kol.sample_date}`
+  if (kol.status === '运输中') return `已发出 ${kol.sample_date}`
+  if (kol.status === '已签收') return `已签收 ${kol.sample_date}`
+  if (kol.status === '合作完成') return `最近寄样 ${kol.sample_date}`
+  return `寄样 ${kol.sample_date}`
+}
+
+const text = (value: unknown) => String(value ?? '').toLowerCase()
+
+export default function KolTable({
+  kols,
+  invitations,
+  shipments,
+  collaborationsByKol,
+  loading,
+  onSelect,
+  selectedId,
+  productOptions,
+  onAddKol,
+  onDelete,
+  onRefresh,
+}: Props) {
   const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterContentShape, setFilterContentShape] = useState('')
   const [filterPlatform, setFilterPlatform] = useState('')
   const [filterTag, setFilterTag] = useState('')
   const [filterInvProduct, setFilterInvProduct] = useState('')
   const [filterInvStatus, setFilterInvStatus] = useState('')
-  const [showAddModal, setShowAddModal] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showBatchInvite, setShowBatchInvite] = useState(false)
   const [batchProduct, setBatchProduct] = useState('')
   const [batchSending, setBatchSending] = useState(false)
   const [batchDone, setBatchDone] = useState(false)
+  const [batchCopySucceeded, setBatchCopySucceeded] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
@@ -39,30 +105,15 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
     return invs.reduce((latest, inv) => !latest || inv.invited_at > latest.invited_at ? inv : latest)
   }
 
-  // Get all unique tags from existing KOL data for filtering
   const allTags = useMemo(() => {
     const set = new Set<string>()
     kols.forEach(kol => (kol.tags || []).forEach(tag => tag && set.add(tag)))
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [kols])
 
-  const allInvProducts = useMemo(() => {
-    const set = new Set<string>()
-    Object.values(invitations).forEach(invs => invs.forEach(inv => set.add(inv.product)))
-    return [...set].sort()
-  }, [invitations])
-
-  const allCountries = useMemo(() => {
-    const set = new Set<string>()
-    kols.forEach(kol => {
-      const country = String(kol.country || '').trim()
-      if (country) set.add(country)
-    })
-    return [...set].sort((a, b) => a.localeCompare(b))
-  }, [kols])
+  const allInvProducts = useMemo(() => collectProductOptions({ invitations }), [invitations])
 
   const filtered = useMemo(() => {
-    const text = (value: unknown) => String(value ?? '').toLowerCase()
     return kols.filter(kol => {
       const q = search.trim().toLowerCase()
       const matchSearch = !q ||
@@ -73,74 +124,45 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
         text(kol.country).includes(q) ||
         text(kol.followers).includes(q) ||
         (kol.tags || []).some(tag => text(tag).includes(q))
-      const matchStatus = !filterStatus || kol.status === filterStatus
+      const matchContentShape = !filterContentShape || getKolContentShape(kol) === filterContentShape
       const matchPlatform = !filterPlatform || kol.platform === filterPlatform
-      const matchTag = !filterTag || (kol.tags || []).some(t => text(t) === filterTag.toLowerCase())
+      const matchTag = !filterTag || (kol.tags || []).some(tag => text(tag) === filterTag.toLowerCase())
 
-      let matchInvProduct = true
-      if (filterInvProduct) {
-        const invs = invitations[kol.id] || []
-        matchInvProduct = invs.some(inv => inv.product === filterInvProduct)
-      }
-
+      const invs = invitations[kol.id] || []
+      const matchInvProduct = !filterInvProduct || invs.some(inv => inv.product === filterInvProduct)
+      const latest = getLatestInv(kol.id)
       let matchInvStatus = true
-      if (filterInvStatus) {
-        const latest = getLatestInv(kol.id)
-        if (!latest) matchInvStatus = filterInvStatus === 'none'
-        else if (filterInvStatus === 'unreplied') matchInvStatus = !latest.replied
-        else if (filterInvStatus === 'agreed') matchInvStatus = latest.replied && latest.reply_result.includes('同意')
-        else if (filterInvStatus === 'rejected') matchInvStatus = latest.replied && latest.reply_result.includes('拒绝')
-      }
+      if (filterInvStatus === 'none') matchInvStatus = !latest
+      if (filterInvStatus === 'unreplied') matchInvStatus = Boolean(latest && (!latest.replied || latest.reply_result === '未回复'))
+      if (filterInvStatus === 'agreed') matchInvStatus = Boolean(latest?.replied && latest.reply_result.includes('同意') && latest.decision !== '我方拒绝')
+      if (filterInvStatus === 'rejected') matchInvStatus = Boolean(latest?.replied && (latest.reply_result.includes('拒绝') || latest.decision === '我方拒绝'))
 
-      return matchSearch && matchStatus && matchPlatform && matchTag && matchInvProduct && matchInvStatus
+      return matchSearch && matchContentShape && matchPlatform && matchTag && matchInvProduct && matchInvStatus
     })
-  }, [kols, search, filterStatus, filterPlatform, filterTag, filterInvProduct, filterInvStatus, invitations])
+  }, [kols, search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, invitations])
 
   useEffect(() => {
     setPage(1)
     setSelectedIds(new Set())
-  }, [search, filterStatus, filterPlatform, filterTag, filterInvProduct, filterInvStatus, pageSize])
+  }, [search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, pageSize])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const pageStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
   const pageEnd = Math.min(safePage * pageSize, filtered.length)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const allPageSelected = paged.length > 0 && paged.every(kol => selectedIds.has(kol.id))
+  const selectedKols = useMemo(() => kols.filter(kol => selectedIds.has(kol.id)), [kols, selectedIds])
+
+  const stats = useMemo(() => ({
+    total: kols.length,
+    video: kols.filter(kol => getKolContentShape(kol) === '视频').length,
+    website: kols.filter(kol => getKolContentShape(kol) === '网站').length,
+    completed: Object.values(collaborationsByKol).reduce((sum, items) => sum + countCompletedCollaborations(items), 0),
+  }), [kols, collaborationsByKol])
 
   const collaborationCount = (kolId: string) => countCompletedCollaborations(collaborationsByKol[kolId] || [])
 
-  const statusColor = (s: string) => {
-    const map: Record<string, string> = {
-      '已邀约': 'bg-purple-100 text-purple-700',
-      '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
-      '内容跟进': 'bg-rose-100 text-rose-700', '异常': 'bg-red-100 text-red-700',
-      '已签收': 'bg-teal-100 text-teal-700', '待制作': 'bg-amber-100 text-amber-700',
-      '制作中': 'bg-sky-100 text-sky-700', '待发布': 'bg-cyan-100 text-cyan-700',
-      '进度异常': 'bg-red-100 text-red-700', '合作完成': 'bg-green-100 text-green-700',
-      '拒绝合作': 'bg-red-100 text-red-700', '我方拒绝': 'bg-red-100 text-red-700',
-    }
-    return map[s] || 'bg-gray-100 text-gray-600'
-  }
-
-  const invMiniBadge = (inv: Invitation | null) => {
-    if (!inv) return <span className="text-[11px] text-gray-300">-</span>
-    const color = !inv.replied
-      ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-      : inv.reply_result.includes('同意')
-        ? 'bg-green-50 text-green-700 border-green-200'
-        : inv.reply_result.includes('拒绝')
-          ? 'bg-red-50 text-red-700 border-red-200'
-          : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-    const label = !inv.replied ? '未回复' : inv.reply_result.includes('同意') ? '已同意' : inv.reply_result.includes('拒绝') ? '已拒绝' : inv.reply_result
-    return (
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs font-medium text-purple-600">{inv.product}</span>
-        <span className={`text-xs px-1.5 py-0.5 rounded border ${color}`}>{label}</span>
-      </div>
-    )
-  }
-
-  // ─── Batch invite logic ───────────────────────────────────────────────────
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -151,37 +173,36 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
   }
 
   const toggleAll = () => {
-    if (selectedIds.size === paged.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(paged.map(k => k.id)))
-    }
-  }
-
-  const selectedKols = kols.filter(k => selectedIds.has(k.id))
-  const INVITATION_ENTRY_STATUSES = ['未首触', '拒绝合作', '我方拒绝', '沟通中', '未回复', '']
-
-  const shipmentDateLabel = (kol: KOL) => {
-    if (!kol.sample_date) return null
-    if (kol.status === '待寄出') return `待寄 ${kol.sample_date}`
-    if (kol.status === '运输中') return `已发出 ${kol.sample_date}`
-    if (kol.status === '已签收') return `已签收 ${kol.sample_date}`
-    if (kol.status === '合作完成') return `最近寄样 ${kol.sample_date}`
-    return `寄样日期 ${kol.sample_date}`
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allPageSelected) {
+        paged.forEach(kol => next.delete(kol.id))
+      } else {
+        paged.forEach(kol => next.add(kol.id))
+      }
+      return next
+    })
   }
 
   const handleBatchInvite = async () => {
     if (selectedKols.length === 0) return
     setBatchSending(true)
     try {
-      // 1. Copy emails to clipboard
       const emails = selectedKols.map(k => k.email).filter(Boolean).join(', ')
-      await navigator.clipboard.writeText(emails)
+      let clipboardCopied = false
+      if (emails && navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(emails)
+          clipboardCopied = true
+        } catch {
+          clipboardCopied = false
+        }
+      }
+      setBatchCopySucceeded(clipboardCopied)
 
-      // 2. Create invitation records for each selected KOL and advance only early-stage KOLs
-      await Promise.all(selectedKols.map(async k => {
-        await createInvitation({
-          kol_id: k.id,
+      await Promise.all(selectedKols.map(async kol => {
+        const inv = await createInvitation({
+          kol_id: kol.id,
           product: batchProduct.trim(),
           invited_at: new Date().toISOString().slice(0, 10),
           email_subject: '',
@@ -192,8 +213,15 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
           decision: '待评估',
           decision_reason: '',
         })
-        if (INVITATION_ENTRY_STATUSES.includes(k.status)) {
-          await updateKOL(k.id, { status: '已邀约' })
+        const nextInvitations = [inv, ...(invitations[kol.id] || [])]
+        const nextStatus = deriveKolStatus(
+          kol,
+          nextInvitations,
+          shipments.filter(shipment => shipment.kol_id === kol.id),
+          collaborationsByKol[kol.id] || []
+        )
+        if (nextStatus !== kol.status) {
+          await updateKOL(kol.id, { status: nextStatus })
         }
       }))
 
@@ -203,7 +231,7 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
         setBatchDone(false)
         setSelectedIds(new Set())
         onRefresh()
-      }, 2000)
+      }, 1400)
     } catch {
       alert('批量邀约失败，请重试')
     } finally {
@@ -213,222 +241,278 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-semibold text-gray-900">KOL 资源池</h1>
-            <div className="flex items-center gap-2">
-              {selectedIds.size > 0 && (
-                <button
-                  onClick={() => { setBatchProduct(''); setShowBatchInvite(true) }}
-                  className="px-4 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm rounded-lg hover:from-purple-600 hover:to-purple-700 shadow-sm transition-all font-medium"
-                >
-                  📩 批量邀约 ({selectedIds.size})
-                </button>
-              )}
-              <button onClick={onRefresh} className="text-xs text-gray-400 hover:text-blue-500 transition-colors">刷新</button>
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{kols.length} 条</span>
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-black/[0.06] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+        <div className="shrink-0 border-b border-black/[0.06] px-5 py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex min-w-[220px] flex-1 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-[17px] font-extrabold text-[#1D1D1F]">KOL 资源池</h2>
+                <p className="mt-0.5 text-xs font-medium text-[#86868B]">共 {stats.total} 位，{filtered.length} 位符合当前筛选</p>
+              </div>
             </div>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <MiniStat label="视频" value={stats.video} tone="text-[#0066FF]" />
+              <MiniStat label="网站" value={stats.website} tone="text-[#FF9F0A]" />
+              <MiniStat label="合作次" value={stats.completed} tone="text-[#34C759]" />
+              <MiniStat label="已选择" value={selectedIds.size} tone="text-[#1D1D1F]" />
+            </div>
+            <button
+              onClick={onRefresh}
+              className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] transition hover:bg-[#F5F5F7]"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> 刷新
+            </button>
+            <button
+              onClick={onAddKol}
+              className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-[#0066FF] px-4 text-xs font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] transition active:scale-95"
+            >
+              <Plus className="h-3.5 w-3.5" /> 添加 KOL
+            </button>
           </div>
-          <div className="space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <input type="text" placeholder="搜索名称 / 邮箱 / 主页..." value={search} onChange={e => setSearch(e.target.value)}
-                className="flex-1 min-w-[200px] px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50" />
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg">
-                <option value="">全部状态</option>
-                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select value={filterPlatform} onChange={e => setFilterPlatform(e.target.value)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg">
-                <option value="">全部平台</option>
-                {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <select value={filterTag} onChange={e => setFilterTag(e.target.value)} className="px-3 py-1.5 text-sm border border-emerald-200 rounded-lg text-emerald-700 bg-emerald-50/40">
-                <option value="">全部分类</option>
-                {allTags.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <button onClick={() => setShowAddModal(true)} className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-sm transition-all shrink-0">
-                + 新增 KOL
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[260px] flex-1">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#AEAEB2]" />
+              <input
+                type="text"
+                placeholder="搜索名称 / 邮箱 / 主页 / 国家 / 标签"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+                className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] pl-9 pr-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40 focus:bg-white"
+              />
+            </div>
+            <FilterSelect value={filterContentShape} onChange={setFilterContentShape} options={CONTENT_SHAPES} placeholder="全部形态" />
+            <FilterSelect value={filterPlatform} onChange={setFilterPlatform} options={PLATFORMS} placeholder="全部平台" />
+            <FilterSelect value={filterTag} onChange={setFilterTag} options={allTags} placeholder="全部分类" />
+            <FilterSelect value={filterInvProduct} onChange={setFilterInvProduct} options={allInvProducts} placeholder="邀约产品" />
+            <select
+              value={filterInvStatus}
+              onChange={event => setFilterInvStatus(event.target.value)}
+              className="h-9 rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] outline-none focus:border-[#0066FF]/40"
+            >
+              <option value="">邀约结果</option>
+              <option value="unreplied">未回复</option>
+              <option value="agreed">已同意</option>
+              <option value="rejected">已拒绝/不推进</option>
+              <option value="none">无邀约</option>
+            </select>
+            {selectedIds.size > 0 && (
+              <button
+                onClick={() => { setBatchProduct(''); setShowBatchInvite(true) }}
+                className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-[#1D1D1F] px-4 text-xs font-bold text-white transition active:scale-95"
+              >
+                <MailPlus className="h-3.5 w-3.5" /> 批量邀约 {selectedIds.size}
               </button>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <select value={filterInvProduct} onChange={e => setFilterInvProduct(e.target.value)} className="px-3 py-1.5 text-xs border border-purple-200 rounded-lg text-purple-700">
-                <option value="">全部邀约产品</option>
-                {allInvProducts.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <select value={filterInvStatus} onChange={e => setFilterInvStatus(e.target.value)} className="px-3 py-1.5 text-xs border border-purple-200 rounded-lg text-purple-700">
-                <option value="">全部邀约状态</option>
-                <option value="unreplied">未回复</option>
-                <option value="agreed">已同意</option>
-                <option value="rejected">已拒绝</option>
-                <option value="none">无邀约记录</option>
-              </select>
-            </div>
+            )}
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-[15px]">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="px-3 py-3 w-[40px]">
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="min-w-[1260px] w-full text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-[#FBFBFD]">
+              <tr className="border-b border-black/[0.06] text-[11px] font-bold text-[#86868B]">
+                <th className="w-12 px-4 py-3">
                   <input
                     type="checkbox"
-                    checked={paged.length > 0 && selectedIds.size === paged.length && paged.every(k => selectedIds.has(k.id))}
+                    checked={allPageSelected}
                     onChange={toggleAll}
-                    className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    className="h-4 w-4 rounded border-gray-300 text-[#0066FF] focus:ring-[#0066FF]"
                   />
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[12%]">博主名称</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[8%]">平台</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[7%]">粉丝</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[9%]">状态</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[10%]">最近邀约</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[9%]">合作次数</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[16%]">联系邮箱</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[7%]">国家</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[9%]">标签</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[8%]">寄样</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 w-[5%]">操作</th>
+                <th className="px-3 py-3">KOL</th>
+                <th className="px-3 py-3">平台</th>
+                <th className="px-3 py-3">内容形态</th>
+                <th className="px-3 py-3">粉丝</th>
+                <th className="px-3 py-3">当前流程</th>
+                <th className="px-3 py-3">最近邀约</th>
+                <th className="px-3 py-3">合作</th>
+                <th className="px-3 py-3">邮箱</th>
+                <th className="px-3 py-3">国家</th>
+                <th className="px-3 py-3">标签</th>
+                <th className="px-3 py-3">寄样</th>
+                <th className="px-3 py-3 text-right">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-black/[0.04]">
               {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-50">
-                    {Array.from({ length: 12 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <div className="h-4 bg-gray-100 rounded animate-pulse" style={{ width: `${60 + Math.random() * 30}%` }} />
+                Array.from({ length: 6 }).map((_, rowIndex) => (
+                  <tr key={rowIndex}>
+                    {Array.from({ length: 13 }).map((__, cellIndex) => (
+                      <td key={cellIndex} className="px-4 py-3">
+                        <div className="h-4 rounded bg-gray-100" />
                       </td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="text-center py-16 text-gray-400">
-                    {kols.length === 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-sm">还没有任何 KOL 数据</p>
-                        <button onClick={() => setShowAddModal(true)} className="text-blue-500 text-sm">点击新增第一个 KOL</button>
+                  <td colSpan={13} className="px-4 py-16 text-center">
+                    <div className="mx-auto flex max-w-sm flex-col items-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#F5F5F7] text-[#86868B]">
+                        <Users className="h-5 w-5" />
                       </div>
-                    ) : <p className="text-sm">无匹配结果</p>}
+                      <p className="mt-3 text-sm font-bold text-[#1D1D1F]">{kols.length === 0 ? '暂无 KOL 数据' : '没有匹配的 KOL'}</p>
+                      {kols.length === 0 && (
+                        <button onClick={onAddKol} className="mt-3 inline-flex items-center gap-1.5 rounded-[10px] bg-[#0066FF] px-4 py-2 text-xs font-bold text-white">
+                          <Plus className="h-3.5 w-3.5" /> 添加第一位 KOL
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
-                paged.map(kol => (
-                  <tr key={kol.id} className={`border-b border-gray-50 cursor-pointer transition-colors hover:bg-blue-50/50 ${selectedId === kol.id ? 'bg-blue-50' : ''} ${selectedIds.has(kol.id) ? 'bg-purple-50/40' : ''}`}>
-                    <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(kol.id)}
-                        onChange={() => toggleSelect(kol.id)}
-                        className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                    </td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3 font-semibold text-blue-600">{kol.name}</td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-700">{kol.platform}</td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-700">{kol.followers}</td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor(kol.status)}`}>{kol.status}</span>
-                    </td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3">{invMiniBadge(getLatestInv(kol.id))}</td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3">
-                      {collaborationCount(kol.id) > 0 ? (
-                        <span className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-100 rounded-full text-xs font-semibold">合作 {collaborationCount(kol.id)} 次</span>
-                      ) : <span className="text-xs text-gray-300">-</span>}
-                    </td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-500 text-sm">{kol.email}</td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3 text-gray-600 text-sm">{kol.country}</td>
-                    <td onClick={() => onSelect(kol)} className="px-4 py-3">
-                      <div className="flex gap-1 flex-wrap">
-                        {(kol.tags || []).slice(0, 2).map(t => <span key={t} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{t}</span>)}
-                        {(kol.tags || []).length > 2 && <span className="text-xs text-gray-400">+{kol.tags.length - 2}</span>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {kol.sample_product || kol.sample_date ? (
-                        <div className="space-y-0.5">
-                          {kol.sample_product && <div className="text-xs font-medium text-orange-600 truncate">{kol.sample_product}</div>}
-                          {kol.sample_date && <div className="text-xs text-green-600">{shipmentDateLabel(kol)}</div>}
+                paged.map(kol => {
+                  const latestInvitation = getLatestInv(kol.id)
+                  const count = collaborationCount(kol.id)
+                  const contentShape = getKolContentShape(kol)
+                  return (
+                    <tr
+                      key={kol.id}
+                      className={`cursor-pointer transition hover:bg-[#F5F5F7] ${selectedId === kol.id ? 'bg-blue-50/70' : ''} ${selectedIds.has(kol.id) ? 'bg-gray-50' : ''}`}
+                    >
+                      <td className="px-4 py-3" onClick={event => event.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(kol.id)}
+                          onChange={() => toggleSelect(kol.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-[#0066FF] focus:ring-[#0066FF]"
+                        />
+                      </td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-[11px] font-extrabold text-white">
+                            {kol.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-[13px] font-extrabold text-[#1D1D1F]">{kol.name}</div>
+                            <div className="truncate text-[11px] font-medium text-[#86868B]">{kol.homepage_url || '-'}</div>
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-xs text-gray-300">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button onClick={(e) => { e.stopPropagation(); onDelete(kol.id) }} className="text-xs text-red-400 hover:text-red-600 transition-colors font-medium">删除</button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3 text-xs font-bold text-[#6E6E73]">{kol.platform || '-'}</td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${contentShape === '网站' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>{contentShape}</span>
+                      </td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3 text-xs font-semibold text-[#6E6E73]">{kol.followers || '-'}</td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(kol.status)}`}>{kol.status || '-'}</span>
+                      </td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3">
+                        <div className="flex max-w-[180px] flex-col gap-1">
+                          <span className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-bold ${replyTone(latestInvitation)}`}>{replyLabel(latestInvitation)}</span>
+                          {latestInvitation && <span className="truncate text-[11px] font-semibold text-[#86868B]">{latestInvitation.product}</span>}
+                        </div>
+                      </td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3">
+                        {count > 0 ? (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">{count} 次</span>
+                        ) : <span className="text-xs font-medium text-[#AEAEB2]">-</span>}
+                      </td>
+                      <td onClick={() => onSelect(kol)} className="max-w-[190px] truncate px-3 py-3 text-xs font-medium text-[#6E6E73]">{kol.email || '-'}</td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3 text-xs font-medium text-[#6E6E73]">{kol.country || '-'}</td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3">
+                        <div className="flex max-w-[180px] flex-wrap gap-1">
+                          {(kol.tags || []).slice(0, 2).map(tag => <span key={tag} className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px] font-bold text-[#6E6E73]">{tag}</span>)}
+                          {(kol.tags || []).length > 2 && <span className="text-[11px] font-bold text-[#AEAEB2]">+{kol.tags.length - 2}</span>}
+                        </div>
+                      </td>
+                      <td onClick={() => onSelect(kol)} className="px-3 py-3">
+                        {kol.sample_product || kol.sample_date ? (
+                          <div className="max-w-[150px]">
+                            {kol.sample_product && <div className="truncate text-[11px] font-bold text-amber-700">{kol.sample_product}</div>}
+                            {kol.sample_date && <div className="text-[11px] font-medium text-[#86868B]">{shipmentDateLabel(kol)}</div>}
+                          </div>
+                        ) : <span className="text-xs font-medium text-[#AEAEB2]">-</span>}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <button
+                          onClick={event => { event.stopPropagation(); onDelete(kol.id) }}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-[9px] text-[#AEAEB2] transition hover:bg-red-50 hover:text-red-600"
+                          title="删除"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/70 text-sm text-gray-600">
+
+        <div className="flex shrink-0 items-center justify-between border-t border-black/[0.06] bg-[#FBFBFD] px-5 py-3 text-xs font-semibold text-[#6E6E73]">
           <div>第 {pageStart}-{pageEnd} 条 / 共 {filtered.length} 条</div>
           <div className="flex items-center gap-2">
             <span>每页</span>
-            <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="px-2 py-1 border border-gray-200 rounded-lg bg-white">
+            <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))} className="h-8 rounded-[8px] border border-black/[0.08] bg-white px-2 outline-none">
               {[25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
             </select>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage <= 1} className="px-3 py-1 border border-gray-200 rounded-lg bg-white disabled:opacity-40">上一页</button>
-            <span className="px-2">{safePage} / {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="px-3 py-1 border border-gray-200 rounded-lg bg-white disabled:opacity-40">下一页</button>
+            <button onClick={() => setPage(value => Math.max(1, value - 1))} disabled={safePage <= 1} className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-black/[0.08] bg-white disabled:opacity-40">
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="min-w-12 text-center">{safePage} / {totalPages}</span>
+            <button onClick={() => setPage(value => Math.min(totalPages, value + 1))} disabled={safePage >= totalPages} className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-black/[0.08] bg-white disabled:opacity-40">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
-      </div>
-      {showAddModal && <AddKolModal existingKols={kols} countryOptions={allCountries} onClose={() => setShowAddModal(false)} onSubmit={(data) => { onCreate(data); setShowAddModal(false) }} />}
+      </section>
 
-      {/* Batch Invite Modal */}
       {showBatchInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setShowBatchInvite(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-[480px] max-h-[80vh] overflow-y-auto p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">📩 批量邀约</h3>
-
-            <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-100">
-              <p className="text-xs text-purple-700 font-medium mb-1">已选 {selectedKols.length} 位 KOL</p>
-              <div className="flex flex-wrap gap-1">
-                {selectedKols.slice(0, 8).map(k => (
-                  <span key={k.id} className="text-[10px] px-2 py-0.5 bg-white rounded-full border border-purple-200 text-purple-600">{k.name}</span>
-                ))}
-                {selectedKols.length > 8 && <span className="text-[10px] text-purple-400">+{selectedKols.length - 8} 更多</span>}
-              </div>
-            </div>
-
-            <div className="space-y-3 mb-5">
+          <div className="relative w-[520px] max-w-[calc(100vw-32px)] rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">邀约产品</label>
-                <input
-                  type="text"
-                  value={batchProduct}
-                  onChange={e => setBatchProduct(e.target.value)}
-                  placeholder="手动输入产品名称，如 BY53"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-400/50 focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-gray-400">这里仅记录本次邀约对应的产品，不会自动发送邮件。</p>
+                <h3 className="text-lg font-extrabold text-[#1D1D1F]">批量邀约</h3>
+                <p className="mt-1 text-xs font-medium text-[#86868B]">将复制邮箱，并为选中的 KOL 创建本次产品邀约记录。</p>
+              </div>
+              <span className="rounded-full bg-[#F5F5F7] px-3 py-1 text-xs font-extrabold text-[#1D1D1F]">{selectedKols.length} 位</span>
+            </div>
+
+            <div className="mt-5 rounded-[14px] border border-black/[0.06] bg-[#F5F5F7] p-3">
+              <div className="flex flex-wrap gap-1.5">
+                {selectedKols.slice(0, 10).map(kol => (
+                  <span key={kol.id} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[#6E6E73]">{kol.name}</span>
+                ))}
+                {selectedKols.length > 10 && <span className="px-2 py-1 text-[11px] font-bold text-[#86868B]">+{selectedKols.length - 10}</span>}
               </div>
             </div>
 
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-500 mb-1">点击确认后将：</p>
-              <ul className="text-xs text-gray-600 space-y-0.5 list-disc list-inside">
-                <li>复制所有选中 KOL 的邮箱到剪贴板</li>
-                <li>为每位 KOL 创建邀约记录</li>
-                <li>你可以直接粘贴邮箱去发邮件</li>
-              </ul>
+            <div className="mt-5">
+              <label className="mb-1.5 block text-xs font-bold text-[#6E6E73]">邀约产品</label>
+              <input
+                type="text"
+                value={batchProduct}
+                onChange={event => setBatchProduct(event.target.value)}
+                list={productOptions.length > 0 ? 'batch-invite-product-options' : undefined}
+                placeholder="例如 BY53 / K1 / 防晒霜 SPF50+"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] bg-white px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
+              />
+              {productOptions.length > 0 && (
+                <datalist id="batch-invite-product-options">
+                  {productOptions.map(product => <option key={product} value={product} />)}
+                </datalist>
+              )}
             </div>
 
             {batchDone ? (
-              <div className="text-center py-3">
-                <p className="text-green-600 font-medium">✅ 邮箱已复制，邀约记录已创建！</p>
-                <p className="text-xs text-gray-500 mt-1">请前往邮箱客户端粘贴收件人发送邮件</p>
+              <div className="mt-5 rounded-[14px] bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                {batchCopySucceeded ? '邮箱已复制，邀约记录已创建' : '邀约记录已创建，邮箱复制需手动处理'}
               </div>
             ) : (
-              <div className="flex justify-end gap-2">
-                <button onClick={() => setShowBatchInvite(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
-                <button onClick={handleBatchInvite} disabled={batchSending || !batchProduct.trim()}
-                  className="px-5 py-2 text-sm bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 shadow-sm transition-all font-medium disabled:opacity-50">
-                  {batchSending ? '处理中...' : `确认邀约 (${selectedKols.length} 人)`}
+              <div className="mt-6 flex justify-end gap-2">
+                <button onClick={() => setShowBatchInvite(false)} className="h-10 rounded-[10px] px-4 text-sm font-bold text-[#6E6E73] transition hover:bg-[#F5F5F7]">取消</button>
+                <button
+                  onClick={handleBatchInvite}
+                  disabled={batchSending || !batchProduct.trim()}
+                  className="h-10 rounded-[10px] bg-[#0066FF] px-5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] transition disabled:opacity-50"
+                >
+                  {batchSending ? '处理中...' : '确认邀约'}
                 </button>
               </div>
             )}
@@ -436,5 +520,37 @@ export default function KolTable({ kols, invitations, collaborationsByKol, loadi
         </div>
       )}
     </>
+  )
+}
+
+function MiniStat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="min-w-16 rounded-[10px] bg-[#F5F5F7] px-3 py-2">
+      <div className={`text-[15px] font-extrabold tabular-nums ${tone}`}>{value}</div>
+      <div className="mt-0.5 text-[10px] font-bold text-[#86868B]">{label}</div>
+    </div>
+  )
+}
+
+function FilterSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  options: string[]
+  placeholder: string
+}) {
+  return (
+    <select
+      value={value}
+      onChange={event => onChange(event.target.value)}
+      className="h-9 rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] outline-none focus:border-[#0066FF]/40"
+    >
+      <option value="">{placeholder}</option>
+      {options.map(option => <option key={option} value={option}>{option}</option>)}
+    </select>
   )
 }

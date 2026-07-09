@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS kols (
   followers TEXT,
   country TEXT,
   tags TEXT[] DEFAULT '{}',
+  notes TEXT,
   status TEXT DEFAULT '未首触',
   sample_product TEXT,
   sample_date DATE,
@@ -144,3 +145,26 @@ CREATE INDEX IF NOT EXISTS idx_shipments_created_at ON shipments (created_at DES
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS completed_at DATE;
 -- ALTER TABLE shipments ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 -- ALTER TABLE kols ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
+
+-- ============================================================
+-- V7 升级：产品主数据表，用于产品机会匹配和真实产品管理
+-- ============================================================
+CREATE TABLE IF NOT EXISTS products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  category TEXT,
+  target_kol_tags TEXT[] DEFAULT '{}',
+  target_content_shapes TEXT[] DEFAULT '{}',
+  status TEXT DEFAULT '在推',
+  priority INTEGER DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all access" ON products FOR ALL USING (true) WITH CHECK (true);
+
+CREATE INDEX IF NOT EXISTS idx_products_name ON products (name);
+CREATE INDEX IF NOT EXISTS idx_products_status ON products (status);
+CREATE INDEX IF NOT EXISTS idx_products_priority ON products (priority DESC);

@@ -11,6 +11,7 @@ export default function MailPanel({ kolEmail: _kolEmail, kolId }: Props) {
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     loadEmails()
@@ -18,11 +19,12 @@ export default function MailPanel({ kolEmail: _kolEmail, kolId }: Props) {
 
   const loadEmails = async () => {
     setLoading(true)
+    setError('')
     try {
       const data = await getEmailsByKOL(kolId)
       setEmails(data)
-    } catch {
-      // silently fail
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '邮件记录加载失败')
     } finally {
       setLoading(false)
     }
@@ -52,7 +54,8 @@ export default function MailPanel({ kolEmail: _kolEmail, kolId }: Props) {
           ))
         ) : emails.length === 0 ? (
           <div className="text-xs text-gray-400 text-center py-8 space-y-2">
-            <p>暂无邮件记录</p>
+            <p>{error ? '邮件记录加载失败' : '暂无邮件记录'}</p>
+            {error && <p className="max-w-sm mx-auto leading-relaxed text-red-500">{error}</p>}
             <p className="max-w-sm mx-auto leading-relaxed">邮件不会自动出现在这里，需要先运行邮件同步，并确认 .env.local 中的 IMAP 配置、发件箱文件夹和 KOL 邮箱匹配正确。</p>
           </div>
         ) : (

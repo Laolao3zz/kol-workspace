@@ -1,6 +1,8 @@
+import { CheckCircle2, ListChecks, X } from 'lucide-react'
 import { useState } from 'react'
 import type { Shipment } from '../types'
 import { PROGRESS_STATUSES } from '../types'
+import { buildProgressSubmitPayload } from '../utils/progressPayload'
 
 export interface ProgressFormData {
   progress_status: string
@@ -22,34 +24,37 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
   })
 
   const submit = () => {
-    onSubmit({
-      progress_status: form.completed_at ? '已完成' : form.progress_status || '待制作',
-      progress_notes: form.progress_notes.trim(),
-      completed_at: form.completed_at || null,
-    })
+    onSubmit(buildProgressSubmitPayload(form))
   }
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-[520px] max-h-[86vh] overflow-y-auto p-6">
+      <div className="relative w-[520px] max-w-[calc(100vw-32px)] max-h-[86vh] overflow-y-auto rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between mb-5">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">编辑内容进度</h3>
-            <p className="text-xs text-gray-400 mt-1">{shipment.product} · 只更新内容推进信息，不影响物流记录</p>
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
+              <ListChecks className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold text-[#1D1D1F]">编辑内容进度</h3>
+              <p className="mt-1 text-xs font-medium text-[#86868B]">{shipment.product} · 只更新内容推进信息，不影响物流记录</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-black/[0.08] text-[#86868B] hover:bg-[#F5F5F7]" title="关闭">
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4">
+          <div className="rounded-[16px] border border-black/[0.06] bg-[#F5F5F7] p-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">进度状态</label>
                 <select
                   value={form.progress_status}
                   onChange={e => setForm(prev => ({ ...prev, progress_status: e.target.value, completed_at: e.target.value === '已完成' ? prev.completed_at : null }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 bg-white"
+                  className="h-10 w-full rounded-[10px] border border-black/[0.08] bg-white px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
                 >
                   {PROGRESS_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                 </select>
@@ -60,15 +65,16 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
                   type="date"
                   value={form.completed_at || ''}
                   onChange={e => setForm(prev => ({ ...prev, completed_at: e.target.value || null, progress_status: e.target.value ? '已完成' : prev.progress_status }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 bg-white"
+                  className="h-10 w-full rounded-[10px] border border-black/[0.08] bg-white px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
                 />
               </div>
               <div className="col-span-2 flex items-end">
                 <button
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, completed_at: new Date().toISOString().slice(0, 10), progress_status: '已完成' }))}
-                  className="w-full px-3 py-2 text-sm bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 px-3 text-sm font-bold text-white transition hover:bg-emerald-700"
                 >
+                  <CheckCircle2 className="h-4 w-4" />
                   标记今天完成
                 </button>
               </div>
@@ -82,16 +88,16 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
               onChange={e => setForm(prev => ({ ...prev, progress_notes: e.target.value }))}
               rows={4}
               placeholder="例如：已签收待制作 / 已催发布日期 / 内容卡住原因"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 resize-y"
+              className="w-full resize-y rounded-[10px] border border-black/[0.08] px-3 py-2 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
             />
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
+        <div className="mt-6 flex justify-end gap-2 border-t border-black/[0.06] pt-4">
+          <button onClick={onClose} className="h-10 rounded-[10px] px-4 text-sm font-bold text-[#6E6E73] hover:bg-[#F5F5F7]">取消</button>
           <button
             onClick={submit}
-            className="px-5 py-2 text-sm bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-lg hover:from-rose-600 hover:to-pink-600 shadow-sm transition-all font-medium"
+            className="h-10 rounded-[10px] bg-[#0066FF] px-5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)]"
           >
             保存进度
           </button>

@@ -7,6 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
+import { findOrphanRows, KOL_HEALTH_COLUMNS, PRODUCT_HEALTH_COLUMNS } from './health-utils.mjs'
 
 dotenv.config({ path: '.env.local' })
 
@@ -14,11 +15,33 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ 缺少 Supabase 配置，请检查 .env.local 文件')
-  process.exit(1)
+  console.log('⚪ 未找到 .env.local 中的 Supabase 配置，已跳过线上数据库健康检查。')
+  console.log('   本地 UI 会自动使用 demo 数据；恢复 VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 后可重新运行。')
+  process.exit(0)
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey)
+
+async function fetchAll(table, columns, pageSize = 1000) {
+  const rows = []
+  let from = 0
+
+  while (true) {
+    const to = from + pageSize - 1
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .range(from, to)
+
+    if (error) throw error
+    rows.push(...(data || []))
+
+    if (!data || data.length < pageSize) break
+    from += pageSize
+  }
+
+  return rows
+}
 
 async function checkDatabaseHealth() {
   console.log('🔍 开始数据库健康检查...\n')
@@ -29,8 +52,7 @@ async function checkDatabaseHealth() {
   console.log('📊 检查 KOL 表...')
   const { data: kols, error: kolError } = await supabase
     .from('kols')
-    .select('id, name, email, status')
-    .limit(10)
+    .select(KOL_HEALTH_COLUMNS)
 
   if (kolError) {
     issues.push(`KOL 表查询失败: ${kolError.message}`)
@@ -44,12 +66,28 @@ async function checkDatabaseHealth() {
     }
   }
 
-  // 2. 检查 Shipments 表
+  // 2. Check Products table and product-targeting columns.
+  console.log('Checking Products table...')
+  const { data: products, error: productError } = await supabase
+    .from('products')
+    .select(PRODUCT_HEALTH_COLUMNS)
+
+  if (productError) {
+    issues.push(`Products table query failed: ${productError.message}`)
+  } else {
+    console.log(`Products table OK (${products.length} rows)`)
+
+    const emptyProductNames = products.filter(product => !product.name?.trim())
+    if (emptyProductNames.length > 0) {
+      issues.push(`Found ${emptyProductNames.length} products with empty names`)
+    }
+  }
+
+  // 3. 检查 Shipments 表
   console.log('📦 检查 Shipments 表...')
   const { data: shipments, error: shipmentError } = await supabase
     .from('shipments')
     .select('id, kol_id, product, status, tracking_number')
-    .limit(10)
 
   if (shipmentError) {
     issues.push(`Shipments 表查询失败: ${shipmentError.message}`)
@@ -70,7 +108,6 @@ async function checkDatabaseHealth() {
   const { data: invitations, error: invError } = await supabase
     .from('invitations')
     .select('id, kol_id, product')
-    .limit(10)
 
   if (invError) {
     issues.push(`Invitations 表查询失败: ${invError.message}`)
@@ -83,7 +120,6 @@ async function checkDatabaseHealth() {
   const { data: collaborations, error: colError } = await supabase
     .from('collaborations')
     .select('id, kol_id, product')
-    .limit(10)
 
   if (colError) {
     issues.push(`Collaborations 表查询失败: ${colError.message}`)
@@ -93,12 +129,23 @@ async function checkDatabaseHealth() {
 
   // 5. 检查孤立记录
   console.log('🔗 检查数据关联...')
-  if (shipments && kols) {
-    const kolIds = new Set(kols.map(k => k.id))
-    const orphanShipments = shipments.filter(s => !kolIds.has(s.kol_id))
-    if (orphanShipments.length > 0) {
-      issues.push(`发现 ${orphanShipments.length} 个孤立的 shipment 记录（关联的 KOL 不存在）`)
-    }
+  try {
+    const [allKols, allShipments, allInvitations, allCollaborations] = await Promise.all([
+      fetchAll('kols', 'id'),
+      fetchAll('shipments', 'id, kol_id'),
+      fetchAll('invitations', 'id, kol_id'),
+      fetchAll('collaborations', 'id, kol_id'),
+    ])
+
+    const orphanShipments = findOrphanRows(allShipments, allKols, 'kol_id')
+    const orphanInvitations = findOrphanRows(allInvitations, allKols, 'kol_id')
+    const orphanCollaborations = findOrphanRows(allCollaborations, allKols, 'kol_id')
+
+    if (orphanShipments.length > 0) issues.push(`发现 ${orphanShipments.length} 个孤立的 shipment 记录（关联的 KOL 不存在）`)
+    if (orphanInvitations.length > 0) issues.push(`发现 ${orphanInvitations.length} 个孤立的 invitation 记录（关联的 KOL 不存在）`)
+    if (orphanCollaborations.length > 0) issues.push(`发现 ${orphanCollaborations.length} 个孤立的 collaboration 记录（关联的 KOL 不存在）`)
+  } catch (err) {
+    issues.push(`关联检查失败: ${err.message}`)
   }
 
   // 输出结果

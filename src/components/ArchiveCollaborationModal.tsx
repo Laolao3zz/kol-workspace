@@ -1,5 +1,8 @@
+import { Archive, X } from 'lucide-react'
 import { useState } from 'react'
 import type { Collaboration, Shipment } from '../types'
+import type { ContentShape } from '../utils/contentShape'
+import { getContentShapeMetricLabels } from '../utils/contentShape'
 
 export interface ArchiveFormData {
   publish_date: string | null
@@ -14,6 +17,7 @@ export interface ArchiveFormData {
 interface Props {
   shipment: Shipment
   existing?: Collaboration | null
+  contentShape?: ContentShape
   onClose: () => void
   onSubmit: (data: ArchiveFormData) => void
 }
@@ -26,7 +30,8 @@ const toNullableNumber = (value: string) => {
   return Number.isFinite(numeric) ? numeric : null
 }
 
-export default function ArchiveCollaborationModal({ shipment, existing, onClose, onSubmit }: Props) {
+export default function ArchiveCollaborationModal({ shipment, existing, contentShape = '视频', onClose, onSubmit }: Props) {
+  const metricLabels = getContentShapeMetricLabels(contentShape)
   const [form, setForm] = useState<ArchiveFormData>({
     publish_date: existing?.publish_date || shipment.completed_at || new Date().toISOString().slice(0, 10),
     work_url: existing?.work_url || '',
@@ -52,13 +57,20 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-[720px] max-h-[90vh] overflow-y-auto p-6">
+      <div className="relative w-[720px] max-w-[calc(100vw-32px)] max-h-[90vh] overflow-y-auto rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between mb-5">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">正式归档合作</h3>
-            <p className="text-xs text-gray-400 mt-1">{shipment.product} · 补充效果数据后归入合作历史</p>
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
+              <Archive className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold text-[#1D1D1F]">正式归档合作</h3>
+              <p className="mt-1 text-xs font-medium text-[#86868B]">{shipment.product} · 补充效果数据后归入合作历史</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-black/[0.08] text-[#86868B] hover:bg-[#F5F5F7]" title="关闭">
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="space-y-4">
@@ -69,7 +81,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
                 type="date"
                 value={form.publish_date || ''}
                 onChange={e => setForm(prev => ({ ...prev, publish_date: e.target.value || null }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
             <div>
@@ -79,7 +91,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
                 value={form.fee}
                 onChange={e => setForm(prev => ({ ...prev, fee: e.target.value }))}
                 placeholder="例如 ¥3000 / 佣金15% / 免费送样"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
           </div>
@@ -91,39 +103,39 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
               value={form.work_url}
               onChange={e => setForm(prev => ({ ...prev, work_url: e.target.value }))}
               placeholder="https://..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
             />
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">播放量</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{metricLabels.viewsInput}</label>
               <input
                 type="number"
                 min="0"
                 value={parseNumber(form.views)}
                 onChange={e => setForm(prev => ({ ...prev, views: toNullableNumber(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">评论数</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{metricLabels.commentsInput}</label>
               <input
                 type="number"
                 min="0"
                 value={parseNumber(form.comments)}
                 onChange={e => setForm(prev => ({ ...prev, comments: toNullableNumber(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">点赞数</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{metricLabels.likesInput}</label>
               <input
                 type="number"
                 min="0"
                 value={parseNumber(form.likes)}
                 onChange={e => setForm(prev => ({ ...prev, likes: toNullableNumber(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
           </div>
@@ -135,14 +147,14 @@ export default function ArchiveCollaborationModal({ shipment, existing, onClose,
               value={form.notes}
               onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
               placeholder="补充合作表现、复盘结论、后续是否继续合作等"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-y"
+              className="w-full resize-y rounded-[10px] border border-black/[0.08] px-3 py-2 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
             />
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
-          <button onClick={handleSubmit} className="px-5 py-2 text-sm bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium">正式归档</button>
+        <div className="mt-6 flex justify-end gap-2 border-t border-black/[0.06] pt-4">
+          <button onClick={onClose} className="h-10 rounded-[10px] px-4 text-sm font-bold text-[#6E6E73] hover:bg-[#F5F5F7]">取消</button>
+          <button onClick={handleSubmit} className="h-10 rounded-[10px] bg-[#0066FF] px-5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)]">正式归档</button>
         </div>
       </div>
     </div>

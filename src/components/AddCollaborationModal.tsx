@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { BarChart3, X } from 'lucide-react'
+import { useId, useState } from 'react'
 import type { Collaboration } from '../types'
+import type { ContentShape } from '../utils/contentShape'
+import { getContentShapeMetricLabels } from '../utils/contentShape'
 
 interface Props {
   kolId: string
   collaboration?: Collaboration | null
+  productOptions?: string[]
+  contentShape?: ContentShape
   onClose: () => void
   onSubmit: (data: CollaborationFormData) => void
 }
@@ -20,8 +25,10 @@ export interface CollaborationFormData {
   notes: string
 }
 
-export default function AddCollaborationModal({ kolId, collaboration, onClose, onSubmit }: Props) {
+export default function AddCollaborationModal({ kolId, collaboration, productOptions = [], contentShape = '视频', onClose, onSubmit }: Props) {
   const isEditing = Boolean(collaboration)
+  const productListId = useId()
+  const metricLabels = getContentShapeMetricLabels(contentShape)
   const [form, setForm] = useState<CollaborationFormData>({
     kol_id: kolId,
     product: collaboration?.product || '',
@@ -42,11 +49,22 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-semibold text-gray-900 mb-5 flex items-center gap-2">
-          <span className="text-2xl">📊</span> {isEditing ? '编辑合作记录' : '添加合作记录'}
-        </h2>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
+              <BarChart3 className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-lg font-extrabold text-[#1D1D1F]">{isEditing ? '编辑合作记录' : '添加合作记录'}</h2>
+              <p className="mt-1 text-xs font-medium text-[#86868B]">补齐发布内容与效果数据。</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-black/[0.08] text-[#86868B] hover:bg-[#F5F5F7]" title="关闭">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -55,9 +73,15 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
                 type="text"
                 value={form.product}
                 onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                list={productOptions.length > 0 ? productListId : undefined}
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
                 placeholder="手动输入产品名称"
               />
+              {productOptions.length > 0 && (
+                <datalist id={productListId}>
+                  {productOptions.map(product => <option key={product} value={product} />)}
+                </datalist>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">发布日期</label>
@@ -65,7 +89,7 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
                 type="date"
                 value={form.publish_date}
                 onChange={e => setForm(p => ({ ...p, publish_date: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
           </div>
@@ -76,37 +100,37 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
               type="url"
               value={form.work_url}
               onChange={e => setForm(p => ({ ...p, work_url: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               placeholder="https://..."
             />
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">播放量</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{metricLabels.viewsInput}</label>
               <input
                 type="number"
                 value={form.views || ''}
                 onChange={e => setForm(p => ({ ...p, views: Number(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">评论数</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{metricLabels.commentsInput}</label>
               <input
                 type="number"
                 value={form.comments || ''}
                 onChange={e => setForm(p => ({ ...p, comments: Number(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">点赞数</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{metricLabels.likesInput}</label>
               <input
                 type="number"
                 value={form.likes || ''}
                 onChange={e => setForm(p => ({ ...p, likes: Number(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
           </div>
@@ -117,13 +141,13 @@ export default function AddCollaborationModal({ kolId, collaboration, onClose, o
               value={form.notes}
               onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
               rows={2}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+              className="w-full resize-none rounded-[10px] border border-black/[0.08] px-3 py-2 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">取消</button>
-            <button type="submit" className="px-5 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-sm">{isEditing ? '保存修改' : '确认添加'}</button>
+          <div className="flex justify-end gap-2 border-t border-black/[0.06] pt-4">
+            <button type="button" onClick={onClose} className="h-10 rounded-[10px] px-4 text-sm font-bold text-[#6E6E73] hover:bg-[#F5F5F7]">取消</button>
+            <button type="submit" className="h-10 rounded-[10px] bg-[#0066FF] px-5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)]">{isEditing ? '保存修改' : '确认添加'}</button>
           </div>
         </form>
       </div>

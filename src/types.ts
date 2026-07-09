@@ -7,6 +7,7 @@ export interface KOL {
   followers: string
   country: string
   tags: string[]
+  notes?: string
   status: string
   sample_product: string
   sample_date: string | null
@@ -43,6 +44,19 @@ export interface Collaboration {
   notes: string
 }
 
+export interface Product {
+  id: string
+  name: string
+  category: string
+  target_kol_tags: string[]
+  target_content_shapes: string[]
+  status: string
+  priority: number
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Shipment {
   id: string
   kol_id: string
@@ -76,10 +90,10 @@ export interface Email {
 }
 
 export const PLATFORMS = ['YouTube', 'TikTok', 'X', 'Blog', 'Forum', 'Instagram', '网站', 'Discord']
+export const CONTENT_SHAPES = ['视频', '网站']
 export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '内容跟进', '合作完成', '拒绝合作', '我方拒绝', '异常']
 export const SHIPMENT_STATUSES = ['待寄出', '运输中', '已签收']
 export const PROGRESS_STATUSES = ['待制作', '制作中', '待发布', '已完成', '暂停/异常']
-export const PRODUCTS = ['BY53', 'BY54', 'YY3588', 'R1', 'X1', 'X1s', 'K1', 'N1', 'Z1', 'NAS', 'Lora']
 export const TAGS = ['SBC', '科技', 'NAS', '户外装备', '无线电', 'Mini PC', 'AI', 'Robotics', 'Smart Home', 'Networking', 'Storage']
 export const REPLY_RESULTS = ['同意合作', '拒绝合作', '未回复']
 export const INVITATION_DECISIONS = ['待评估', '继续推进', '我方拒绝']

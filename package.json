@@ -12,7 +12,8 @@
     "repair:collaborations": "node scripts/repair-misclassified-collaborations.mjs --apply",
     "repair:collaborations:dry": "node scripts/repair-misclassified-collaborations.mjs",
     "health-check": "node scripts/health-check.mjs",
-    "health-fix": "node scripts/health-check.mjs fix"
+    "health-fix": "node scripts/health-check.mjs fix",
+    "test": "vitest run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -32,6 +33,7 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.3",
-    "vite": "^5.3.4"
+    "vite": "^5.3.4",
+    "vitest": "^4.1.10"
   }
 }

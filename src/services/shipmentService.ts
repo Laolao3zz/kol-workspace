@@ -1,5 +1,6 @@
-import { getSupabase } from '../lib/supabase'
+import { getSupabase, isDemoMode } from '../lib/supabase'
 import type { Shipment } from '../types'
+import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError, logWarning } from '../utils/logger'
 
@@ -55,6 +56,10 @@ function normalizeShipmentPayload(shipment: Partial<Shipment>): Partial<Shipment
 
 export async function getShipments(): Promise<Shipment[]> {
   try {
+    if (isDemoMode()) {
+      return demoDatabase.getShipments()
+    }
+
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
@@ -77,6 +82,10 @@ export async function getShipments(): Promise<Shipment[]> {
 
 export async function getShipmentsByKOL(kolId: string): Promise<Shipment[]> {
   try {
+    if (isDemoMode()) {
+      return demoDatabase.getShipmentsByKOL(kolId)
+    }
+
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
@@ -107,6 +116,10 @@ export async function createShipment(shipment: ShipmentInput): Promise<Shipment>
     }
 
     const payload = normalizeShipmentPayload(shipment)
+
+    if (isDemoMode()) {
+      return demoDatabase.createShipment(payload as Partial<Shipment> & Pick<Shipment, 'kol_id' | 'product'>)
+    }
 
     const result = await retryOperation(
       async () => {
@@ -143,6 +156,10 @@ export async function updateShipment(
 
     const safeUpdates = normalizeShipmentPayload(updates)
 
+    if (isDemoMode()) {
+      return demoDatabase.updateShipment(id, safeUpdates)
+    }
+
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
@@ -172,6 +189,11 @@ export async function updateShipment(
 
 export async function deleteShipment(id: string): Promise<void> {
   try {
+    if (isDemoMode()) {
+      demoDatabase.deleteShipment(id)
+      return
+    }
+
     await retryOperation(
       async () => {
         const { error } = await getSupabase()

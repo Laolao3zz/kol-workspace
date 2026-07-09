@@ -1,5 +1,13 @@
-import { getSupabase } from '../lib/supabase'
-import type { Collaboration } from '../types'
+import { getSupabase, isDemoMode } from '../lib/supabase'
+import type { Collaboration, Shipment } from '../types'
+import { demoDatabase } from './demoDatabase'
+import {
+  buildCompletionCollaborationPayload,
+  findCollaborationForShipment,
+  mergeCompletionCollaborationPayload,
+} from '../utils/collaborationArchive'
+import { retryOperation } from '../utils/retry'
+import { logError } from '../utils/logger'
 
 const nullableDate = (value: unknown): string | null => {
   if (typeof value !== 'string') return value == null ? null : String(value)
@@ -32,59 +40,158 @@ function normalizeCollaborationPayload(
 }
 
 export async function getCollaborations(): Promise<Collaboration[]> {
-  const { data, error } = await getSupabase()
-    .from('collaborations')
-    .select('*')
-    .order('publish_date', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
+  try {
+    if (isDemoMode()) {
+      return demoDatabase.getCollaborations()
+    }
 
-  if (error) throw error
-  return data as Collaboration[]
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('collaborations')
+          .select('*')
+          .order('publish_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        return data
+      },
+      { maxRetries: 2 }
+    )
+
+    return result as Collaboration[]
+  } catch (error) {
+    logError('getCollaborations', error)
+    throw error
+  }
 }
 
 export async function getCollaborationsByKOL(kolId: string): Promise<Collaboration[]> {
-  const { data, error } = await getSupabase()
-    .from('collaborations')
-    .select('*')
-    .eq('kol_id', kolId)
-    .order('publish_date', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
+  try {
+    if (isDemoMode()) {
+      return demoDatabase.getCollaborationsByKOL(kolId)
+    }
 
-  if (error) throw error
-  return data as Collaboration[]
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('collaborations')
+          .select('*')
+          .eq('kol_id', kolId)
+          .order('publish_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        return data
+      },
+      { maxRetries: 2 }
+    )
+
+    return result as Collaboration[]
+  } catch (error) {
+    logError('getCollaborationsByKOL', error, { kolId })
+    throw error
+  }
 }
 
 export async function createCollaboration(
   collab: Omit<Collaboration, 'id'>
 ): Promise<Collaboration> {
-  const { data, error } = await getSupabase()
-    .from('collaborations')
-    .insert([normalizeCollaborationPayload(collab)])
-    .select()
-    .single()
+  try {
+    const payload = normalizeCollaborationPayload(collab)
 
-  if (error) throw error
-  return data as Collaboration
+    if (isDemoMode()) {
+      return demoDatabase.createCollaboration(payload as Partial<Collaboration> & Pick<Collaboration, 'kol_id' | 'product'>)
+    }
+
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('collaborations')
+          .insert([payload])
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      },
+      { maxRetries: 2 }
+    )
+
+    return result as Collaboration
+  } catch (error) {
+    logError('createCollaboration', error, { collab })
+    throw error
+  }
 }
 
 export async function updateCollaboration(
   id: string,
   updates: Partial<Collaboration>
 ): Promise<Collaboration> {
-  const safeUpdates = normalizeCollaborationPayload(updates)
+  try {
+    const safeUpdates = normalizeCollaborationPayload(updates)
 
-  const { data, error } = await getSupabase()
-    .from('collaborations')
-    .update(safeUpdates)
-    .eq('id', id)
-    .select()
-    .single()
+    if (isDemoMode()) {
+      return demoDatabase.updateCollaboration(id, safeUpdates)
+    }
 
-  if (error) throw error
-  return data as Collaboration
+    const result = await retryOperation(
+      async () => {
+        const { data, error } = await getSupabase()
+          .from('collaborations')
+          .update(safeUpdates)
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      },
+      { maxRetries: 2 }
+    )
+
+    return result as Collaboration
+  } catch (error) {
+    logError('updateCollaboration', error, { id, updates })
+    throw error
+  }
 }
 
 export async function deleteCollaboration(id: string): Promise<void> {
-  const { error } = await getSupabase().from('collaborations').delete().eq('id', id)
-  if (error) throw error
+  try {
+    if (isDemoMode()) {
+      demoDatabase.deleteCollaboration(id)
+      return
+    }
+
+    await retryOperation(
+      async () => {
+        const { error } = await getSupabase().from('collaborations').delete().eq('id', id)
+        if (error) throw error
+        return true
+      },
+      { maxRetries: 2 }
+    )
+  } catch (error) {
+    logError('deleteCollaboration', error, { id })
+    throw error
+  }
+}
+
+export async function ensureCompletionCollaboration(shipment: Shipment): Promise<Collaboration> {
+  try {
+    const payload = buildCompletionCollaborationPayload(shipment)
+    const existingCollaborations = await getCollaborationsByKOL(shipment.kol_id)
+    const existing = findCollaborationForShipment(existingCollaborations, shipment)
+
+    if (existing) {
+      return updateCollaboration(existing.id, mergeCompletionCollaborationPayload(existing, payload))
+    }
+
+    return createCollaboration(payload)
+  } catch (error) {
+    logError('ensureCompletionCollaboration', error, { shipmentId: shipment.id, kolId: shipment.kol_id })
+    throw error
+  }
 }

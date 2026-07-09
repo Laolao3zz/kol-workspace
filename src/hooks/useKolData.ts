@@ -3,17 +3,19 @@
  * 集中处理数据获取、更新和状态同步
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { KOL, Invitation, Shipment, Collaboration } from '../types'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { KOL, Invitation, Shipment, Collaboration, Product } from '../types'
 import { getKOLs, updateKOL } from '../services/kolService'
 import { getInvitationsByKOL } from '../services/invitationService'
 import { getShipments } from '../services/shipmentService'
 import { getCollaborations } from '../services/collaborationService'
+import { getProducts } from '../services/productService'
 import { applyKolSnapshot } from '../utils/kolStatus'
 import { logError } from '../utils/logger'
 
 interface UseKolDataReturn {
   kols: KOL[]
+  products: Product[]
   invitations: Record<string, Invitation[]>
   shipments: Shipment[]
   collaborationsByKol: Record<string, Collaboration[]>
@@ -21,19 +23,49 @@ interface UseKolDataReturn {
   error: string | null
   refreshAll: () => Promise<void>
   refreshKol: (kolId: string) => Promise<void>
+  refreshProducts: () => Promise<void>
   refreshInvitations: (kolId: string) => Promise<void>
   refreshShipments: () => Promise<void>
   refreshCollaborations: () => Promise<void>
   updateKolOptimistic: (id: string, updates: Partial<KOL>) => Promise<KOL>
 }
 
+interface KolDataSnapshot {
+  kols: KOL[]
+  products: Product[]
+  invitations: Record<string, Invitation[]>
+  shipments: Shipment[]
+  collaborationsByKol: Record<string, Collaboration[]>
+}
+
 export function useKolData(): UseKolDataReturn {
   const [kols, setKols] = useState<KOL[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [invitations, setInvitations] = useState<Record<string, Invitation[]>>({})
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [collaborationsByKol, setCollaborationsByKol] = useState<Record<string, Collaboration[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const stateRef = useRef<KolDataSnapshot>({
+    kols: [],
+    products: [],
+    invitations: {},
+    shipments: [],
+    collaborationsByKol: {},
+  })
+
+  const commitData = useCallback((next: Partial<KolDataSnapshot>) => {
+    const snapshot = { ...stateRef.current, ...next }
+    stateRef.current = snapshot
+
+    if (next.kols) setKols(next.kols)
+    if (next.products) setProducts(next.products)
+    if (next.invitations) setInvitations(next.invitations)
+    if (next.shipments) setShipments(next.shipments)
+    if (next.collaborationsByKol) setCollaborationsByKol(next.collaborationsByKol)
+
+    return snapshot
+  }, [])
 
   const groupShipmentsByKol = useCallback((shipmentList: Shipment[]) => {
     return shipmentList.reduce<Record<string, Shipment[]>>((map, shipment) => {
@@ -69,8 +101,9 @@ export function useKolData(): UseKolDataReturn {
       setLoading(true)
       setError(null)
 
-      const [kolData, shipmentData, collaborationData] = await Promise.all([
+      const [kolData, productData, shipmentData, collaborationData] = await Promise.all([
         getKOLs(),
+        getProducts(),
         getShipments(),
         getCollaborations(),
       ])
@@ -87,10 +120,13 @@ export function useKolData(): UseKolDataReturn {
         }
       }))
 
-      setInvitations(invMap)
-      setShipments(shipmentData)
-      setCollaborationsByKol(colMap)
-      setKols(normalizeKols(kolData, shipmentData, invMap, colMap))
+      commitData({
+        kols: normalizeKols(kolData, shipmentData, invMap, colMap),
+        products: productData,
+        invitations: invMap,
+        shipments: shipmentData,
+        collaborationsByKol: colMap,
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : '加载数据失败'
       setError(message)
@@ -98,7 +134,7 @@ export function useKolData(): UseKolDataReturn {
     } finally {
       setLoading(false)
     }
-  }, [groupCollaborationsByKol, normalizeKols])
+  }, [commitData, groupCollaborationsByKol, normalizeKols])
 
   const refreshKol = useCallback(async (kolId: string) => {
     try {
@@ -108,90 +144,113 @@ export function useKolData(): UseKolDataReturn {
         getCollaborations(),
       ])
 
-      const nextInvitations = { ...invitations, [kolId]: invData }
+      const current = stateRef.current
+      const nextInvitations = { ...current.invitations, [kolId]: invData }
       const colMap = groupCollaborationsByKol(colData)
 
-      setInvitations(nextInvitations)
-      setShipments(shipmentData)
-      setCollaborationsByKol(colMap)
-      setKols(prev => normalizeKols(prev, shipmentData, nextInvitations, colMap))
+      commitData({
+        invitations: nextInvitations,
+        shipments: shipmentData,
+        collaborationsByKol: colMap,
+        kols: normalizeKols(current.kols, shipmentData, nextInvitations, colMap),
+      })
     } catch (err) {
       logError('refreshKol', err, { kolId })
       throw err
     }
-  }, [invitations, groupCollaborationsByKol, normalizeKols])
+  }, [commitData, groupCollaborationsByKol, normalizeKols])
+
+  const refreshProducts = useCallback(async () => {
+    try {
+      commitData({ products: await getProducts() })
+    } catch (err) {
+      logError('refreshProducts', err)
+      throw err
+    }
+  }, [commitData])
 
   const refreshInvitations = useCallback(async (kolId: string) => {
     try {
       const data = await getInvitationsByKOL(kolId)
-      const nextInvitations = { ...invitations, [kolId]: data }
-      setInvitations(nextInvitations)
-      setKols(prev => normalizeKols(prev, shipments, nextInvitations, collaborationsByKol))
+      const current = stateRef.current
+      const nextInvitations = { ...current.invitations, [kolId]: data }
+      commitData({
+        invitations: nextInvitations,
+        kols: normalizeKols(current.kols, current.shipments, nextInvitations, current.collaborationsByKol),
+      })
     } catch (err) {
       logError('refreshInvitations', err, { kolId })
       throw err
     }
-  }, [invitations, shipments, collaborationsByKol, normalizeKols])
+  }, [commitData, normalizeKols])
 
   const refreshShipments = useCallback(async () => {
     try {
       const data = await getShipments()
-      setShipments(data)
-      setKols(prev => normalizeKols(prev, data, invitations, collaborationsByKol))
+      const current = stateRef.current
+      commitData({
+        shipments: data,
+        kols: normalizeKols(current.kols, data, current.invitations, current.collaborationsByKol),
+      })
     } catch (err) {
       logError('refreshShipments', err)
       throw err
     }
-  }, [invitations, collaborationsByKol, normalizeKols])
+  }, [commitData, normalizeKols])
 
   const refreshCollaborations = useCallback(async () => {
     try {
       const data = await getCollaborations()
+      const current = stateRef.current
       const colMap = groupCollaborationsByKol(data)
-      setCollaborationsByKol(colMap)
-      setKols(prev => normalizeKols(prev, shipments, invitations, colMap))
+      commitData({
+        collaborationsByKol: colMap,
+        kols: normalizeKols(current.kols, current.shipments, current.invitations, colMap),
+      })
     } catch (err) {
       logError('refreshCollaborations', err)
       throw err
     }
-  }, [shipments, invitations, groupCollaborationsByKol, normalizeKols])
+  }, [commitData, groupCollaborationsByKol, normalizeKols])
 
   const updateKolOptimistic = useCallback(async (id: string, updates: Partial<KOL>) => {
     // 保存原始数据用于回滚
-    const originalKols = [...kols]
+    const originalKols = [...stateRef.current.kols]
 
     try {
       // 1. 乐观更新：立即更新 UI
-      setKols(prev => prev.map(k => k.id === id ? { ...k, ...updates } : k))
+      commitData({ kols: originalKols.map(k => k.id === id ? { ...k, ...updates } : k) })
 
       // 2. 发送到服务器
       const result = await updateKOL(id, updates)
 
       // 3. 用服务器返回的数据更新（包含计算后的状态）
+      const current = stateRef.current
       const nextKol = applyKolSnapshot(
         result,
-        invitations[result.id] || [],
-        shipments.filter(s => s.kol_id === result.id),
-        collaborationsByKol[result.id] || []
+        current.invitations[result.id] || [],
+        current.shipments.filter(s => s.kol_id === result.id),
+        current.collaborationsByKol[result.id] || []
       )
 
-      setKols(prev => prev.map(k => k.id === result.id ? nextKol : k))
+      commitData({ kols: stateRef.current.kols.map(k => k.id === result.id ? nextKol : k) })
 
       return nextKol
     } catch (err) {
       // 4. 失败时回滚
-      setKols(originalKols)
+      commitData({ kols: originalKols })
       logError('updateKolOptimistic', err, { id, updates })
       throw err
     }
-  }, [kols, invitations, shipments, collaborationsByKol])
+  }, [commitData])
 
   useEffect(() => {
     refreshAll()
-  }, []) // 只在组件挂载时执行一次
+  }, [refreshAll]) // 只在组件挂载时执行一次
 
   return {
     kols,
+    products,
     invitations,
     shipments,
     collaborationsByKol,
@@ -199,6 +258,7 @@ export function useKolData(): UseKolDataReturn {
     error,
     refreshAll,
     refreshKol,
+    refreshProducts,
     refreshInvitations,
     refreshShipments,
     refreshCollaborations,

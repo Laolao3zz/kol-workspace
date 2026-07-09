@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { MailPlus, X } from 'lucide-react'
+import { useId, useState } from 'react'
 import { Invitation } from '../types'
 
 interface Props {
   kolId: string
   invitation?: Invitation | null
+  productOptions?: string[]
   onClose: () => void
   onSubmit: (data: InvitationFormData) => void
 }
@@ -26,8 +28,8 @@ type CooperationOutcome = 'pending' | 'agreed' | 'creator_declined' | 'company_d
 const OUTCOME_OPTIONS: Array<{ value: CooperationOutcome; label: string; desc: string; tone: string }> = [
   { value: 'pending', label: '未回复 / 待确认', desc: '只记录已发起邀约，KOL 状态进入已邀约', tone: 'border-amber-200 bg-amber-50 text-amber-700' },
   { value: 'agreed', label: '同意合作', desc: '会自动进入待寄出，并生成一条待寄出寄样记录', tone: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  { value: 'creator_declined', label: '博主不同意', desc: 'KOL 状态进入拒绝合作', tone: 'border-red-200 bg-red-50 text-red-700' },
-  { value: 'company_declined', label: '我方不同意', desc: 'KOL 状态进入我方拒绝', tone: 'border-slate-200 bg-slate-50 text-slate-700' },
+  { value: 'creator_declined', label: '博主不同意', desc: '仅记录本次产品结果，后续仍可邀约其他产品', tone: 'border-red-200 bg-red-50 text-red-700' },
+  { value: 'company_declined', label: '我方不同意', desc: '仅记录本次产品不推进，不把 KOL 标成永久拒绝', tone: 'border-slate-200 bg-slate-50 text-slate-700' },
 ]
 
 const getInitialOutcome = (invitation?: Invitation | null): CooperationOutcome => {
@@ -49,8 +51,9 @@ const applyOutcome = (form: InvitationFormData, outcome: CooperationOutcome): In
   return { ...form, ...outcomePayload[outcome] }
 }
 
-export default function AddInvitationModal({ kolId, invitation, onClose, onSubmit }: Props) {
+export default function AddInvitationModal({ kolId, invitation, productOptions = [], onClose, onSubmit }: Props) {
   const isEditing = Boolean(invitation)
+  const productListId = useId()
   const initialOutcome = getInitialOutcome(invitation)
   const [outcome, setOutcome] = useState<CooperationOutcome>(initialOutcome)
   const [form, setForm] = useState<InvitationFormData>(() => applyOutcome({
@@ -85,12 +88,22 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 p-6 border border-gray-100">
-        <h2 className="text-xl font-semibold text-gray-900 mb-1 flex items-center gap-2">
-          <span className="text-2xl">📩</span> {isEditing ? '编辑邀约记录' : '添加邀约记录'}
-        </h2>
-        <p className="text-xs text-gray-400 mb-5">邀约只保留一次合作结果：同意、博主不同意、我方不同意，避免重复状态。</p>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative mx-4 w-full max-w-2xl rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
+              <MailPlus className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-lg font-extrabold text-[#1D1D1F]">{isEditing ? '编辑邀约记录' : '添加邀约记录'}</h2>
+              <p className="mt-1 text-xs font-medium text-[#86868B]">记录本次产品邀约结果，保持产品级状态清晰。</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-black/[0.08] text-[#86868B] hover:bg-[#F5F5F7]" title="关闭">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
@@ -100,9 +113,15 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
                 type="text"
                 value={form.product}
                 onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                list={productOptions.length > 0 ? productListId : undefined}
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
                 placeholder="手动输入产品名称"
               />
+              {productOptions.length > 0 && (
+                <datalist id={productListId}>
+                  {productOptions.map(product => <option key={product} value={product} />)}
+                </datalist>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">邀约日期</label>
@@ -110,7 +129,7 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
                 type="date"
                 value={form.invited_at}
                 onChange={e => setForm(p => ({ ...p, invited_at: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               />
             </div>
           </div>
@@ -125,7 +144,7 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
                     key={option.value}
                     type="button"
                     onClick={() => updateOutcome(option.value)}
-                    className={`text-left rounded-xl border p-3 transition-all ${active ? `${option.tone} shadow-sm ring-2 ring-purple-100` : 'border-gray-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-purple-50/40'}`}
+                    className={`rounded-[14px] border p-3 text-left transition-all ${active ? `${option.tone} shadow-sm ring-2 ring-black/[0.04]` : 'border-black/[0.08] bg-white text-gray-600 hover:bg-[#F5F5F7]'}`}
                   >
                     <div className="text-sm font-semibold">{option.label}</div>
                     <div className="text-[11px] mt-1 opacity-80 leading-relaxed">{option.desc}</div>
@@ -141,7 +160,7 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
               type="text"
               value={form.quoted_fee}
               onChange={e => setForm(p => ({ ...p, quoted_fee: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
               placeholder="例如 $1,500 / 送样免费 / 佣金合作"
             />
           </div>
@@ -153,13 +172,13 @@ export default function AddInvitationModal({ kolId, invitation, onClose, onSubmi
               onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
               rows={3}
               placeholder="记录关键沟通信息即可，不需要额外维护多套状态。"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+              className="w-full resize-none rounded-[10px] border border-black/[0.08] px-3 py-2 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">取消</button>
-            <button type="submit" className="px-5 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 shadow-sm">{isEditing ? '保存修改' : '确认添加'}</button>
+          <div className="flex justify-end gap-2 border-t border-black/[0.06] pt-4">
+            <button type="button" onClick={onClose} className="h-10 rounded-[10px] px-4 text-sm font-bold text-[#6E6E73] hover:bg-[#F5F5F7]">取消</button>
+            <button type="submit" className="h-10 rounded-[10px] bg-[#0066FF] px-5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)]">{isEditing ? '保存修改' : '确认添加'}</button>
           </div>
         </form>
       </div>

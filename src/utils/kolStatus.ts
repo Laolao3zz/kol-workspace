@@ -49,8 +49,6 @@ export function countCompletedCollaborations(collaborations: Collaboration[] = [
 const isProgressAbnormal = (status?: string | null) => status === '暂停/异常' || status === '进度异常'
 
 const isInvitationApproved = (invitation: Invitation) => invitation.reply_result?.includes('同意') && invitation.decision === '继续推进'
-const isInvitationDeclinedByCreator = (invitation: Invitation) => invitation.reply_result?.includes('拒绝')
-const isInvitationDeclinedByUs = (invitation: Invitation) => invitation.decision === '我方拒绝'
 
 const isShipmentCompleted = (shipment: Shipment) => Boolean(shipment.completed_at) || shipment.progress_status === '已完成'
 const isShipmentActive = (shipment: Shipment) => !isShipmentCompleted(shipment)
@@ -61,7 +59,8 @@ export function deriveKolStatus(
   shipments: Shipment[] = [],
   collaborations: Collaboration[] = []
 ): string {
-  const latestShipment = getLatestShipment(shipments)
+  const activeShipments = shipments.filter(shipment => !shipment.archived_at)
+  const latestShipment = getLatestShipment(activeShipments)
   if (latestShipment) {
     if (isShipmentCompleted(latestShipment)) return '合作完成'
     if (latestShipment.status === '已签收') return isProgressAbnormal(latestShipment.progress_status) ? '异常' : '内容跟进'
@@ -70,16 +69,19 @@ export function deriveKolStatus(
   }
 
   const latestCollaboration = getLatestCollaboration(collaborations)
-  if (latestCollaboration && !shipments.some(isShipmentActive)) return '合作完成'
-
   const latestInvitation = getLatestInvitation(invitations)
-  if (latestInvitation) {
+  const invitationIsCurrent = latestInvitation && (
+    !latestCollaboration ||
+    invitationTime(latestInvitation) >= collaborationTime(latestCollaboration)
+  )
+
+  if (latestInvitation && invitationIsCurrent) {
     if (!latestInvitation.replied || latestInvitation.reply_result === '未回复') return '已邀约'
     if (isInvitationApproved(latestInvitation)) return '待寄出'
-    if (isInvitationDeclinedByUs(latestInvitation)) return '我方拒绝'
-    if (isInvitationDeclinedByCreator(latestInvitation)) return '拒绝合作'
     return '已邀约'
   }
+
+  if (latestCollaboration && !activeShipments.some(isShipmentActive)) return '合作完成'
 
   return '未首触'
 }

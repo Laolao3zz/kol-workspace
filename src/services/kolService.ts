@@ -1,10 +1,15 @@
-import { getSupabase } from '../lib/supabase'
+import { getSupabase, isDemoMode } from '../lib/supabase'
 import type { KOL } from '../types'
+import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError, logWarning } from '../utils/logger'
 
 export async function getKOLs(): Promise<KOL[]> {
   try {
+    if (isDemoMode()) {
+      return demoDatabase.getKOLs()
+    }
+
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
@@ -32,6 +37,10 @@ export async function createKOL(
     // 数据验证
     if (!kol.name?.trim()) {
       throw new Error('KOL 名称不能为空')
+    }
+
+    if (isDemoMode()) {
+      return demoDatabase.createKOL(kol)
     }
 
     const result = await retryOperation(
@@ -68,7 +77,9 @@ export async function updateKOL(
       'followers',
       'country',
       'tags',
+      'notes',
       'status',
+      'sample_product',
       'sample_date',
       'tracking_number',
       'shipping_details',
@@ -92,6 +103,10 @@ export async function updateKOL(
     if (Object.keys(safeUpdates).length === 0) {
       logWarning('updateKOL', '没有可保存的字段', { id, updates })
       throw new Error('没有可保存的 KOL 字段')
+    }
+
+    if (isDemoMode()) {
+      return demoDatabase.updateKOL(id, safeUpdates)
     }
 
     // 添加 updated_at 时间戳
@@ -131,6 +146,11 @@ export async function updateKOL(
 
 export async function deleteKOL(id: string): Promise<void> {
   try {
+    if (isDemoMode()) {
+      demoDatabase.deleteKOL(id)
+      return
+    }
+
     await retryOperation(
       async () => {
         const { error } = await getSupabase()

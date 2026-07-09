@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { KOL } from './types'
+import { useState, useEffect, useMemo } from 'react'
+import { Bell, Clock, LayoutDashboard, LayoutGrid, Package, Plus, Star, Users } from 'lucide-react'
+import { KOL, Shipment } from './types'
 import { createKOL, deleteKOL } from './services/kolService'
 import { countCompletedCollaborations } from './utils/kolStatus'
 import { useKolData } from './hooks/useKolData'
@@ -7,19 +8,54 @@ import KolTable from './components/KolTable'
 import KolDrawer from './components/KolDrawer'
 import ShipmentBoard from './components/ShipmentBoard'
 import ErrorBoundary from './components/ErrorBoundary'
-import type { KolFormData } from './components/AddKolModal'
+import AddKolModal, { KolFormData } from './components/AddKolModal'
+import WorkspaceDashboard from './components/WorkspaceDashboard'
+import ProductOpportunityView from './components/ProductOpportunityView'
+import CollaborationHistoryView from './components/CollaborationHistoryView'
+import { collectProductOptions } from './utils/productOptions'
 
-type ViewMode = 'table' | 'progress'
+type ViewMode = 'dashboard' | 'table' | 'progress' | 'products' | 'history'
+
+const PAGE_META: Record<ViewMode, { title: string; sub: string }> = {
+  dashboard: { title: '工作台', sub: '' },
+  table: { title: 'KOL 资源池', sub: '管理所有创作者资源' },
+  progress: { title: '进度看板', sub: '物流与内容全览' },
+  products: { title: '产品机会', sub: '按产品查看 KOL 触达状态' },
+  history: { title: '合作历史', sub: '已归档的发布内容与数据' },
+}
+
+const NAV_ITEMS: Array<{ id: ViewMode; label: string; icon: typeof LayoutDashboard }> = [
+  { id: 'dashboard', label: '工作台', icon: LayoutDashboard },
+  { id: 'table', label: 'KOL 资源池', icon: Users },
+  { id: 'progress', label: '进度看板', icon: LayoutGrid },
+  { id: 'products', label: '产品机会', icon: Package },
+  { id: 'history', label: '合作历史', icon: Clock },
+]
+
+function formatTodayLabel() {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
+  return `${year}年${month}月${day}日 · ${weekday}`
+}
+
+function countProgressBadge(shipments: Shipment[]) {
+  return shipments.filter(shipment => !shipment.archived_at).length
+}
 
 function App() {
   const {
     kols,
+    products,
     invitations,
     shipments,
     collaborationsByKol,
     loading,
     error: dataError,
     refreshAll,
+    refreshProducts,
     refreshInvitations,
     refreshShipments,
     refreshCollaborations,
@@ -28,16 +64,23 @@ function App() {
 
   const [error, setError] = useState<string | null>(null)
   const [selectedKol, setSelectedKol] = useState<KOL | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
+  const [showAddKolModal, setShowAddKolModal] = useState(false)
+  const productOptions = useMemo(() => collectProductOptions({
+    products,
+    kols,
+    invitations,
+    shipments,
+    collaborationsByKol,
+  }), [products, kols, invitations, shipments, collaborationsByKol])
+  const progressCount = useMemo(() => countProgressBadge(shipments), [shipments])
 
-  // 同步数据加载错误到本地状态
   useEffect(() => {
     if (dataError) {
       setError(dataError)
     }
   }, [dataError])
 
-  // 当 kols 更新时，同步更新 selectedKol
   useEffect(() => {
     if (selectedKol) {
       const updated = kols.find(k => k.id === selectedKol.id)
@@ -51,6 +94,7 @@ function App() {
     try {
       await createKOL(data)
       await refreshAll()
+      setShowAddKolModal(false)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建失败')
@@ -83,61 +127,92 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gray-50">
+      <div
+        className="flex h-screen overflow-hidden bg-[#F5F5F7] text-[#1D1D1F]"
+        style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}
+      >
         {error && (
-          <div className="fixed top-4 right-4 z-[60] bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg shadow-lg">
+          <div className="fixed right-5 top-5 z-[80] rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg">
             {error}
             <button onClick={() => setError(null)} className="ml-3 font-bold hover:text-red-900">&times;</button>
           </div>
         )}
 
-        <div className="max-w-[1600px] mx-auto p-4">
-          {/* Tab Bar */}
-          <div className="flex items-center gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm border border-gray-200 w-fit">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                viewMode === 'table'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-               KOL 资源池
-            </button>
-            <button
-              onClick={() => setViewMode('progress')}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                viewMode === 'progress'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              进度跟踪
-            </button>
-          </div>
+        <Sidebar active={viewMode} onNav={mode => { setViewMode(mode); setSelectedKol(null) }} kolsCount={kols.length} progressCount={progressCount} />
 
-          {viewMode === 'table' ? (
-            <KolTable
-              kols={kols}
-              invitations={invitations}
-              collaborationsByKol={collaborationsByKol}
-              loading={loading}
-              onSelect={setSelectedKol}
-              selectedId={selectedKol?.id || null}
-              onCreate={handleCreateKol}
-              onDelete={handleDeleteKol}
-              onRefresh={refreshAll}
-            />
-          ) : (
-            <ShipmentBoard
-              kols={kols}
-              invitations={invitations}
-              shipments={shipments}
-              onSelect={setSelectedKol}
-              onUpdate={handleUpdateKol}
-              onShipmentsChange={refreshShipments}
-            />
-          )}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <PageHeader
+            page={viewMode}
+            onAddKol={() => setShowAddKolModal(true)}
+            onQuickInvite={() => setViewMode('table')}
+          />
+
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {viewMode === 'dashboard' && (
+              <WorkspaceDashboard
+                kols={kols}
+                invitations={invitations}
+                shipments={shipments}
+                collaborationsByKol={collaborationsByKol}
+                onSelectKol={setSelectedKol}
+                onNavigate={target => setViewMode(target)}
+              />
+            )}
+
+            {viewMode === 'table' && (
+              <div className="flex-1 overflow-auto p-5">
+                <KolTable
+                  kols={kols}
+                  invitations={invitations}
+                  shipments={shipments}
+                  collaborationsByKol={collaborationsByKol}
+                  loading={loading}
+                  onSelect={setSelectedKol}
+                  selectedId={selectedKol?.id || null}
+                  productOptions={productOptions}
+                  onAddKol={() => setShowAddKolModal(true)}
+                  onDelete={handleDeleteKol}
+                  onRefresh={refreshAll}
+                />
+              </div>
+            )}
+
+            {viewMode === 'progress' && (
+              <div className="flex-1 overflow-hidden p-5">
+                <ShipmentBoard
+                  kols={kols}
+                  invitations={invitations}
+                  shipments={shipments}
+                  onSelect={setSelectedKol}
+                  onUpdate={handleUpdateKol}
+                  onShipmentsChange={refreshShipments}
+                  onCollaborationsChange={refreshCollaborations}
+                />
+              </div>
+            )}
+
+            {viewMode === 'products' && (
+              <ProductOpportunityView
+                products={products}
+                kols={kols}
+                invitations={invitations}
+                shipments={shipments}
+                collaborationsByKol={collaborationsByKol}
+                productOptions={productOptions}
+                onProductsChange={refreshProducts}
+                onSelectKol={setSelectedKol}
+              />
+            )}
+
+            {viewMode === 'history' && (
+              <CollaborationHistoryView
+                kols={kols}
+                collaborationsByKol={collaborationsByKol}
+                productOptions={productOptions}
+                onSelectKol={setSelectedKol}
+              />
+            )}
+          </main>
         </div>
 
         {selectedKol && (
@@ -145,17 +220,104 @@ function App() {
             kol={selectedKol}
             shipments={shipments}
             collaborationCount={countCompletedCollaborations(collaborationsByKol[selectedKol.id] || [])}
-            onClose={() => {
-              setSelectedKol(null)
-            }}
+            products={products}
+            productOptions={productOptions}
+            onClose={() => setSelectedKol(null)}
             onUpdate={handleUpdateKol}
             onInvitationsChange={() => refreshInvitations(selectedKol.id)}
             onCollaborationsChange={refreshCollaborations}
             onShipmentsChange={refreshShipments}
           />
         )}
+
+        {showAddKolModal && (
+          <AddKolModal
+            existingKols={kols}
+            countryOptions={[...new Set(kols.map(kol => String(kol.country || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))}
+            onClose={() => setShowAddKolModal(false)}
+            onSubmit={handleCreateKol}
+          />
+        )}
       </div>
     </ErrorBoundary>
+  )
+}
+
+function Sidebar({ active, onNav, kolsCount, progressCount }: { active: ViewMode; onNav: (mode: ViewMode) => void; kolsCount: number; progressCount: number }) {
+  return (
+    <aside className="flex min-h-screen w-[224px] shrink-0 flex-col border-r border-black/[0.06] bg-white">
+      <div className="px-5 pb-5 pt-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#0066FF] text-white shadow-[0_4px_12px_rgba(0,102,255,0.35)]">
+            <Star className="h-4 w-4" fill="white" />
+          </div>
+          <div>
+            <div className="text-[15px] font-extrabold leading-tight text-[#1D1D1F]">KOL Hub</div>
+            <div className="text-[11px] font-medium text-[#6E6E73]">品牌合作管理</div>
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-0.5 px-3">
+        <div className="mb-2 px-3 text-[10px] font-bold text-[#AEAEB2]">导航</div>
+        {NAV_ITEMS.map(item => {
+          const Icon = item.icon
+          const selected = active === item.id
+          return (
+            <button
+              key={item.id}
+              onClick={() => onNav(item.id)}
+              className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-[13px] font-semibold transition-colors ${selected ? 'bg-[#1D1D1F] text-white' : 'text-[#6E6E73] hover:bg-[#F5F5F7]'}`}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">{item.label}</span>
+              {(item.id === 'table' || item.id === 'progress') && (
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${selected ? 'bg-white/20 text-white' : 'bg-[#F5F5F7] text-[#6E6E73]'}`}>
+                  {item.id === 'table' ? kolsCount : progressCount}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </nav>
+
+      <div className="border-t border-black/[0.06] px-3 pb-5 pt-4">
+        <div className="flex cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-[#F5F5F7]">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5856D6] text-xs font-bold text-white">运</div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-bold text-[#1D1D1F]">运营工作台</div>
+            <div className="text-[11px] text-[#6E6E73]">KOL 管理</div>
+          </div>
+          <Bell className="h-4 w-4 shrink-0 text-[#AEAEB2]" />
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+function PageHeader({ page, onAddKol, onQuickInvite }: { page: ViewMode; onAddKol: () => void; onQuickInvite: () => void }) {
+  const meta = PAGE_META[page]
+  const sub = page === 'dashboard' ? formatTodayLabel() : meta.sub
+  return (
+    <div className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.06] bg-white px-8">
+      <div className="flex items-center gap-3">
+        <h1 className="text-[18px] font-extrabold text-[#1D1D1F]">{meta.title}</h1>
+        <span className="text-sm text-[#AEAEB2]">·</span>
+        <span className="text-[13px] font-medium text-[#6E6E73]">{sub}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {page === 'dashboard' && (
+          <button onClick={onQuickInvite} className="flex items-center gap-1.5 rounded-[10px] bg-[#0066FF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] transition active:scale-95">
+            <Plus className="h-3.5 w-3.5" /> 快速邀约
+          </button>
+        )}
+        {page === 'table' && (
+          <button onClick={onAddKol} className="flex items-center gap-1.5 rounded-[10px] bg-[#0066FF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] transition active:scale-95">
+            <Plus className="h-3.5 w-3.5" /> 添加 KOL
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 

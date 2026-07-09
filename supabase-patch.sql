@@ -28,6 +28,48 @@ ALTER TABLE invitations ADD COLUMN IF NOT EXISTS decision_reason TEXT;
 
 -- kols 表：确保 tags 字段存在
 ALTER TABLE kols ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
+ALTER TABLE kols ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- products 表：真实产品主数据与产品机会匹配
+CREATE TABLE IF NOT EXISTS products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  category TEXT,
+  target_kol_tags TEXT[] DEFAULT '{}',
+  target_content_shapes TEXT[] DEFAULT '{}',
+  status TEXT DEFAULT '在推',
+  priority INTEGER DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS target_kol_tags TEXT[] DEFAULT '{}';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS target_content_shapes TEXT[] DEFAULT '{}';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT DEFAULT '在推';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'products'
+      AND policyname = 'Allow all access'
+  ) THEN
+    CREATE POLICY "Allow all access" ON products FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_products_name ON products (name);
+CREATE INDEX IF NOT EXISTS idx_products_status ON products (status);
+CREATE INDEX IF NOT EXISTS idx_products_priority ON products (priority DESC);
 
 -- 强制 PostgREST 重新加载 schema 缓存
 -- 不加这一行的话，即使列已经存在，PostgREST 仍可能返回 PGRST204

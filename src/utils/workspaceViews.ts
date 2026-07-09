@@ -1,0 +1,150 @@
+import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
+import { countCompletedCollaborations, hasRealCollaborationSignal } from './kolStatus'
+import { getProductName, hasProductRecordForKol, shouldShowProductForKol } from './productMatching'
+
+export type OpportunityStatus = '未触达' | '待回复' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
+
+export interface DashboardMetricSources {
+  kols: KOL[]
+  invitations: Record<string, Invitation[]>
+  shipments: Shipment[]
+  collaborationsByKol: Record<string, Collaboration[]>
+}
+
+export interface DashboardMetrics {
+  totalKols: number
+  pendingReplies: number
+  pendingShipments: number
+  inTransit: number
+  contentFollowUp: number
+  waitingArchive: number
+  completedCollaborations: number
+}
+
+export interface ProductOpportunitySummary {
+  product: string
+  counts: Record<OpportunityStatus, number>
+  rows: Array<{ kol: KOL; status: OpportunityStatus }>
+}
+
+const opportunityStatuses: OpportunityStatus[] = ['未触达', '待回复', '已同意', '已拒绝', '不推进', '寄样中', '内容中', '已完成']
+
+function flatInvitations(invitations: Record<string, Invitation[]>): Invitation[] {
+  return Object.values(invitations).flat()
+}
+
+function flatCollaborations(collaborationsByKol: Record<string, Collaboration[]>): Collaboration[] {
+  return Object.values(collaborationsByKol).flat()
+}
+
+function isCompletedShipment(shipment: Shipment): boolean {
+  return Boolean(shipment.completed_at) || shipment.progress_status === '已完成'
+}
+
+function hasActiveShipment(shipment: Shipment): boolean {
+  return !shipment.archived_at
+}
+
+export function buildDashboardMetrics(sources: DashboardMetricSources): DashboardMetrics {
+  const activeShipments = sources.shipments.filter(hasActiveShipment)
+  const collaborations = flatCollaborations(sources.collaborationsByKol)
+
+  return {
+    totalKols: sources.kols.length,
+    pendingReplies: flatInvitations(sources.invitations).filter(invitation =>
+      !invitation.replied || invitation.reply_result === '未回复'
+    ).length,
+    pendingShipments: activeShipments.filter(shipment =>
+      shipment.status === '待寄出' && !shipment.tracking_number?.trim()
+    ).length,
+    inTransit: activeShipments.filter(shipment =>
+      shipment.status === '运输中' || (Boolean(shipment.tracking_number?.trim()) && shipment.status !== '已签收' && !isCompletedShipment(shipment))
+    ).length,
+    contentFollowUp: activeShipments.filter(shipment =>
+      shipment.status === '已签收' && !isCompletedShipment(shipment)
+    ).length,
+    waitingArchive: activeShipments.filter(shipment =>
+      isCompletedShipment(shipment) && !shipment.archived_at
+    ).length,
+    completedCollaborations: countCompletedCollaborations(collaborations),
+  }
+}
+
+function latestInvitationForProduct(invitations: Invitation[], product: string): Invitation | null {
+  const matches = invitations.filter(invitation => invitation.product === product)
+  if (matches.length === 0) return null
+  return matches.reduce((latest, invitation) => invitation.invited_at > latest.invited_at ? invitation : latest)
+}
+
+function shipmentForProduct(shipments: Shipment[], product: string): Shipment | null {
+  const matches = shipments.filter(shipment => shipment.product === product && hasActiveShipment(shipment))
+  if (matches.length === 0) return null
+  return matches[0]
+}
+
+function hasCollaborationForProduct(collaborations: Collaboration[], product: string): boolean {
+  return collaborations.some(collaboration => collaboration.product === product && hasRealCollaborationSignal(collaboration))
+}
+
+function opportunityStatusForKol(
+  _kol: KOL,
+  product: string,
+  invitations: Invitation[],
+  shipments: Shipment[],
+  collaborations: Collaboration[]
+): OpportunityStatus {
+  if (hasCollaborationForProduct(collaborations, product)) return '已完成'
+
+  const shipment = shipmentForProduct(shipments, product)
+  if (shipment) {
+    if (isCompletedShipment(shipment)) return '已完成'
+    if (shipment.status === '已签收') return '内容中'
+    if (shipment.status === '运输中' || shipment.tracking_number?.trim()) return '寄样中'
+    return '已同意'
+  }
+
+  const latestInvitation = latestInvitationForProduct(invitations, product)
+  if (!latestInvitation) return '未触达'
+  if (!latestInvitation.replied || latestInvitation.reply_result === '未回复') return '待回复'
+  if (latestInvitation.decision === '我方拒绝') return '不推进'
+  if (latestInvitation.reply_result?.includes('拒绝')) return '已拒绝'
+  if (latestInvitation.reply_result?.includes('同意')) return '已同意'
+
+  return '待回复'
+}
+
+export function buildProductOpportunitySummary(
+  sources: DashboardMetricSources & { products: Array<string | Product> }
+): ProductOpportunitySummary[] {
+  return sources.products.map(product => {
+    const productName = getProductName(product)
+    const rows = sources.kols.flatMap(kol => {
+      const invitations = sources.invitations[kol.id] || []
+      const shipments = sources.shipments.filter(shipment => shipment.kol_id === kol.id)
+      const collaborations = sources.collaborationsByKol[kol.id] || []
+      const hasExistingProductRecord = hasProductRecordForKol(productName, invitations, shipments, collaborations)
+
+      if (!shouldShowProductForKol(kol, product, hasExistingProductRecord)) {
+        return []
+      }
+
+      return [{
+        kol,
+        status: opportunityStatusForKol(
+        kol,
+          productName,
+          invitations,
+          shipments,
+          collaborations
+        ),
+      }]
+    })
+
+    const counts = opportunityStatuses.reduce<Record<OpportunityStatus, number>>((map, status) => {
+      map[status] = rows.filter(row => row.status === status).length
+      return map
+    }, {} as Record<OpportunityStatus, number>)
+
+    return { product: productName, rows, counts }
+  })
+}

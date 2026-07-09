@@ -1,5 +1,6 @@
-import { getSupabase } from '../lib/supabase'
+import { getSupabase, isDemoMode } from '../lib/supabase'
 import type { Invitation } from '../types'
+import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError } from '../utils/logger'
 
@@ -28,6 +29,10 @@ function normalizeInvitationPayload(invitation: Partial<Invitation>): Partial<In
 
 export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> {
   try {
+    if (isDemoMode()) {
+      return demoDatabase.getInvitationsByKOL(kolId)
+    }
+
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
@@ -51,11 +56,17 @@ export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> 
 
 export async function createInvitation(inv: Omit<Invitation, 'id'>): Promise<Invitation> {
   try {
+    const payload = normalizeInvitationPayload(inv)
+
+    if (isDemoMode()) {
+      return demoDatabase.createInvitation(payload as Partial<Invitation> & Pick<Invitation, 'kol_id' | 'product'>)
+    }
+
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
           .from('invitations')
-          .insert([normalizeInvitationPayload(inv)])
+          .insert([payload])
           .select()
           .single()
 
@@ -74,6 +85,11 @@ export async function createInvitation(inv: Omit<Invitation, 'id'>): Promise<Inv
 
 export async function deleteInvitation(id: string): Promise<void> {
   try {
+    if (isDemoMode()) {
+      demoDatabase.deleteInvitation(id)
+      return
+    }
+
     await retryOperation(
       async () => {
         const { error } = await getSupabase().from('invitations').delete().eq('id', id)
@@ -90,11 +106,17 @@ export async function deleteInvitation(id: string): Promise<void> {
 
 export async function updateInvitation(id: string, updates: Partial<Invitation>): Promise<Invitation> {
   try {
+    const payload = normalizeInvitationPayload(updates)
+
+    if (isDemoMode()) {
+      return demoDatabase.updateInvitation(id, payload)
+    }
+
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
           .from('invitations')
-          .update(normalizeInvitationPayload(updates))
+          .update(payload)
           .eq('id', id)
           .select()
           .single()
