@@ -16,7 +16,7 @@ function intersects(left: string[], right: string[]): boolean {
   return left.some(item => rightSet.has(normalizeToken(item)))
 }
 
-export function mergeOpportunityProducts(products: Product[], productNames: string[]): ProductLike[] {
+export function mergeOpportunityProducts(products: Product[], _productNames: string[]): ProductLike[] {
   const merged: ProductLike[] = []
   const seen = new Set<string>()
 
@@ -32,7 +32,6 @@ export function mergeOpportunityProducts(products: Product[], productNames: stri
   }
 
   products.forEach(add)
-  productNames.forEach(add)
 
   return merged
 }

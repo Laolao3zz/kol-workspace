@@ -9,10 +9,11 @@ import KolDrawer from './components/KolDrawer'
 import ShipmentBoard from './components/ShipmentBoard'
 import ErrorBoundary from './components/ErrorBoundary'
 import AddKolModal, { KolFormData } from './components/AddKolModal'
-import WorkspaceDashboard from './components/WorkspaceDashboard'
+import WorkspaceDashboard, { type DashboardNavigateOptions } from './components/WorkspaceDashboard'
 import ProductOpportunityView from './components/ProductOpportunityView'
 import CollaborationHistoryView from './components/CollaborationHistoryView'
 import { collectProductOptions } from './utils/productOptions'
+import { countActiveShipments } from './utils/workspaceViews'
 
 type ViewMode = 'dashboard' | 'table' | 'progress' | 'products' | 'history'
 
@@ -42,7 +43,7 @@ function formatTodayLabel() {
 }
 
 function countProgressBadge(shipments: Shipment[]) {
-  return shipments.filter(shipment => !shipment.archived_at).length
+  return countActiveShipments(shipments)
 }
 
 function App() {
@@ -65,6 +66,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [selectedKol, setSelectedKol] = useState<KOL | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
+  const [tableInvitationStatusFilter, setTableInvitationStatusFilter] = useState<string | undefined>()
   const [showAddKolModal, setShowAddKolModal] = useState(false)
   const productOptions = useMemo(() => collectProductOptions({
     products,
@@ -125,6 +127,16 @@ function App() {
     }
   }
 
+  const handleNavigate = (mode: ViewMode, options?: DashboardNavigateOptions) => {
+    setViewMode(mode)
+    setSelectedKol(null)
+    if (mode === 'table' && options?.invitationStatus) {
+      setTableInvitationStatusFilter(options.invitationStatus)
+    } else {
+      setTableInvitationStatusFilter(undefined)
+    }
+  }
+
   return (
     <ErrorBoundary>
       <div
@@ -138,7 +150,7 @@ function App() {
           </div>
         )}
 
-        <Sidebar active={viewMode} onNav={mode => { setViewMode(mode); setSelectedKol(null) }} kolsCount={kols.length} progressCount={progressCount} />
+        <Sidebar active={viewMode} onNav={handleNavigate} kolsCount={kols.length} progressCount={progressCount} />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <PageHeader
@@ -155,7 +167,7 @@ function App() {
                 shipments={shipments}
                 collaborationsByKol={collaborationsByKol}
                 onSelectKol={setSelectedKol}
-                onNavigate={target => setViewMode(target)}
+                onNavigate={handleNavigate}
               />
             )}
 
@@ -170,6 +182,7 @@ function App() {
                   onSelect={setSelectedKol}
                   selectedId={selectedKol?.id || null}
                   productOptions={productOptions}
+                  initialInvitationStatusFilter={tableInvitationStatusFilter}
                   onAddKol={() => setShowAddKolModal(true)}
                   onDelete={handleDeleteKol}
                   onRefresh={refreshAll}

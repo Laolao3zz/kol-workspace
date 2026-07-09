@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
-import { buildDashboardMetrics, buildProductOpportunitySummary } from './workspaceViews'
+import { buildDashboardMetrics, buildProductOpportunitySummary, countActiveShipments } from './workspaceViews'
 
 const kol = (id: string, overrides: Partial<KOL> = {}): KOL => ({
   id,
@@ -89,7 +89,7 @@ describe('workspace view helpers', () => {
     const metrics = buildDashboardMetrics({
       kols: [kol('k1'), kol('k2'), kol('k3')],
       invitations: {
-        k1: [invitation({ kol_id: 'k1', product: 'BY53' })],
+        k1: [invitation({ kol_id: 'k1', product: 'InviteOnly' })],
       },
       shipments: [
         shipment({ kol_id: 'k1', product: 'BY53', status: '待寄出' }),
@@ -109,6 +109,34 @@ describe('workspace view helpers', () => {
     expect(metrics.contentFollowUp).toBe(1)
     expect(metrics.waitingArchive).toBe(1)
     expect(metrics.completedCollaborations).toBe(1)
+  })
+
+  it('counts only actionable recent unresolved invitations as pending replies', () => {
+    const metrics = buildDashboardMetrics({
+      kols: [kol('active'), kol('stale'), kol('covered')],
+      invitations: {
+        active: [invitation({ kol_id: 'active', product: 'BY53', invited_at: '2026-07-01' })],
+        stale: [invitation({ kol_id: 'stale', product: 'Old Product', invited_at: '2026-04-01' })],
+        covered: [invitation({ kol_id: 'covered', product: 'Shipped Product', invited_at: '2026-07-02' })],
+      },
+      shipments: [
+        shipment({ kol_id: 'covered', product: 'Shipped Product', status: '待寄出' }),
+      ],
+      collaborationsByKol: {},
+    })
+
+    expect(metrics.pendingReplies).toBe(1)
+  })
+
+  it('does not count completed waiting-archive shipments as active progress', () => {
+    const shipments = [
+      shipment({ kol_id: 'k1', product: 'Pending', status: '待寄出' }),
+      shipment({ kol_id: 'k2', product: 'Transit', status: '运输中', tracking_number: 'TRACK' }),
+      shipment({ kol_id: 'k3', product: 'Content', status: '已签收', delivered_at: '2026-07-01' }),
+      shipment({ kol_id: 'k4', product: 'Waiting Archive', status: '已签收', progress_status: '已完成', completed_at: '2026-07-02' }),
+    ]
+
+    expect(countActiveShipments(shipments)).toBe(3)
   })
 
   it('separates product-level opportunity statuses from KOL identity', () => {

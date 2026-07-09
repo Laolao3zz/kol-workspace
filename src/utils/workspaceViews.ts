@@ -28,6 +28,7 @@ export interface ProductOpportunitySummary {
 }
 
 const opportunityStatuses: OpportunityStatus[] = ['未触达', '待回复', '已同意', '已拒绝', '不推进', '寄样中', '内容中', '已完成']
+const PENDING_REPLY_LOOKBACK_DAYS = 45
 
 function flatInvitations(invitations: Record<string, Invitation[]>): Invitation[] {
   return Object.values(invitations).flat()
@@ -45,14 +46,83 @@ function hasActiveShipment(shipment: Shipment): boolean {
   return !shipment.archived_at
 }
 
+function normalizeToken(value: string): string {
+  return value.trim().toLocaleLowerCase()
+}
+
+function sameProduct(left: string, right: string): boolean {
+  return normalizeToken(left) === normalizeToken(right)
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function daysBetween(startDate: string, endDate: string): number {
+  const start = new Date(`${startDate.slice(0, 10)}T00:00:00`).getTime()
+  const end = new Date(`${endDate.slice(0, 10)}T00:00:00`).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end)) return Number.POSITIVE_INFINITY
+  return Math.floor((end - start) / 86400000)
+}
+
+function isPendingInvitation(invitation: Invitation): boolean {
+  return !invitation.replied || !invitation.reply_result?.trim() || invitation.reply_result === '未回复'
+}
+
+function hasLaterWorkflowForInvitation(
+  invitation: Invitation,
+  shipments: Shipment[],
+  collaborations: Collaboration[]
+): boolean {
+  return shipments.some(shipment =>
+    shipment.kol_id === invitation.kol_id && sameProduct(shipment.product, invitation.product)
+  ) || collaborations.some(collaboration =>
+    collaboration.kol_id === invitation.kol_id &&
+    sameProduct(collaboration.product, invitation.product) &&
+    hasRealCollaborationSignal(collaboration)
+  )
+}
+
+export function isActionablePendingInvitation(
+  invitation: Invitation,
+  shipments: Shipment[],
+  collaborations: Collaboration[],
+  currentDate = todayISO()
+): boolean {
+  if (!isPendingInvitation(invitation)) return false
+  if (hasLaterWorkflowForInvitation(invitation, shipments, collaborations)) return false
+
+  const ageDays = daysBetween(invitation.invited_at || '', currentDate)
+  return ageDays <= PENDING_REPLY_LOOKBACK_DAYS
+}
+
+export function getActionablePendingInvitations(
+  invitations: Record<string, Invitation[]>,
+  shipments: Shipment[],
+  collaborationsByKol: Record<string, Collaboration[]>
+): Invitation[] {
+  const collaborations = flatCollaborations(collaborationsByKol)
+  return flatInvitations(invitations).filter(invitation =>
+    isActionablePendingInvitation(invitation, shipments, collaborations)
+  )
+}
+
+export function countActiveShipments(shipments: Shipment[]): number {
+  return shipments.filter(shipment =>
+    hasActiveShipment(shipment) && !isCompletedShipment(shipment)
+  ).length
+}
+
 export function buildDashboardMetrics(sources: DashboardMetricSources): DashboardMetrics {
   const activeShipments = sources.shipments.filter(hasActiveShipment)
   const collaborations = flatCollaborations(sources.collaborationsByKol)
 
   return {
     totalKols: sources.kols.length,
-    pendingReplies: flatInvitations(sources.invitations).filter(invitation =>
-      !invitation.replied || invitation.reply_result === '未回复'
+    pendingReplies: getActionablePendingInvitations(
+      sources.invitations,
+      sources.shipments,
+      sources.collaborationsByKol
     ).length,
     pendingShipments: activeShipments.filter(shipment =>
       shipment.status === '待寄出' && !shipment.tracking_number?.trim()

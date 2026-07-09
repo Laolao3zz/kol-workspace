@@ -6,6 +6,7 @@ import { updateKOL } from '../services/kolService'
 import { countCompletedCollaborations, deriveKolStatus } from '../utils/kolStatus'
 import { collectProductOptions } from '../utils/productOptions'
 import { CONTENT_SHAPES, getKolContentShape } from '../utils/contentShape'
+import { isActionablePendingInvitation } from '../utils/workspaceViews'
 
 interface Props {
   kols: KOL[]
@@ -16,6 +17,7 @@ interface Props {
   onSelect: (kol: KOL) => void
   selectedId: string | null
   productOptions: string[]
+  initialInvitationStatusFilter?: string
   onAddKol: () => void
   onDelete: (id: string) => void
   onRefresh: () => void
@@ -80,6 +82,7 @@ export default function KolTable({
   onSelect,
   selectedId,
   productOptions,
+  initialInvitationStatusFilter,
   onAddKol,
   onDelete,
   onRefresh,
@@ -112,6 +115,13 @@ export default function KolTable({
   }, [kols])
 
   const allInvProducts = useMemo(() => collectProductOptions({ invitations }), [invitations])
+  const allCollaborations = useMemo(() => Object.values(collaborationsByKol).flat(), [collaborationsByKol])
+
+  useEffect(() => {
+    if (initialInvitationStatusFilter) {
+      setFilterInvStatus(initialInvitationStatusFilter)
+    }
+  }, [initialInvitationStatusFilter])
 
   const filtered = useMemo(() => {
     return kols.filter(kol => {
@@ -133,13 +143,17 @@ export default function KolTable({
       const latest = getLatestInv(kol.id)
       let matchInvStatus = true
       if (filterInvStatus === 'none') matchInvStatus = !latest
-      if (filterInvStatus === 'unreplied') matchInvStatus = Boolean(latest && (!latest.replied || latest.reply_result === '未回复'))
+      if (filterInvStatus === 'unreplied') {
+        matchInvStatus = invs.some(invitation =>
+          isActionablePendingInvitation(invitation, shipments, allCollaborations)
+        )
+      }
       if (filterInvStatus === 'agreed') matchInvStatus = Boolean(latest?.replied && latest.reply_result.includes('同意') && latest.decision !== '我方拒绝')
       if (filterInvStatus === 'rejected') matchInvStatus = Boolean(latest?.replied && (latest.reply_result.includes('拒绝') || latest.decision === '我方拒绝'))
 
       return matchSearch && matchContentShape && matchPlatform && matchTag && matchInvProduct && matchInvStatus
     })
-  }, [kols, search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, invitations])
+  }, [kols, search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, invitations, shipments, allCollaborations])
 
   useEffect(() => {
     setPage(1)

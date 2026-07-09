@@ -7,6 +7,7 @@ import { updateShipment } from '../services/shipmentService'
 import ArchiveCollaborationModal, { ArchiveFormData } from './ArchiveCollaborationModal'
 import { findCollaborationForShipment, withShipmentHistoryMarker } from '../utils/collaborationArchive'
 import { getKolContentShape } from '../utils/contentShape'
+import { countActiveShipments } from '../utils/workspaceViews'
 
 interface Props {
   kols: KOL[]
@@ -109,7 +110,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
     ]
   }, [shipments])
 
-  const totalActive = columns.reduce((sum, column) => sum + column.shipments.length, 0)
+  const totalActive = countActiveShipments(shipments)
   const overdueCount = columns.find(column => column.key === 'progress')?.shipments.filter(shipment => daysSince(shipment.delivered_at) >= 60).length || 0
 
   const getPaymentTerm = (shipment: Shipment) => {

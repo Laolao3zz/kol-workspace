@@ -12,10 +12,13 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Collaboration, Invitation, KOL, Shipment } from '../types'
-import { buildDashboardMetrics } from '../utils/workspaceViews'
+import { buildDashboardMetrics, getActionablePendingInvitations } from '../utils/workspaceViews'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
 
 type NavigateTarget = 'table' | 'progress' | 'products' | 'history'
+export type DashboardNavigateOptions = {
+  invitationStatus?: string
+}
 
 interface Props {
   kols: KOL[]
@@ -23,7 +26,7 @@ interface Props {
   shipments: Shipment[]
   collaborationsByKol: Record<string, Collaboration[]>
   onSelectKol: (kol: KOL) => void
-  onNavigate: (target: NavigateTarget) => void
+  onNavigate: (target: NavigateTarget, options?: DashboardNavigateOptions) => void
 }
 
 interface ActivityItem {
@@ -213,8 +216,7 @@ function buildRecentActivities(kols: KOL[], pendingReplies: Invitation[], pendin
 
 export default function WorkspaceDashboard({ kols, invitations, shipments, collaborationsByKol, onSelectKol, onNavigate }: Props) {
   const metrics = buildDashboardMetrics({ kols, invitations, shipments, collaborationsByKol })
-  const allInvitations = Object.values(invitations).flat()
-  const pendingReplies = allInvitations.filter(invitation => !invitation.replied || invitation.reply_result === '未回复')
+  const pendingReplies = getActionablePendingInvitations(invitations, shipments, collaborationsByKol)
   const pendingShipments = shipments.filter(shipment => !shipment.archived_at && shipment.status === '待寄出' && !shipment.tracking_number?.trim())
   const inTransitSoon = shipments.filter(shipment => !shipment.archived_at && shipment.status === '运输中').length
   const contentFollowUps = shipments
@@ -242,7 +244,7 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card>
-          <SectionHeader dot="bg-amber-400" title="待回复邀约" count={pendingReplies.length} actionLabel="全部" onClick={() => onNavigate('table')} />
+          <SectionHeader dot="bg-amber-400" title="待回复邀约" count={pendingReplies.length} actionLabel="全部" onClick={() => onNavigate('table', { invitationStatus: 'unreplied' })} />
           <div className="py-1">
             {pendingReplies.slice(0, 3).map(invitation => {
               const kol = kolById(kols, invitation.kol_id)
