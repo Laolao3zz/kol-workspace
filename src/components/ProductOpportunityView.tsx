@@ -1,11 +1,11 @@
-import { Archive, Check, Package, Pencil, Plus, Search, UserRound, X } from 'lucide-react'
+import { Archive, Check, ChevronDown, ChevronRight, GitMerge, ListFilter, Package, Pencil, Plus, Search, UserRound, X } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
-import { createProduct, updateProduct, type ProductInput } from '../services/productService'
+import { createProduct, mergeProducts, updateProduct, type ProductInput } from '../services/productService'
 import { CONTENT_SHAPES } from '../utils/contentShape'
 import { deriveProductDraftsFromHistory } from '../utils/productExtraction'
 import { mergeOpportunityProducts } from '../utils/productMatching'
-import { buildProductOpportunitySummary, type OpportunityStatus } from '../utils/workspaceViews'
+import { buildProductOpportunitySummary, filterOpportunityRowsByStatus, type OpportunityStatus, type OpportunityStatusFilter } from '../utils/workspaceViews'
 
 interface Props {
   products: Product[]
@@ -93,6 +93,8 @@ function productPayloadFromForm(form: ProductFormState): ProductInput {
 export default function ProductOpportunityView({ products, kols, invitations, shipments, collaborationsByKol, productOptions, onProductsChange, onSelectKol }: Props) {
   const [selectedProduct, setSelectedProduct] = useState('')
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<OpportunityStatusFilter>('全部')
+  const [showUntouched, setShowUntouched] = useState(false)
   const opportunityProducts = useMemo(
     () => mergeOpportunityProducts(products, productOptions),
     [products, productOptions]
@@ -112,9 +114,13 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
     if (selectedProduct && names.length > 0 && !names.includes(selectedProduct)) setSelectedProduct(names[0])
   }, [summary, selectedProduct])
 
+  useEffect(() => {
+    setShowUntouched(false)
+  }, [selectedProduct])
+
   const selected = summary.find(item => item.product === selectedProduct) || summary[0]
   const q = query.trim().toLowerCase()
-  const filteredRows = selected?.rows.filter(row => {
+  const queryFilteredRows = selected?.rows.filter(row => {
     if (!q) return true
     return [
       row.kol.name,
@@ -124,6 +130,11 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
       ...(row.kol.tags || []),
     ].some(value => String(value || '').toLowerCase().includes(q))
   }) || []
+  const statusCounts = statusOrder.reduce<Record<OpportunityStatus, number>>((counts, status) => {
+    counts[status] = queryFilteredRows.filter(row => row.status === status).length
+    return counts
+  }, {} as Record<OpportunityStatus, number>)
+  const filteredRows = filterOpportunityRowsByStatus(queryFilteredRows, statusFilter)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -155,14 +166,29 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
       {selected && (
         <div className="shrink-0 border-b border-black/[0.06] bg-white px-8 py-3">
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('全部')}
+              className={`flex items-center gap-2 rounded-full px-3 py-1.5 transition ${statusFilter === '全部' ? 'bg-[#1D1D1F] text-white' : 'bg-[#F5F5F7] text-[#6E6E73] hover:bg-gray-200'}`}
+            >
+              <ListFilter className="h-3.5 w-3.5" />
+              <span className="text-[11px] font-bold">全部</span>
+              <span className={`text-xs font-extrabold tabular-nums ${statusFilter === '全部' ? 'text-white' : 'text-[#1D1D1F]'}`}>{queryFilteredRows.length}</span>
+            </button>
             {statusOrder.map(status => {
-              const count = selected.counts[status]
+              const count = statusCounts[status]
+              const active = statusFilter === status
               return (
-                <div key={status} className="flex items-center gap-2 rounded-full bg-[#F5F5F7] px-3 py-1.5">
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setStatusFilter(status)}
+                  className={`flex items-center gap-2 rounded-full px-3 py-1.5 transition ${active ? 'bg-[#1D1D1F] text-white' : 'bg-[#F5F5F7] text-[#6E6E73] hover:bg-gray-200'}`}
+                >
                   <span className={`h-2 w-2 rounded-full ${statusDot[status]}`} />
-                  <span className="text-[11px] font-bold text-[#6E6E73]">{status}</span>
-                  <span className="text-xs font-extrabold tabular-nums text-[#1D1D1F]">{count}</span>
-                </div>
+                  <span className="text-[11px] font-bold">{status}</span>
+                  <span className={`text-xs font-extrabold tabular-nums ${active ? 'text-white' : 'text-[#1D1D1F]'}`}>{count}</span>
+                </button>
               )
             })}
             <span className="ml-auto text-xs font-bold text-[#86868B]">共 {filteredRows.length} 位 KOL</span>
@@ -183,10 +209,38 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
             {statusOrder.map(status => {
               const rows = filteredRows.filter(row => row.status === status)
               if (rows.length === 0) return null
+              const collapsedUntouched = status === '未触达' && statusFilter === '全部' && !showUntouched
+
+              if (collapsedUntouched) {
+                return (
+                  <section key={status}>
+                    <button
+                      type="button"
+                      onClick={() => setShowUntouched(true)}
+                      className="flex w-full items-center gap-2 rounded-[14px] border border-black/[0.06] bg-white px-4 py-3 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition hover:border-[#0066FF]/30"
+                    >
+                      <ChevronRight className="h-4 w-4 text-[#86868B]" />
+                      <span className={`h-2 w-2 rounded-full ${statusDot[status]}`} />
+                      <span className="text-sm font-extrabold text-[#1D1D1F]">{status}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone[status]}`}>{rows.length}</span>
+                      <span className="ml-auto text-xs font-bold text-[#86868B]">展开</span>
+                    </button>
+                  </section>
+                )
+              }
 
               return (
                 <section key={status}>
                   <div className="mb-3 flex items-center gap-2">
+                    {status === '未触达' && statusFilter === '全部' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowUntouched(false)}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#F5F5F7] text-[#86868B] transition hover:bg-gray-200"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                    )}
                     <span className={`h-2 w-2 rounded-full ${statusDot[status]}`} />
                     <h3 className="text-sm font-extrabold text-[#1D1D1F]">{status}</h3>
                     <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone[status]}`}>{rows.length}</span>
@@ -268,6 +322,8 @@ function ProductLibraryPanel({
 }) {
   const [form, setForm] = useState<ProductFormState>(emptyProductForm)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [mergingProduct, setMergingProduct] = useState<Product | null>(null)
+  const [mergeTargetId, setMergeTargetId] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const importCandidates = useMemo(() => deriveProductDraftsFromHistory({
@@ -277,6 +333,10 @@ function ProductLibraryPanel({
     shipments,
     collaborationsByKol,
   }), [products, kols, invitations, shipments, collaborationsByKol])
+  const activeProductCount = products.filter(product => product.status !== '归档').length
+  const mergeTargetOptions = products.filter(product =>
+    product.status !== '归档' && product.id !== mergingProduct?.id
+  )
 
   const resetForm = () => {
     setEditingProduct(null)
@@ -285,8 +345,17 @@ function ProductLibraryPanel({
   }
 
   const startEdit = (product: Product) => {
+    setMergingProduct(null)
+    setMergeTargetId('')
     setEditingProduct(product)
     setForm(formFromProduct(product))
+    setMessage('')
+  }
+
+  const startMerge = (product: Product) => {
+    setEditingProduct(null)
+    setMergingProduct(product)
+    setMergeTargetId('')
     setMessage('')
   }
 
@@ -345,6 +414,39 @@ function ProductLibraryPanel({
       setMessage('产品已归档')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '归档失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleMergeProducts = async () => {
+    if (!mergingProduct) return
+    const target = products.find(product => product.id === mergeTargetId)
+    if (!target) {
+      setMessage('请选择要保留的目标产品')
+      return
+    }
+    if (!confirm(`把「${mergingProduct.name}」合并到「${target.name}」？历史邀约、寄样、合作和 KOL 样品名会一起改为目标产品，来源产品会归档。`)) return
+
+    setSaving(true)
+    setMessage('')
+    try {
+      const merged = await mergeProducts({
+        sourceProductId: mergingProduct.id,
+        targetProductId: target.id,
+      })
+
+      await onProductsChange()
+      onSelectProduct(merged.target.name)
+      if (editingProduct?.id === mergingProduct.id) {
+        setEditingProduct(null)
+        setForm(emptyProductForm)
+      }
+      setMergingProduct(null)
+      setMergeTargetId('')
+      setMessage('产品已合并')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '合并失败')
     } finally {
       setSaving(false)
     }
@@ -495,6 +597,48 @@ function ProductLibraryPanel({
       </form>
 
       <div className="min-h-0 overflow-y-auto px-5 py-4">
+        {mergingProduct && (
+          <div className="mb-3 rounded-[14px] border border-[#0066FF]/15 bg-blue-50/60 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <GitMerge className="h-4 w-4 text-[#0066FF]" />
+              <div className="min-w-0 flex-1 text-xs font-extrabold text-[#1D1D1F]">合并产品</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMergingProduct(null)
+                  setMergeTargetId('')
+                }}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-white/80 text-[#6E6E73] transition hover:bg-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="mb-2 truncate rounded-[10px] bg-white/80 px-3 py-2 text-[11px] font-bold text-[#6E6E73]">
+              来源：<span className="text-[#1D1D1F]">{mergingProduct.name}</span>
+            </div>
+            <select
+              value={mergeTargetId}
+              onChange={event => setMergeTargetId(event.target.value)}
+              className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40"
+            >
+              <option value="">选择保留的目标产品</option>
+              {mergeTargetOptions.map(product => (
+                <option key={product.id} value={product.id}>{product.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleMergeProducts}
+              disabled={saving || !mergeTargetId}
+              className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] bg-[#0066FF] px-3 text-xs font-extrabold text-white shadow-[0_2px_8px_rgba(0,102,255,0.25)] transition disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <GitMerge className="h-3.5 w-3.5" /> 确认合并
+            </button>
+            <div className="mt-2 text-[11px] font-semibold leading-5 text-[#6E6E73]">
+              历史记录会同步改到目标产品，来源产品归档。
+            </div>
+          </div>
+        )}
         {products.length === 0 ? (
           <div className="rounded-[14px] border border-dashed border-black/[0.08] bg-[#F5F5F7] px-4 py-6 text-center">
             <Package className="mx-auto mb-2 h-5 w-5 text-[#AEAEB2]" />
@@ -540,19 +684,28 @@ function ProductLibraryPanel({
                     ))}
                   </div>
 
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => startEdit(product)}
-                      className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[#F5F5F7] text-[11px] font-bold text-[#1D1D1F] transition hover:bg-gray-200"
+                      className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[#F5F5F7] text-[11px] font-bold text-[#1D1D1F] transition hover:bg-gray-200"
                     >
                       <Pencil className="h-3.5 w-3.5" /> 编辑
                     </button>
+                    {!archived && activeProductCount > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => startMerge(product)}
+                        className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-blue-50 text-[11px] font-bold text-[#0066FF] transition hover:bg-blue-100"
+                      >
+                        <GitMerge className="h-3.5 w-3.5" /> 合并
+                      </button>
+                    )}
                     {!archived && (
                       <button
                         type="button"
                         onClick={() => archiveProduct(product)}
-                        className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-slate-100 text-[11px] font-bold text-slate-600 transition hover:bg-slate-200"
+                        className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-slate-100 text-[11px] font-bold text-slate-600 transition hover:bg-slate-200"
                       >
                         <Archive className="h-3.5 w-3.5" /> 归档
                       </button>

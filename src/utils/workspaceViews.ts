@@ -3,6 +3,7 @@ import { countCompletedCollaborations, hasRealCollaborationSignal } from './kolS
 import { getProductName, hasProductRecordForKol, shouldShowProductForKol } from './productMatching'
 
 export type OpportunityStatus = '未触达' | '待回复' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
+export type OpportunityStatusFilter = OpportunityStatus | '全部'
 
 export interface DashboardMetricSources {
   kols: KOL[]
@@ -27,8 +28,18 @@ export interface ProductOpportunitySummary {
   rows: Array<{ kol: KOL; status: OpportunityStatus }>
 }
 
+export type ProductOpportunityRow = ProductOpportunitySummary['rows'][number]
+
 const opportunityStatuses: OpportunityStatus[] = ['未触达', '待回复', '已同意', '已拒绝', '不推进', '寄样中', '内容中', '已完成']
 const PENDING_REPLY_LOOKBACK_DAYS = 45
+
+export function filterOpportunityRowsByStatus(
+  rows: ProductOpportunityRow[],
+  status: OpportunityStatusFilter
+): ProductOpportunityRow[] {
+  if (status === '全部') return rows
+  return rows.filter(row => row.status === status)
+}
 
 function flatInvitations(invitations: Record<string, Invitation[]>): Invitation[] {
   return Object.values(invitations).flat()

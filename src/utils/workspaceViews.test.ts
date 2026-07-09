@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
-import { buildDashboardMetrics, buildProductOpportunitySummary, countActiveShipments } from './workspaceViews'
+import { buildDashboardMetrics, buildProductOpportunitySummary, countActiveShipments, filterOpportunityRowsByStatus } from './workspaceViews'
 
 const kol = (id: string, overrides: Partial<KOL> = {}): KOL => ({
   id,
@@ -259,5 +259,17 @@ describe('workspace view helpers', () => {
     expect(sbc?.rows.map(row => row.kol.id)).toEqual(['outdoor', 'storage'])
     expect(sbc?.rows.find(row => row.kol.id === 'outdoor')?.status).toBe('待回复')
     expect(sbc?.rows.find(row => row.kol.id === 'storage')?.status).toBe('未触达')
+  })
+
+  it('filters product opportunity rows by selected status', () => {
+    const rows = [
+      { kol: kol('untouched'), status: '未触达' as const },
+      { kol: kol('pending'), status: '待回复' as const },
+      { kol: kol('done'), status: '已完成' as const },
+    ]
+
+    expect(filterOpportunityRowsByStatus(rows, '全部').map(row => row.kol.id)).toEqual(['untouched', 'pending', 'done'])
+    expect(filterOpportunityRowsByStatus(rows, '未触达').map(row => row.kol.id)).toEqual(['untouched'])
+    expect(filterOpportunityRowsByStatus(rows, '已完成').map(row => row.kol.id)).toEqual(['done'])
   })
 })
