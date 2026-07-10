@@ -634,36 +634,6 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                 </FieldGrid>
               </SectionCard>
 
-              <SectionCard icon={Package} title="产品机会"
-                action={(
-                  <div className="flex items-center gap-2">
-                    <HeaderButton onClick={() => setShowProductCorrection(true)} icon={ArrowRightLeft} tone="neutral" disabled={loadingSub}>修正产品</HeaderButton>
-                    <HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus}>发起邀约</HeaderButton>
-                  </div>
-                )}
-              >
-                {productOpportunities.length === 0 ? (
-                  <div className="rounded-[14px] border border-dashed border-black/[0.08] bg-[#F5F5F7] px-4 py-6 text-center">
-                    <p className="text-sm font-bold text-[#1D1D1F]">暂无产品机会</p>
-                    <p className="mt-1 text-xs font-medium text-[#86868B]">新增产品邀约、寄样或合作记录后会自动汇总。</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {productOpportunities.map(item => (
-                      <div key={item.product} className="rounded-[12px] border border-black/[0.06] bg-white p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="truncate text-xs font-extrabold text-[#1D1D1F]" title={item.product}>{item.product}</div>
-                            <div className="mt-1 text-[11px] font-medium text-[#86868B]">{opportunityHint(item.status)}</div>
-                          </div>
-                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${opportunityTone[item.status]}`}>{item.status}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </SectionCard>
-
               <SectionCard icon={Package} title="当前合作链路"
                 action={<HeaderButton onClick={() => { setEditingShipment(null); setShowShipmentModal(true) }} icon={Plus}>新增寄样</HeaderButton>}
               >
@@ -745,6 +715,36 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
             </div>
 
             <div className="space-y-5">
+              <SectionCard icon={Package} title="产品机会"
+                action={(
+                  <div className="flex items-center gap-2">
+                    <HeaderButton onClick={() => setShowProductCorrection(true)} icon={ArrowRightLeft} tone="neutral" disabled={loadingSub}>修正产品</HeaderButton>
+                    <HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus}>发起邀约</HeaderButton>
+                  </div>
+                )}
+              >
+                {productOpportunities.length === 0 ? (
+                  <div className="rounded-[14px] border border-dashed border-black/[0.08] bg-[#F5F5F7] px-4 py-6 text-center">
+                    <p className="text-sm font-bold text-[#1D1D1F]">暂无产品机会</p>
+                    <p className="mt-1 text-xs font-medium text-[#86868B]">新增产品邀约、寄样或合作记录后会自动汇总。</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    {productOpportunities.map(item => (
+                      <div key={item.product} className="rounded-[12px] border border-black/[0.06] bg-white p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-extrabold text-[#1D1D1F]" title={item.product}>{item.product}</div>
+                            <div className="mt-1 text-[11px] font-medium text-[#86868B]">{opportunityHint(item.status)}</div>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${opportunityTone[item.status]}`}>{item.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionCard>
+
               <SectionCard icon={Mail} title="邀约记录"
                 action={<HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus}>发起邀约</HeaderButton>}
               >
