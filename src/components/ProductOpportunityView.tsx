@@ -22,7 +22,7 @@ interface Props {
 const statusTone: Record<OpportunityStatus, string> = {
   未触达: 'bg-gray-100 text-gray-600',
   待回复: 'bg-amber-50 text-amber-700',
-  未回复: 'bg-neutral-100 text-neutral-600',
+  未回复: 'bg-violet-50 text-violet-700',
   已同意: 'bg-blue-50 text-blue-700',
   已拒绝: 'bg-red-50 text-red-700',
   不推进: 'bg-slate-100 text-slate-600',
@@ -34,7 +34,7 @@ const statusTone: Record<OpportunityStatus, string> = {
 const statusDot: Record<OpportunityStatus, string> = {
   未触达: 'bg-gray-300',
   待回复: 'bg-[#FFB000]',
-  未回复: 'bg-neutral-400',
+  未回复: 'bg-violet-500',
   已同意: 'bg-[#0066FF]',
   已拒绝: 'bg-[#FF3B30]',
   不推进: 'bg-slate-400',

@@ -4,6 +4,7 @@ import { getProductName, hasProductRecordForKol, sameProduct, shouldShowProductF
 
 export type OpportunityStatus = '未触达' | '待回复' | '未回复' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
 export type OpportunityStatusFilter = OpportunityStatus | '全部'
+export type UnansweredInvitationStatus = '待回复' | '未回复'
 
 export interface DashboardMetricSources {
   kols: KOL[]
@@ -77,6 +78,14 @@ function isWithinPendingReplyWindow(invitation: Invitation, currentDate: string)
   return ageDays <= PENDING_REPLY_WINDOW_DAYS
 }
 
+export function getUnansweredInvitationStatus(
+  invitation: Invitation,
+  currentDate = todayISO()
+): UnansweredInvitationStatus | null {
+  if (!isPendingInvitation(invitation)) return null
+  return isWithinPendingReplyWindow(invitation, currentDate) ? '待回复' : '未回复'
+}
+
 function hasLaterWorkflowForInvitation(
   invitation: Invitation,
   shipments: Shipment[],
@@ -97,10 +106,20 @@ export function isActionablePendingInvitation(
   collaborations: Collaboration[],
   currentDate = todayISO()
 ): boolean {
-  if (!isPendingInvitation(invitation)) return false
+  if (getUnansweredInvitationStatus(invitation, currentDate) !== '待回复') return false
   if (hasLaterWorkflowForInvitation(invitation, shipments, collaborations)) return false
 
-  return isWithinPendingReplyWindow(invitation, currentDate)
+  return true
+}
+
+export function isOverduePendingInvitation(
+  invitation: Invitation,
+  shipments: Shipment[],
+  collaborations: Collaboration[],
+  currentDate = todayISO()
+): boolean {
+  if (getUnansweredInvitationStatus(invitation, currentDate) !== '未回复') return false
+  return !hasLaterWorkflowForInvitation(invitation, shipments, collaborations)
 }
 
 export function getActionablePendingInvitations(
@@ -183,9 +202,8 @@ function opportunityStatusForKol(
 
   const latestInvitation = latestInvitationForProduct(invitations, product)
   if (!latestInvitation) return '未触达'
-  if (isPendingInvitation(latestInvitation)) {
-    return isWithinPendingReplyWindow(latestInvitation, currentDate) ? '待回复' : '未回复'
-  }
+  const unansweredStatus = getUnansweredInvitationStatus(latestInvitation, currentDate)
+  if (unansweredStatus) return unansweredStatus
   if (latestInvitation.decision === '我方拒绝') return '不推进'
   if (latestInvitation.reply_result?.includes('拒绝')) return '已拒绝'
   if (latestInvitation.reply_result?.includes('同意')) return '已同意'

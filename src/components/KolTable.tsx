@@ -6,7 +6,11 @@ import { updateKOL } from '../services/kolService'
 import { countCompletedCollaborations, deriveKolStatus } from '../utils/kolStatus'
 import { collectProductOptions } from '../utils/productOptions'
 import { CONTENT_SHAPES, getKolContentShape } from '../utils/contentShape'
-import { isActionablePendingInvitation } from '../utils/workspaceViews'
+import {
+  getUnansweredInvitationStatus,
+  isActionablePendingInvitation,
+  isOverduePendingInvitation,
+} from '../utils/workspaceViews'
 import { sameProduct } from '../utils/productMatching'
 import { resolveProductSelection } from '../utils/productCorrection'
 
@@ -48,7 +52,9 @@ const statusTone = (status: string) => {
 
 const replyTone = (invitation: Invitation | null) => {
   if (!invitation) return 'bg-gray-100 text-gray-400'
-  if (!invitation.replied || invitation.reply_result === '未回复') return 'bg-amber-50 text-amber-700'
+  const unansweredStatus = getUnansweredInvitationStatus(invitation)
+  if (unansweredStatus === '待回复') return 'bg-amber-50 text-amber-700'
+  if (unansweredStatus === '未回复') return 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100'
   if (invitation.decision === '我方拒绝') return 'bg-slate-100 text-slate-600'
   if (invitation.reply_result.includes('同意')) return 'bg-emerald-50 text-emerald-700'
   if (invitation.reply_result.includes('拒绝')) return 'bg-red-50 text-red-700'
@@ -57,7 +63,8 @@ const replyTone = (invitation: Invitation | null) => {
 
 const replyLabel = (invitation: Invitation | null) => {
   if (!invitation) return '无邀约'
-  if (!invitation.replied || invitation.reply_result === '未回复') return '未回复'
+  const unansweredStatus = getUnansweredInvitationStatus(invitation)
+  if (unansweredStatus) return unansweredStatus
   if (invitation.decision === '我方拒绝') return '不推进'
   if (invitation.reply_result.includes('同意')) return '已同意'
   if (invitation.reply_result.includes('拒绝')) return '已拒绝'
@@ -149,9 +156,14 @@ export default function KolTable({
       const latest = getLatestInv(kol.id)
       let matchInvStatus = true
       if (filterInvStatus === 'none') matchInvStatus = !latest
-      if (filterInvStatus === 'unreplied') {
+      if (filterInvStatus === 'pending') {
         matchInvStatus = invs.some(invitation =>
           isActionablePendingInvitation(invitation, shipments, allCollaborations)
+        )
+      }
+      if (filterInvStatus === 'unreplied') {
+        matchInvStatus = invs.some(invitation =>
+          isOverduePendingInvitation(invitation, shipments, allCollaborations)
         )
       }
       if (filterInvStatus === 'agreed') matchInvStatus = Boolean(latest?.replied && latest.reply_result.includes('同意') && latest.decision !== '我方拒绝')
@@ -314,7 +326,8 @@ export default function KolTable({
               className="h-9 rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] outline-none focus:border-[#0066FF]/40"
             >
               <option value="">邀约结果</option>
-              <option value="unreplied">未回复</option>
+              <option value="pending">待回复（14天内）</option>
+              <option value="unreplied">未回复（超14天）</option>
               <option value="agreed">已同意</option>
               <option value="rejected">已拒绝/不推进</option>
               <option value="none">无邀约</option>

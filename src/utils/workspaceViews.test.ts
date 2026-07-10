@@ -5,7 +5,9 @@ import {
   buildProductOpportunitySummary,
   countActiveShipments,
   filterOpportunityRowsByStatus,
+  getUnansweredInvitationStatus,
   isActionablePendingInvitation,
+  isOverduePendingInvitation,
 } from './workspaceViews'
 
 const kol = (id: string, overrides: Partial<KOL> = {}): KOL => ({
@@ -135,16 +137,33 @@ describe('workspace view helpers', () => {
   })
 
   it('keeps unanswered invitations actionable through day 14 and expires them on day 15', () => {
+    const pending = invitation({ invited_at: '2026-06-26' })
+    const overdue = invitation({ invited_at: '2026-06-25' })
+
+    expect(getUnansweredInvitationStatus(pending, '2026-07-10')).toBe('待回复')
+    expect(getUnansweredInvitationStatus(overdue, '2026-07-10')).toBe('未回复')
+
     expect(isActionablePendingInvitation(
-      invitation({ invited_at: '2026-06-26' }),
+      pending,
       [],
       [],
       '2026-07-10'
     )).toBe(true)
 
-    expect(isActionablePendingInvitation(
-      invitation({ invited_at: '2026-06-25' }),
+    expect(isOverduePendingInvitation(
+      overdue,
       [],
+      [],
+      '2026-07-10'
+    )).toBe(true)
+  })
+
+  it('does not classify an old unanswered invitation as overdue after its workflow advanced', () => {
+    const overdue = invitation({ kol_id: 'advanced', product: 'K1', invited_at: '2026-06-25' })
+
+    expect(isOverduePendingInvitation(
+      overdue,
+      [shipment({ kol_id: 'advanced', product: 'K1' })],
       [],
       '2026-07-10'
     )).toBe(false)

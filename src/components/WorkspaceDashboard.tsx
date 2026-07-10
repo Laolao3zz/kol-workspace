@@ -244,7 +244,7 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card>
-          <SectionHeader dot="bg-amber-400" title="待回复邀约" count={pendingReplies.length} actionLabel="全部" onClick={() => onNavigate('table', { invitationStatus: 'unreplied' })} />
+          <SectionHeader dot="bg-amber-400" title="待回复邀约" count={pendingReplies.length} actionLabel="全部" onClick={() => onNavigate('table', { invitationStatus: 'pending' })} />
           <div className="py-1">
             {pendingReplies.slice(0, 3).map(invitation => {
               const kol = kolById(kols, invitation.kol_id)
