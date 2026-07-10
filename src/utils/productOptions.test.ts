@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Product } from '../types'
 import { collectProductOptions } from './productOptions'
 
 describe('collectProductOptions', () => {
@@ -35,5 +36,19 @@ describe('collectProductOptions', () => {
     })
 
     expect(options).toEqual(['P1', 'P2'])
+  })
+
+  it('does not offer archived products unless workflow history still references them', () => {
+    const archived = {
+      id: 'archived-product',
+      name: 'youyeetoo x1',
+      status: '归档',
+    } as Product
+
+    expect(collectProductOptions({ products: [archived] })).toEqual([])
+    expect(collectProductOptions({
+      products: [archived],
+      invitations: [{ product: 'youyeetoo x1' }],
+    })).toEqual(['youyeetoo x1'])
   })
 })

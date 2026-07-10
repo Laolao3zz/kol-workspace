@@ -31,7 +31,7 @@ export function mergeOpportunityProducts(products: Product[], _productNames: str
     merged.push(typeof product === 'string' ? name : product)
   }
 
-  products.forEach(add)
+  products.filter(product => product.status !== '归档').forEach(add)
 
   return merged
 }

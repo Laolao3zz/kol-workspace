@@ -5,7 +5,7 @@ type ProductRecord = Pick<Invitation | Shipment | Collaboration, 'product'>
 type ProductRecordMap = Record<string, ProductRecord[]>
 
 interface ProductOptionSources {
-  products?: Array<string | Pick<Product, 'name'>>
+  products?: Array<string | Pick<Product, 'name' | 'status'>>
   kols?: Array<Pick<KOL, 'sample_product'>>
   invitations?: ProductRecord[] | ProductRecordMap
   shipments?: ProductRecord[]
@@ -30,7 +30,10 @@ function addProduct(optionsByKey: Map<string, string>, value: string | null | un
 export function collectProductOptions(sources: ProductOptionSources): string[] {
   const optionsByKey = new Map<string, string>()
 
-  sources.products?.forEach(product => addProduct(optionsByKey, typeof product === 'string' ? product : product.name))
+  sources.products?.forEach(product => {
+    if (typeof product !== 'string' && product.status === '归档') return
+    addProduct(optionsByKey, typeof product === 'string' ? product : product.name)
+  })
   sources.kols?.forEach(kol => addProduct(optionsByKey, kol.sample_product))
   listFromRecordMap(sources.invitations).forEach(invitation => addProduct(optionsByKey, invitation.product))
   sources.shipments?.forEach(shipment => addProduct(optionsByKey, shipment.product))

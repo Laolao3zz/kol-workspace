@@ -19,11 +19,15 @@ const product = (name: string, overrides: Partial<Product> = {}): Product => ({
 describe('product matching helpers', () => {
   it('keeps product opportunities limited to managed product records', () => {
     const merged = mergeOpportunityProducts(
-      [product('Atlas NAS 4-bay'), product('TrailCam X2')],
+      [
+        product('Atlas NAS 4-bay'),
+        product('Paused Product', { status: '暂停' }),
+        product('youyeetoo x1', { status: '归档' }),
+      ],
       [' atlas nas 4-bay ', 'Legacy Sample']
     )
 
-    expect(merged.map(getProductName)).toEqual(['Atlas NAS 4-bay', 'TrailCam X2'])
+    expect(merged.map(getProductName)).toEqual(['Atlas NAS 4-bay', 'Paused Product'])
     expect(typeof merged[0]).toBe('object')
   })
 })

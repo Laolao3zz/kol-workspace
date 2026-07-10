@@ -1,7 +1,7 @@
-import { Archive, Check, ChevronDown, ChevronRight, GitMerge, ListFilter, Package, Pencil, Plus, Search, UserRound, X } from 'lucide-react'
+import { Archive, Check, ChevronDown, ChevronRight, ListFilter, Package, Pencil, Plus, Search, UserRound, X } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
-import { createProduct, mergeProducts, updateProduct, type ProductInput } from '../services/productService'
+import { createProduct, updateProduct, type ProductInput } from '../services/productService'
 import { CONTENT_SHAPES } from '../utils/contentShape'
 import { deriveProductDraftsFromHistory } from '../utils/productExtraction'
 import { mergeOpportunityProducts } from '../utils/productMatching'
@@ -322,10 +322,9 @@ function ProductLibraryPanel({
 }) {
   const [form, setForm] = useState<ProductFormState>(emptyProductForm)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [mergingProduct, setMergingProduct] = useState<Product | null>(null)
-  const [mergeTargetId, setMergeTargetId] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const operationalProducts = products.filter(product => product.status !== '归档')
   const importCandidates = useMemo(() => deriveProductDraftsFromHistory({
     existingProducts: products,
     kols,
@@ -333,11 +332,6 @@ function ProductLibraryPanel({
     shipments,
     collaborationsByKol,
   }), [products, kols, invitations, shipments, collaborationsByKol])
-  const activeProductCount = products.filter(product => product.status !== '归档').length
-  const mergeTargetOptions = products.filter(product =>
-    product.status !== '归档' && product.id !== mergingProduct?.id
-  )
-
   const resetForm = () => {
     setEditingProduct(null)
     setForm(emptyProductForm)
@@ -345,17 +339,8 @@ function ProductLibraryPanel({
   }
 
   const startEdit = (product: Product) => {
-    setMergingProduct(null)
-    setMergeTargetId('')
     setEditingProduct(product)
     setForm(formFromProduct(product))
-    setMessage('')
-  }
-
-  const startMerge = (product: Product) => {
-    setEditingProduct(null)
-    setMergingProduct(product)
-    setMergeTargetId('')
     setMessage('')
   }
 
@@ -419,39 +404,6 @@ function ProductLibraryPanel({
     }
   }
 
-  const handleMergeProducts = async () => {
-    if (!mergingProduct) return
-    const target = products.find(product => product.id === mergeTargetId)
-    if (!target) {
-      setMessage('请选择要保留的目标产品')
-      return
-    }
-    if (!confirm(`把「${mergingProduct.name}」合并到「${target.name}」？历史邀约、寄样、合作和 KOL 样品名会一起改为目标产品，来源产品会归档。`)) return
-
-    setSaving(true)
-    setMessage('')
-    try {
-      const merged = await mergeProducts({
-        sourceProductId: mergingProduct.id,
-        targetProductId: target.id,
-      })
-
-      await onProductsChange()
-      onSelectProduct(merged.target.name)
-      if (editingProduct?.id === mergingProduct.id) {
-        setEditingProduct(null)
-        setForm(emptyProductForm)
-      }
-      setMergingProduct(null)
-      setMergeTargetId('')
-      setMessage('产品已合并')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : '合并失败')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const importHistoricalProducts = async () => {
     if (importCandidates.length === 0) {
       setMessage('没有可提取的历史产品')
@@ -481,7 +433,7 @@ function ProductLibraryPanel({
       <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3">
         <div>
           <div className="text-sm font-extrabold text-[#1D1D1F]">产品库</div>
-          <div className="mt-0.5 text-[11px] font-semibold text-[#86868B]">{products.length} 个产品</div>
+          <div className="mt-0.5 text-[11px] font-semibold text-[#86868B]">{operationalProducts.length} 个产品</div>
         </div>
         <div className="flex items-center gap-2">
           {importCandidates.length > 0 && (
@@ -597,49 +549,7 @@ function ProductLibraryPanel({
       </form>
 
       <div className="min-h-0 overflow-y-auto px-5 py-4">
-        {mergingProduct && (
-          <div className="mb-3 rounded-[14px] border border-[#0066FF]/15 bg-blue-50/60 p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <GitMerge className="h-4 w-4 text-[#0066FF]" />
-              <div className="min-w-0 flex-1 text-xs font-extrabold text-[#1D1D1F]">合并产品</div>
-              <button
-                type="button"
-                onClick={() => {
-                  setMergingProduct(null)
-                  setMergeTargetId('')
-                }}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-white/80 text-[#6E6E73] transition hover:bg-white"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div className="mb-2 truncate rounded-[10px] bg-white/80 px-3 py-2 text-[11px] font-bold text-[#6E6E73]">
-              来源：<span className="text-[#1D1D1F]">{mergingProduct.name}</span>
-            </div>
-            <select
-              value={mergeTargetId}
-              onChange={event => setMergeTargetId(event.target.value)}
-              className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40"
-            >
-              <option value="">选择保留的目标产品</option>
-              {mergeTargetOptions.map(product => (
-                <option key={product.id} value={product.id}>{product.name}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleMergeProducts}
-              disabled={saving || !mergeTargetId}
-              className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] bg-[#0066FF] px-3 text-xs font-extrabold text-white shadow-[0_2px_8px_rgba(0,102,255,0.25)] transition disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <GitMerge className="h-3.5 w-3.5" /> 确认合并
-            </button>
-            <div className="mt-2 text-[11px] font-semibold leading-5 text-[#6E6E73]">
-              历史记录会同步改到目标产品，来源产品归档。
-            </div>
-          </div>
-        )}
-        {products.length === 0 ? (
+        {operationalProducts.length === 0 ? (
           <div className="rounded-[14px] border border-dashed border-black/[0.08] bg-[#F5F5F7] px-4 py-6 text-center">
             <Package className="mx-auto mb-2 h-5 w-5 text-[#AEAEB2]" />
             <div className="text-xs font-extrabold text-[#1D1D1F]">暂无产品</div>
@@ -656,17 +566,14 @@ function ProductLibraryPanel({
           </div>
         ) : (
           <div className="space-y-2">
-            {products.map(product => {
-              const archived = product.status === '归档'
+            {operationalProducts.map(product => {
               const paused = product.status === '暂停'
-              const tone = archived
-                ? 'bg-slate-100 text-slate-500'
-                : paused
-                  ? 'bg-amber-50 text-amber-700'
-                  : 'bg-emerald-50 text-emerald-700'
+              const tone = paused
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-emerald-50 text-emerald-700'
 
               return (
-                <div key={product.id} className={`rounded-[12px] border border-black/[0.06] bg-white p-3 ${archived ? 'opacity-65' : ''}`}>
+                <div key={product.id} className="rounded-[12px] border border-black/[0.06] bg-white p-3">
                   <div className="flex items-start justify-between gap-3">
                     <button type="button" onClick={() => onSelectProduct(product.name)} className="min-w-0 flex-1 text-left">
                       <div className="truncate text-xs font-extrabold text-[#1D1D1F]" title={product.name}>{product.name}</div>
@@ -692,24 +599,13 @@ function ProductLibraryPanel({
                     >
                       <Pencil className="h-3.5 w-3.5" /> 编辑
                     </button>
-                    {!archived && activeProductCount > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => startMerge(product)}
-                        className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-blue-50 text-[11px] font-bold text-[#0066FF] transition hover:bg-blue-100"
-                      >
-                        <GitMerge className="h-3.5 w-3.5" /> 合并
-                      </button>
-                    )}
-                    {!archived && (
-                      <button
-                        type="button"
-                        onClick={() => archiveProduct(product)}
-                        className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-slate-100 text-[11px] font-bold text-slate-600 transition hover:bg-slate-200"
-                      >
-                        <Archive className="h-3.5 w-3.5" /> 归档
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => archiveProduct(product)}
+                      className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-slate-100 text-[11px] font-bold text-slate-600 transition hover:bg-slate-200"
+                    >
+                      <Archive className="h-3.5 w-3.5" /> 归档
+                    </button>
                   </div>
                 </div>
               )

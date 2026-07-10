@@ -11,6 +11,8 @@
     "sync-emails:debug": "node --env-file=.env.local scripts/sync-emails.mjs",
     "repair:collaborations": "node scripts/repair-misclassified-collaborations.mjs --apply",
     "repair:collaborations:dry": "node scripts/repair-misclassified-collaborations.mjs",
+    "repair:product-aliases": "node scripts/repair-product-aliases.mjs",
+    "repair:product-aliases:apply": "node scripts/repair-product-aliases.mjs --apply",
     "health-check": "node scripts/health-check.mjs",
     "health-fix": "node scripts/health-check.mjs fix",
     "test": "vitest run"

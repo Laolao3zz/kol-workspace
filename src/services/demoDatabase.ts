@@ -521,48 +521,6 @@ export const demoDatabase = {
     return clone(record)
   },
 
-  mergeProducts(sourceProductId: string, targetProductId: string, targetUpdates: Partial<Product>): { source: Product; target: Product } {
-    if (sourceProductId === targetProductId) {
-      throw new Error('不能合并同一个产品')
-    }
-
-    const current = loadState()
-    const source = requireRecord(current.products, sourceProductId, '来源产品')
-    const target = requireRecord(current.products, targetProductId, '目标产品')
-    const sourceName = source.name
-    const targetName = target.name
-    const mergedAt = nowISO()
-
-    Object.assign(target, targetUpdates, { updated_at: mergedAt })
-    Object.assign(source, {
-      status: '归档',
-      notes: [source.notes, `已合并到「${targetName}」。`].filter(Boolean).join('\n'),
-      updated_at: mergedAt,
-    })
-
-    current.kols.forEach(kol => {
-      if (kol.sample_product === sourceName) {
-        kol.sample_product = targetName
-        kol.updated_at = mergedAt
-      }
-    })
-    current.invitations.forEach(invitation => {
-      if (invitation.product === sourceName) invitation.product = targetName
-    })
-    current.shipments.forEach(shipment => {
-      if (shipment.product === sourceName) {
-        shipment.product = targetName
-        shipment.updated_at = mergedAt
-      }
-    })
-    current.collaborations.forEach(collaboration => {
-      if (collaboration.product === sourceName) collaboration.product = targetName
-    })
-
-    saveState()
-    return { source: clone(source), target: clone(target) }
-  },
-
   deleteProduct(id: string): void {
     const current = loadState()
     current.products = current.products.filter(product => product.id !== id)
