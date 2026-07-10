@@ -118,21 +118,15 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
     return matched?.quoted_fee?.trim() || ''
   }
 
-  const syncKolSnapshot = async (shipment: Shipment, status: string) => {
-    await onUpdate(shipment.kol_id, {
-      sample_product: shipment.product || '',
-      sample_date: shipment.sample_date || null,
-      tracking_number: shipment.tracking_number || '',
-      shipping_details: shipment.shipping_details || '',
-      status,
-    })
+  const syncKolStatus = async (kolId: string, status: string) => {
+    await onUpdate(kolId, { status })
   }
 
   const handleFillTracking = async (shipment: Shipment) => {
     const trackingNumber = (trackingDrafts[shipment.id] || '').trim()
     if (!trackingNumber) return
     const saved = await updateShipment(shipment.id, { tracking_number: trackingNumber, status: '运输中' })
-    await syncKolSnapshot(saved, '运输中')
+    await syncKolStatus(saved.kol_id, '运输中')
     await onShipmentsChange()
     setTrackingDrafts(prev => ({ ...prev, [shipment.id]: '' }))
   }
@@ -145,7 +139,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
         delivered_at: todayISO(),
         progress_status: shipment.progress_status || '待制作',
       })
-      await syncKolSnapshot(saved, kolMainStatus(saved))
+      await syncKolStatus(saved.kol_id, kolMainStatus(saved))
       await onShipmentsChange()
     } catch (err) {
       setBoardError(err instanceof Error ? err.message : '确认签收失败')
@@ -167,7 +161,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
         progress_status: progressDraft.progress_status,
         progress_notes: progressDraft.progress_notes.trim(),
       })
-      await syncKolSnapshot(saved, kolMainStatus(saved))
+      await syncKolStatus(saved.kol_id, kolMainStatus(saved))
       await onShipmentsChange()
       setEditingProgressId(null)
     } catch (err) {
@@ -187,7 +181,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
         completed_at: completedAt,
       })
       await ensureCompletionCollaboration(saved)
-      await syncKolSnapshot(saved, '合作完成')
+      await syncKolStatus(saved.kol_id, '合作完成')
       await onCollaborationsChange()
       await onShipmentsChange()
     } catch (err) {
@@ -228,7 +222,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
         })
       }
       const archived = await updateShipment(archivingShipment.id, { archived_at: new Date().toISOString() })
-      await syncKolSnapshot(archived, '合作完成')
+      await syncKolStatus(archived.kol_id, '合作完成')
       await onCollaborationsChange()
       await onShipmentsChange()
       setArchivingShipment(null)

@@ -142,14 +142,8 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     return '待寄出'
   }
 
-  const syncKolSnapshot = async (shipment: ShipmentFormData | Shipment, status?: string) => {
-    await onUpdate(kol.id, {
-      sample_product: shipment.product || '',
-      sample_date: shipment.sample_date || null,
-      tracking_number: shipment.tracking_number || '',
-      shipping_details: shipment.shipping_details || '',
-      status: status || nextKolStatus(shipment),
-    })
+  const syncKolStatus = async (status: string) => {
+    await onUpdate(kol.id, { status })
   }
 
   const syncDerivedKolStatus = async (
@@ -293,7 +287,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
 
       console.log('✅ 寄样记录保存成功:', saved)
 
-      await syncKolSnapshot(saved)
+      await syncKolStatus(nextKolStatus(saved))
       await onShipmentsChange()
       setShowShipmentModal(false)
       setEditingShipment(null)
@@ -315,18 +309,13 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     }, null)
 
     if (latest) {
-      await syncKolSnapshot(latest)
+      await syncKolStatus(nextKolStatus(latest))
       return
     }
 
     const fallbackStatus = deriveKolStatus(kol, invitations, [], collaborations)
 
-    await onUpdate(kol.id, {
-      sample_date: null,
-      tracking_number: '',
-      shipping_details: '',
-      status: fallbackStatus,
-    })
+    await syncKolStatus(fallbackStatus)
   }
 
   const handleDeleteShipment = async (shipment: Shipment) => {
@@ -348,7 +337,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
         delivered_at: new Date().toISOString().slice(0, 10),
         progress_status: shipment.progress_status || '待制作',
       })
-      await syncKolSnapshot(saved, nextKolStatus(saved))
+      await syncKolStatus(nextKolStatus(saved))
       await onShipmentsChange()
       showToast('已进入已送达待推进')
     } catch (err) {
@@ -366,7 +355,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
         setCollaborations(nextCollaborations)
         await onCollaborationsChange()
       }
-      await syncKolSnapshot(saved, nextKolStatus(saved))
+      await syncKolStatus(nextKolStatus(saved))
       await onShipmentsChange()
       setEditingProgress(null)
       showToast('内容进度已保存')

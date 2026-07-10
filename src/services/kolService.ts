@@ -64,41 +64,41 @@ export async function createKOL(
   }
 }
 
+const KOL_UPDATE_FIELDS: Array<keyof KOL> = [
+  'name',
+  'email',
+  'homepage_url',
+  'platform',
+  'followers',
+  'country',
+  'tags',
+  'notes',
+  'status',
+]
+
+export function sanitizeKOLUpdates(updates: Partial<KOL>): Partial<KOL> {
+  return KOL_UPDATE_FIELDS.reduce<Partial<KOL>>((payload, field) => {
+    if (!(field in updates)) return payload
+
+    const value = updates[field]
+    if (field === 'tags') {
+      payload.tags = Array.isArray(value) ? value : []
+      return payload
+    }
+
+    if (value !== undefined) {
+      payload[field] = value as never
+    }
+    return payload
+  }, {})
+}
+
 export async function updateKOL(
   id: string,
   updates: Partial<KOL>
 ): Promise<KOL> {
   try {
-    const allowedFields: Array<keyof KOL> = [
-      'name',
-      'email',
-      'homepage_url',
-      'platform',
-      'followers',
-      'country',
-      'tags',
-      'notes',
-      'status',
-      'sample_product',
-      'sample_date',
-      'tracking_number',
-      'shipping_details',
-    ]
-
-    const safeUpdates = allowedFields.reduce<Partial<KOL>>((payload, field) => {
-      if (!(field in updates)) return payload
-
-      const value = updates[field]
-      if (field === 'tags') {
-        payload.tags = Array.isArray(value) ? value : []
-        return payload
-      }
-
-      if (value !== undefined) {
-        payload[field] = value as never
-      }
-      return payload
-    }, {})
+    const safeUpdates = sanitizeKOLUpdates(updates)
 
     if (Object.keys(safeUpdates).length === 0) {
       logWarning('updateKOL', '没有可保存的字段', { id, updates })
