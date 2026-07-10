@@ -1,4 +1,5 @@
 import type { Collaboration, Shipment } from '../types'
+import { sameProduct } from './productMatching'
 
 const defaultToday = () => new Date().toISOString().slice(0, 10)
 
@@ -39,7 +40,7 @@ export function findCollaborationForShipment(
   const marked = collaborations.find(collaboration => collaboration.notes?.includes(marker))
   if (marked) return marked
 
-  const productMatches = collaborations.filter(collaboration => collaboration.product === shipment.product)
+  const productMatches = collaborations.filter(collaboration => sameProduct(collaboration.product, shipment.product))
   return productMatches.length === 1 ? productMatches[0] : null
 }
 

@@ -582,6 +582,10 @@ export const demoDatabase = {
     ))
   },
 
+  getInvitations(): Invitation[] {
+    return clone(sortByDateDesc(loadState().invitations, invitation => invitation.invited_at))
+  },
+
   createInvitation(invitation: Partial<Invitation> & Pick<Invitation, 'kol_id' | 'product'>): Invitation {
     const current = loadState()
     const record: Invitation = {

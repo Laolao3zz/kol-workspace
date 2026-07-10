@@ -3,6 +3,7 @@ import type { Product } from '../types'
 import { retryOperation } from '../utils/retry'
 import { logError, logWarning } from '../utils/logger'
 import { demoDatabase } from './demoDatabase'
+import { countProductDeletionReferences } from '../utils/productCorrection'
 
 export type ProductInput = Omit<Product, 'id' | 'created_at' | 'updated_at'>
 
@@ -117,23 +118,48 @@ export async function updateProduct(id: string, updates: Partial<Product>): Prom
   }
 }
 
-export async function deleteProduct(id: string): Promise<void> {
+export async function deleteProduct(product: Pick<Product, 'id' | 'name'>): Promise<void> {
   try {
     if (isDemoMode()) {
-      demoDatabase.deleteProduct(id)
+      const references = countProductDeletionReferences(product, demoDatabase.getProducts(), {
+        invitations: demoDatabase.getInvitations(),
+        shipments: demoDatabase.getShipments(),
+        collaborations: demoDatabase.getCollaborations(),
+      })
+      if (references.total > 0) {
+        throw new Error(`产品「${product.name}」仍有 ${references.total} 条业务记录引用，请先在 KOL 档案中修正产品`)
+      }
+      demoDatabase.deleteProduct(product.id)
       return
     }
 
-    await retryOperation(
+    const deletion = await retryOperation(
       async () => {
-        const { error } = await getSupabase().from('products').delete().eq('id', id)
-        if (error) throw error
-        return true
+        const { data, error } = await getSupabase().rpc('delete_product_if_unreferenced', {
+          p_product_id: product.id,
+        })
+        if (error) {
+          if (error.code === 'PGRST202' || error.code === '42883') {
+            throw new Error('永久删除功能需要先运行最新的 supabase-patch.sql 数据库补丁')
+          }
+          throw error
+        }
+        return data as {
+          deleted: boolean
+          reference_count?: number
+          invitation_count?: number
+          shipment_count?: number
+          collaboration_count?: number
+        }
       },
       { maxRetries: 2 }
     )
+
+    if (!deletion.deleted) {
+      throw new Error(`产品「${product.name}」仍有 ${deletion.reference_count || 0} 条业务记录引用，请先在 KOL 档案中修正产品`)
+    }
   } catch (error) {
-    logError('deleteProduct', error, { id })
+    logError('deleteProduct', error, { id: product.id, name: product.name })
     throw error
   }
 }

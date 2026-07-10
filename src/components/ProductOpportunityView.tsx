@@ -1,11 +1,12 @@
-import { Archive, Check, ChevronDown, ChevronRight, ListFilter, Package, Pencil, Plus, Search, UserRound, X } from 'lucide-react'
+import { Archive, Check, ChevronDown, ChevronRight, ListFilter, Package, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
-import { createProduct, updateProduct, type ProductInput } from '../services/productService'
+import { createProduct, deleteProduct, updateProduct, type ProductInput } from '../services/productService'
 import { CONTENT_SHAPES } from '../utils/contentShape'
 import { deriveProductDraftsFromHistory } from '../utils/productExtraction'
 import { mergeOpportunityProducts } from '../utils/productMatching'
 import { buildProductOpportunitySummary, filterOpportunityRowsByStatus, type OpportunityStatus, type OpportunityStatusFilter } from '../utils/workspaceViews'
+import { countProductDeletionReferences } from '../utils/productCorrection'
 
 interface Props {
   products: Product[]
@@ -325,6 +326,7 @@ function ProductLibraryPanel({
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const operationalProducts = products.filter(product => product.status !== '归档')
+  const archivedProducts = products.filter(product => product.status === '归档')
   const importCandidates = useMemo(() => deriveProductDraftsFromHistory({
     existingProducts: products,
     kols,
@@ -404,6 +406,38 @@ function ProductLibraryPanel({
     }
   }
 
+  const removeProduct = async (product: Product) => {
+    const references = countProductDeletionReferences(
+      product,
+      products,
+      {
+        invitations: Object.values(invitations).flat(),
+        shipments,
+        collaborations: Object.values(collaborationsByKol).flat(),
+      }
+    )
+
+    if (references.total > 0) {
+      setMessage(`无法删除「${product.name}」：还有邀约 ${references.invitations}、寄样 ${references.shipments}、合作 ${references.collaborations} 条引用。请先在对应 KOL 档案中修正产品。`)
+      return
+    }
+
+    if (!confirm(`永久删除产品「${product.name}」？此操作无法撤销。`)) return
+
+    setSaving(true)
+    setMessage('')
+    try {
+      await deleteProduct(product)
+      await onProductsChange()
+      if (editingProduct?.id === product.id) resetForm()
+      setMessage('产品已删除')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '删除失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const importHistoricalProducts = async () => {
     if (importCandidates.length === 0) {
       setMessage('没有可提取的历史产品')
@@ -433,7 +467,7 @@ function ProductLibraryPanel({
       <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3">
         <div>
           <div className="text-sm font-extrabold text-[#1D1D1F]">产品库</div>
-          <div className="mt-0.5 text-[11px] font-semibold text-[#86868B]">{operationalProducts.length} 个产品</div>
+          <div className="mt-0.5 text-[11px] font-semibold text-[#86868B]">{operationalProducts.length} 个在用{archivedProducts.length > 0 ? ` · ${archivedProducts.length} 个已归档` : ''}</div>
         </div>
         <div className="flex items-center gap-2">
           {importCandidates.length > 0 && (
@@ -549,7 +583,7 @@ function ProductLibraryPanel({
       </form>
 
       <div className="min-h-0 overflow-y-auto px-5 py-4">
-        {operationalProducts.length === 0 ? (
+        {products.length === 0 ? (
           <div className="rounded-[14px] border border-dashed border-black/[0.08] bg-[#F5F5F7] px-4 py-6 text-center">
             <Package className="mx-auto mb-2 h-5 w-5 text-[#AEAEB2]" />
             <div className="text-xs font-extrabold text-[#1D1D1F]">暂无产品</div>
@@ -566,11 +600,13 @@ function ProductLibraryPanel({
           </div>
         ) : (
           <div className="space-y-2">
-            {operationalProducts.map(product => {
+            {products.map(product => {
               const paused = product.status === '暂停'
-              const tone = paused
-                ? 'bg-amber-50 text-amber-700'
-                : 'bg-emerald-50 text-emerald-700'
+              const tone = product.status === '归档'
+                ? 'bg-slate-100 text-slate-600'
+                : paused
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'bg-emerald-50 text-emerald-700'
 
               return (
                 <div key={product.id} className="rounded-[12px] border border-black/[0.06] bg-white p-3">
@@ -599,12 +635,21 @@ function ProductLibraryPanel({
                     >
                       <Pencil className="h-3.5 w-3.5" /> 编辑
                     </button>
+                    {product.status !== '归档' && (
+                      <button
+                        type="button"
+                        onClick={() => archiveProduct(product)}
+                        className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-slate-100 text-[11px] font-bold text-slate-600 transition hover:bg-slate-200"
+                      >
+                        <Archive className="h-3.5 w-3.5" /> 归档
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => archiveProduct(product)}
-                      className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-slate-100 text-[11px] font-bold text-slate-600 transition hover:bg-slate-200"
+                      onClick={() => removeProduct(product)}
+                      className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-red-50 text-[11px] font-bold text-red-600 transition hover:bg-red-100"
                     >
-                      <Archive className="h-3.5 w-3.5" /> 归档
+                      <Trash2 className="h-3.5 w-3.5" /> 删除
                     </button>
                   </div>
                 </div>

@@ -1,5 +1,5 @@
 import { MailPlus, X } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Invitation } from '../types'
 
 interface Props {
@@ -53,12 +53,11 @@ const applyOutcome = (form: InvitationFormData, outcome: CooperationOutcome): In
 
 export default function AddInvitationModal({ kolId, invitation, productOptions = [], onClose, onSubmit }: Props) {
   const isEditing = Boolean(invitation)
-  const productListId = useId()
   const initialOutcome = getInitialOutcome(invitation)
   const [outcome, setOutcome] = useState<CooperationOutcome>(initialOutcome)
   const [form, setForm] = useState<InvitationFormData>(() => applyOutcome({
     kol_id: kolId,
-    product: invitation?.product || '',
+    product: invitation?.product || productOptions[0] || '',
     invited_at: invitation?.invited_at || new Date().toISOString().slice(0, 10),
     email_subject: invitation?.email_subject || '',
     replied: invitation?.replied || false,
@@ -68,6 +67,12 @@ export default function AddInvitationModal({ kolId, invitation, productOptions =
     decision_reason: invitation?.decision_reason || '',
     notes: invitation?.notes || '',
   }, initialOutcome))
+
+  useEffect(() => {
+    if (!invitation && !form.product && productOptions[0]) {
+      setForm(current => ({ ...current, product: productOptions[0] }))
+    }
+  }, [form.product, invitation, productOptions])
 
   const updateOutcome = (nextOutcome: CooperationOutcome) => {
     setOutcome(nextOutcome)
@@ -109,19 +114,15 @@ export default function AddInvitationModal({ kolId, invitation, productOptions =
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">产品</label>
-              <input
-                type="text"
+              <select
                 value={form.product}
                 onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
-                list={productOptions.length > 0 ? productListId : undefined}
+                disabled={productOptions.length === 0}
                 className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
-                placeholder="手动输入产品名称"
-              />
-              {productOptions.length > 0 && (
-                <datalist id={productListId}>
-                  {productOptions.map(product => <option key={product} value={product} />)}
-                </datalist>
-              )}
+              >
+                {productOptions.length === 0 && <option value="">请先在产品库新增产品</option>}
+                {productOptions.map(product => <option key={product} value={product}>{product}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">邀约日期</label>

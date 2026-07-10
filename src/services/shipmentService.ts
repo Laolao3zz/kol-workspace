@@ -3,6 +3,7 @@ import type { Shipment } from '../types'
 import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError, logWarning } from '../utils/logger'
+import { collectAllPages } from '../utils/pagination'
 
 export type ShipmentInput = Omit<Shipment, 'id' | 'created_at' | 'updated_at'>
 
@@ -61,15 +62,17 @@ export async function getShipments(): Promise<Shipment[]> {
     }
 
     const result = await retryOperation(
-      async () => {
+      async () => collectAllPages(async (from, to) => {
         const { data, error } = await getSupabase()
           .from('shipments')
           .select('*')
           .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
 
         if (error) throw error
-        return data
-      },
+        return data || []
+      }),
       { maxRetries: 2 }
     )
 
@@ -87,16 +90,18 @@ export async function getShipmentsByKOL(kolId: string): Promise<Shipment[]> {
     }
 
     const result = await retryOperation(
-      async () => {
+      async () => collectAllPages(async (from, to) => {
         const { data, error } = await getSupabase()
           .from('shipments')
           .select('*')
           .eq('kol_id', kolId)
           .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
 
         if (error) throw error
-        return data
-      },
+        return data || []
+      }),
       { maxRetries: 2 }
     )
 

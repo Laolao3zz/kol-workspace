@@ -7,7 +7,7 @@ import { updateShipment } from '../services/shipmentService'
 import ArchiveCollaborationModal, { ArchiveFormData } from './ArchiveCollaborationModal'
 import { findCollaborationForShipment, withShipmentHistoryMarker } from '../utils/collaborationArchive'
 import { getKolContentShape } from '../utils/contentShape'
-import { countActiveShipments } from '../utils/workspaceViews'
+import { sameProduct } from '../utils/productMatching'
 
 interface Props {
   kols: KOL[]
@@ -110,11 +110,10 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
     ]
   }, [shipments])
 
-  const totalActive = countActiveShipments(shipments)
   const overdueCount = columns.find(column => column.key === 'progress')?.shipments.filter(shipment => daysSince(shipment.delivered_at) >= 60).length || 0
 
   const getPaymentTerm = (shipment: Shipment) => {
-    const matched = (invitations[shipment.kol_id] || []).find(invitation => invitation.product === shipment.product && invitation.quoted_fee?.trim())
+    const matched = (invitations[shipment.kol_id] || []).find(invitation => sameProduct(invitation.product, shipment.product) && invitation.quoted_fee?.trim())
     return matched?.quoted_fee?.trim() || ''
   }
 
@@ -243,13 +242,6 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
           </div>
         )}
 
-        <div className="mb-4 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
-          <BoardMetric label="未完成" value={totalActive} tone="text-[#0066FF]" />
-          <BoardMetric label="待寄出" value={columns[0]?.shipments.length || 0} tone="text-[#FF9F0A]" />
-          <BoardMetric label="内容风险" value={overdueCount} tone="text-[#FF3B30]" />
-          <BoardMetric label="待归档" value={columns[3]?.shipments.length || 0} tone="text-[#34C759]" />
-        </div>
-
         <div className="min-h-0 flex-1 overflow-x-auto">
           <div className="grid h-full min-w-[1180px] grid-cols-4 gap-4">
             {columns.map(column => {
@@ -267,7 +259,10 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
                             <span className={`h-2 w-2 rounded-full ${column.dot}`} />
                             <h3 className="text-sm font-extrabold text-[#1D1D1F]">{column.label}</h3>
                           </div>
-                          <p className="mt-0.5 text-[11px] font-semibold text-[#86868B]">{column.subtitle}</p>
+                          <p className="mt-0.5 text-[11px] font-semibold text-[#86868B]">
+                            {column.subtitle}
+                            {column.key === 'progress' && overdueCount > 0 && <span className="ml-1.5 font-extrabold text-[#FF3B30]">· 风险 {overdueCount}</span>}
+                          </p>
                         </div>
                       </div>
                       <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#1D1D1F]">{column.shipments.length}</span>
@@ -392,15 +387,6 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
         />
       )}
     </>
-  )
-}
-
-function BoardMetric({ label, value, tone }: { label: string; value: number; tone: string }) {
-  return (
-    <div className="rounded-[14px] border border-black/[0.06] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-      <div className={`text-[22px] font-extrabold tabular-nums ${tone}`}>{value}</div>
-      <div className="mt-1 text-xs font-bold text-[#86868B]">{label}</div>
-    </div>
   )
 }
 

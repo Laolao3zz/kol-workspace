@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Product } from '../types'
-import { getProductName, mergeOpportunityProducts } from './productMatching'
+import { getProductName, mergeOpportunityProducts, normalizeProductName } from './productMatching'
 
 const product = (name: string, overrides: Partial<Product> = {}): Product => ({
   id: `product_${name}`,
@@ -17,6 +17,10 @@ const product = (name: string, overrides: Partial<Product> = {}): Product => ({
 })
 
 describe('product matching helpers', () => {
+  it('normalizes legacy null product values to an empty name', () => {
+    expect(normalizeProductName(null)).toBe('')
+  })
+
   it('keeps product opportunities limited to managed product records', () => {
     const merged = mergeOpportunityProducts(
       [

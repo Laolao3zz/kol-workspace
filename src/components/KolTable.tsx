@@ -7,6 +7,8 @@ import { countCompletedCollaborations, deriveKolStatus } from '../utils/kolStatu
 import { collectProductOptions } from '../utils/productOptions'
 import { CONTENT_SHAPES, getKolContentShape } from '../utils/contentShape'
 import { isActionablePendingInvitation } from '../utils/workspaceViews'
+import { sameProduct } from '../utils/productMatching'
+import { resolveProductSelection } from '../utils/productCorrection'
 
 interface Props {
   kols: KOL[]
@@ -123,6 +125,10 @@ export default function KolTable({
     }
   }, [initialInvitationStatusFilter])
 
+  useEffect(() => {
+    setBatchProduct(current => resolveProductSelection(current, productOptions))
+  }, [productOptions])
+
   const filtered = useMemo(() => {
     return kols.filter(kol => {
       const q = search.trim().toLowerCase()
@@ -139,7 +145,7 @@ export default function KolTable({
       const matchTag = !filterTag || (kol.tags || []).some(tag => text(tag) === filterTag.toLowerCase())
 
       const invs = invitations[kol.id] || []
-      const matchInvProduct = !filterInvProduct || invs.some(inv => inv.product === filterInvProduct)
+      const matchInvProduct = !filterInvProduct || invs.some(inv => sameProduct(inv.product, filterInvProduct))
       const latest = getLatestInv(kol.id)
       let matchInvStatus = true
       if (filterInvStatus === 'none') matchInvStatus = !latest
@@ -499,19 +505,15 @@ export default function KolTable({
 
             <div className="mt-5">
               <label className="mb-1.5 block text-xs font-bold text-[#6E6E73]">邀约产品</label>
-              <input
-                type="text"
+              <select
                 value={batchProduct}
                 onChange={event => setBatchProduct(event.target.value)}
-                list={productOptions.length > 0 ? 'batch-invite-product-options' : undefined}
-                placeholder="例如 BY53 / K1 / 防晒霜 SPF50+"
+                disabled={productOptions.length === 0}
                 className="h-10 w-full rounded-[10px] border border-black/[0.08] bg-white px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
-              />
-              {productOptions.length > 0 && (
-                <datalist id="batch-invite-product-options">
-                  {productOptions.map(product => <option key={product} value={product} />)}
-                </datalist>
-              )}
+              >
+                {productOptions.length === 0 && <option value="">请先在产品库新增产品</option>}
+                {productOptions.map(product => <option key={product} value={product}>{product}</option>)}
+              </select>
             </div>
 
             {batchDone ? (

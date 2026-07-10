@@ -160,6 +160,28 @@ describe('workspace view helpers', () => {
     expect(k1?.counts['未触达']).toBe(2)
   })
 
+  it('groups product records that differ only by casing and whitespace', () => {
+    const summary = buildProductOpportunitySummary({
+      products: ['K1'],
+      kols: [kol('technodrive')],
+      invitations: {
+        technodrive: [invitation({
+          kol_id: 'technodrive',
+          product: ' k1 ',
+          replied: true,
+          reply_result: '同意合作',
+          decision: '继续推进',
+        })],
+      },
+      shipments: [],
+      collaborationsByKol: {},
+    })
+
+    expect(summary[0].rows).toHaveLength(1)
+    expect(summary[0].rows[0].status).toBe('已同意')
+    expect(summary[0].counts['已同意']).toBe(1)
+  })
+
   it('keeps a completed KOL untouched for a new product with no product-level records', () => {
     const summary = buildProductOpportunitySummary({
       products: ['Atlas NAS 4-bay', 'New Launch'],

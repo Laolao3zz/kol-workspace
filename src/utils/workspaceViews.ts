@@ -1,6 +1,6 @@
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
 import { countCompletedCollaborations, hasRealCollaborationSignal } from './kolStatus'
-import { getProductName, hasProductRecordForKol, shouldShowProductForKol } from './productMatching'
+import { getProductName, hasProductRecordForKol, sameProduct, shouldShowProductForKol } from './productMatching'
 
 export type OpportunityStatus = '未触达' | '待回复' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
 export type OpportunityStatusFilter = OpportunityStatus | '全部'
@@ -55,14 +55,6 @@ function isCompletedShipment(shipment: Shipment): boolean {
 
 function hasActiveShipment(shipment: Shipment): boolean {
   return !shipment.archived_at
-}
-
-function normalizeToken(value: string): string {
-  return value.trim().toLocaleLowerCase()
-}
-
-function sameProduct(left: string, right: string): boolean {
-  return normalizeToken(left) === normalizeToken(right)
 }
 
 function todayISO() {
@@ -152,19 +144,19 @@ export function buildDashboardMetrics(sources: DashboardMetricSources): Dashboar
 }
 
 function latestInvitationForProduct(invitations: Invitation[], product: string): Invitation | null {
-  const matches = invitations.filter(invitation => invitation.product === product)
+  const matches = invitations.filter(invitation => sameProduct(invitation.product, product))
   if (matches.length === 0) return null
   return matches.reduce((latest, invitation) => invitation.invited_at > latest.invited_at ? invitation : latest)
 }
 
 function shipmentForProduct(shipments: Shipment[], product: string): Shipment | null {
-  const matches = shipments.filter(shipment => shipment.product === product && hasActiveShipment(shipment))
+  const matches = shipments.filter(shipment => sameProduct(shipment.product, product) && hasActiveShipment(shipment))
   if (matches.length === 0) return null
   return matches[0]
 }
 
 function hasCollaborationForProduct(collaborations: Collaboration[], product: string): boolean {
-  return collaborations.some(collaboration => collaboration.product === product && hasRealCollaborationSignal(collaboration))
+  return collaborations.some(collaboration => sameProduct(collaboration.product, product) && hasRealCollaborationSignal(collaboration))
 }
 
 function opportunityStatusForKol(

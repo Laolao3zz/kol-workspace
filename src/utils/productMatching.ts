@@ -7,13 +7,17 @@ export function getProductName(product: ProductLike): string {
   return typeof product === 'string' ? product : product.name
 }
 
-function normalizeToken(value: string): string {
-  return value.trim().toLocaleLowerCase()
+export function normalizeProductName(value: string | null | undefined): string {
+  return value?.trim().toLocaleLowerCase() || ''
+}
+
+export function sameProduct(left: string | null | undefined, right: string | null | undefined): boolean {
+  return normalizeProductName(left) === normalizeProductName(right)
 }
 
 function intersects(left: string[], right: string[]): boolean {
-  const rightSet = new Set(right.map(normalizeToken).filter(Boolean))
-  return left.some(item => rightSet.has(normalizeToken(item)))
+  const rightSet = new Set(right.map(normalizeProductName).filter(Boolean))
+  return left.some(item => rightSet.has(normalizeProductName(item)))
 }
 
 export function mergeOpportunityProducts(products: Product[], _productNames: string[]): ProductLike[] {
@@ -24,7 +28,7 @@ export function mergeOpportunityProducts(products: Product[], _productNames: str
     const name = getProductName(product).trim()
     if (!name) return
 
-    const key = normalizeToken(name)
+    const key = normalizeProductName(name)
     if (seen.has(key)) return
 
     seen.add(key)
@@ -42,9 +46,9 @@ export function hasProductRecordForKol(
   shipments: Shipment[],
   collaborations: Collaboration[]
 ): boolean {
-  return invitations.some(invitation => invitation.product === productName) ||
-    shipments.some(shipment => shipment.product === productName) ||
-    collaborations.some(collaboration => collaboration.product === productName)
+  return invitations.some(invitation => sameProduct(invitation.product, productName)) ||
+    shipments.some(shipment => sameProduct(shipment.product, productName)) ||
+    collaborations.some(collaboration => sameProduct(collaboration.product, productName))
 }
 
 export function shouldShowProductForKol(

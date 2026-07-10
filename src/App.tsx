@@ -75,6 +75,10 @@ function App() {
     shipments,
     collaborationsByKol,
   }), [products, kols, invitations, shipments, collaborationsByKol])
+  const managedProductOptions = useMemo(
+    () => products.filter(product => product.status !== '归档').map(product => product.name),
+    [products]
+  )
   const progressCount = useMemo(() => countProgressBadge(shipments), [shipments])
 
   useEffect(() => {
@@ -181,7 +185,7 @@ function App() {
                   loading={loading}
                   onSelect={setSelectedKol}
                   selectedId={selectedKol?.id || null}
-                  productOptions={productOptions}
+                  productOptions={managedProductOptions}
                   initialInvitationStatusFilter={tableInvitationStatusFilter}
                   onAddKol={() => setShowAddKolModal(true)}
                   onDelete={handleDeleteKol}

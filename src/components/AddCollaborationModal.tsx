@@ -1,5 +1,5 @@
 import { BarChart3, X } from 'lucide-react'
-import { useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Collaboration } from '../types'
 import type { ContentShape } from '../utils/contentShape'
 import { getContentShapeMetricLabels } from '../utils/contentShape'
@@ -27,11 +27,10 @@ export interface CollaborationFormData {
 
 export default function AddCollaborationModal({ kolId, collaboration, productOptions = [], contentShape = '视频', onClose, onSubmit }: Props) {
   const isEditing = Boolean(collaboration)
-  const productListId = useId()
   const metricLabels = getContentShapeMetricLabels(contentShape)
   const [form, setForm] = useState<CollaborationFormData>({
     kol_id: kolId,
-    product: collaboration?.product || '',
+    product: collaboration?.product || productOptions[0] || '',
     publish_date: collaboration?.publish_date || '',
     work_url: collaboration?.work_url || '',
     views: collaboration?.views || 0,
@@ -40,6 +39,12 @@ export default function AddCollaborationModal({ kolId, collaboration, productOpt
     fee: collaboration?.fee || '',
     notes: collaboration?.notes || '',
   })
+
+  useEffect(() => {
+    if (!collaboration && !form.product && productOptions[0]) {
+      setForm(current => ({ ...current, product: productOptions[0] }))
+    }
+  }, [collaboration, form.product, productOptions])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,19 +74,15 @@ export default function AddCollaborationModal({ kolId, collaboration, productOpt
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">产品名</label>
-              <input
-                type="text"
+              <select
                 value={form.product}
                 onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
-                list={productOptions.length > 0 ? productListId : undefined}
+                disabled={productOptions.length === 0}
                 className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
-                placeholder="手动输入产品名称"
-              />
-              {productOptions.length > 0 && (
-                <datalist id={productListId}>
-                  {productOptions.map(product => <option key={product} value={product} />)}
-                </datalist>
-              )}
+              >
+                {productOptions.length === 0 && <option value="">请先在产品库新增产品</option>}
+                {productOptions.map(product => <option key={product} value={product}>{product}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">发布日期</label>

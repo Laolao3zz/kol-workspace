@@ -1,5 +1,5 @@
 import { PackagePlus, X } from 'lucide-react'
-import { useState, useEffect, useId } from 'react'
+import { useState, useEffect } from 'react'
 import type { Shipment } from '../types'
 import { buildShipmentSubmitPayload } from '../utils/shipmentPayload'
 
@@ -27,10 +27,9 @@ interface Props {
 }
 
 export default function AddShipmentModal({ kolId, shipment, productOptions = [], onClose, onSubmit }: Props) {
-  const productListId = useId()
   const [form, setForm] = useState<ShipmentFormData>({
     kol_id: kolId,
-    product: '',
+    product: shipment?.product || productOptions[0] || '',
     sample_date: '',
     tracking_number: '',
     shipping_details: '',
@@ -61,6 +60,12 @@ export default function AddShipmentModal({ kolId, shipment, productOptions = [],
     })
   }, [shipment])
 
+  useEffect(() => {
+    if (!shipment && !form.product && productOptions[0]) {
+      setForm(current => ({ ...current, product: productOptions[0] }))
+    }
+  }, [form.product, productOptions, shipment])
+
   const submit = () => {
     if (!form.product.trim()) return
     onSubmit(buildShipmentSubmitPayload(form))
@@ -88,19 +93,15 @@ export default function AddShipmentModal({ kolId, shipment, productOptions = [],
         <div className="space-y-4">
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">寄送产品 <span className="text-red-400">*</span></label>
-            <input
-              type="text"
+            <select
               value={form.product}
               onChange={e => setForm(p => ({ ...p, product: e.target.value }))}
-              list={productOptions.length > 0 ? productListId : undefined}
-              placeholder="手动输入产品名称，如 BY53 / K1"
+              disabled={productOptions.length === 0}
               className="h-10 w-full rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
-            />
-            {productOptions.length > 0 && (
-              <datalist id={productListId}>
-                {productOptions.map(product => <option key={product} value={product} />)}
-              </datalist>
-            )}
+            >
+              {productOptions.length === 0 && <option value="">请先在产品库新增产品</option>}
+              {productOptions.map(product => <option key={product} value={product}>{product}</option>)}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

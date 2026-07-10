@@ -8,6 +8,7 @@ import {
 } from '../utils/collaborationArchive'
 import { retryOperation } from '../utils/retry'
 import { logError } from '../utils/logger'
+import { collectAllPages } from '../utils/pagination'
 
 const nullableDate = (value: unknown): string | null => {
   if (typeof value !== 'string') return value == null ? null : String(value)
@@ -46,16 +47,18 @@ export async function getCollaborations(): Promise<Collaboration[]> {
     }
 
     const result = await retryOperation(
-      async () => {
+      async () => collectAllPages(async (from, to) => {
         const { data, error } = await getSupabase()
           .from('collaborations')
           .select('*')
           .order('publish_date', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
 
         if (error) throw error
-        return data
-      },
+        return data || []
+      }),
       { maxRetries: 2 }
     )
 
@@ -73,17 +76,19 @@ export async function getCollaborationsByKOL(kolId: string): Promise<Collaborati
     }
 
     const result = await retryOperation(
-      async () => {
+      async () => collectAllPages(async (from, to) => {
         const { data, error } = await getSupabase()
           .from('collaborations')
           .select('*')
           .eq('kol_id', kolId)
           .order('publish_date', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
 
         if (error) throw error
-        return data
-      },
+        return data || []
+      }),
       { maxRetries: 2 }
     )
 

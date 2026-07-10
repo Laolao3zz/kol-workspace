@@ -3,6 +3,7 @@ import type { Invitation } from '../types'
 import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError } from '../utils/logger'
+import { collectAllPages } from '../utils/pagination'
 
 const nullableDate = (value: unknown): string | null => {
   if (typeof value !== 'string') return value == null ? null : String(value)
@@ -34,16 +35,18 @@ export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> 
     }
 
     const result = await retryOperation(
-      async () => {
+      async () => collectAllPages(async (from, to) => {
         const { data, error } = await getSupabase()
           .from('invitations')
           .select('*')
           .eq('kol_id', kolId)
           .order('invited_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
 
         if (error) throw error
-        return data
-      },
+        return data || []
+      }),
       { maxRetries: 2 }
     )
 

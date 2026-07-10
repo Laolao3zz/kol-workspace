@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import type { Collaboration, KOL } from '../types'
 import { hasPublishReadyCollaborationSignal } from '../utils/kolStatus'
+import { sameProduct } from '../utils/productMatching'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
 
 interface Props {
@@ -54,7 +55,7 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, pr
       row.collaboration.notes,
       row.collaboration.fee,
     ].some(value => String(value || '').toLowerCase().includes(q))
-    const matchesProduct = !product || row.collaboration.product === product
+    const matchesProduct = !product || sameProduct(row.collaboration.product, product)
     return matchesQuery && matchesProduct
   })
 

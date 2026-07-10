@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { BarChart3, ChevronDown, ChevronRight, CheckCircle2, ExternalLink, Mail, Package, Pencil, Plus, Trash2, Truck, UserRound, X } from 'lucide-react'
+import { ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, CheckCircle2, ExternalLink, Mail, Package, Pencil, Plus, Trash2, Truck, UserRound, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { KOL, Invitation, Collaboration, Shipment, Product, PLATFORMS } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
@@ -21,6 +21,10 @@ import {
 } from '../utils/invitationWorkflow'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
 import { buildProductOpportunitySummary, type OpportunityStatus } from '../utils/workspaceViews'
+import CorrectProductModal from './CorrectProductModal'
+import { applyProductCorrection } from '../services/productCorrectionService'
+import type { ProductCorrectionPlan } from '../utils/productCorrection'
+import { sameProduct } from '../utils/productMatching'
 
 interface Props {
   kol: KOL
@@ -70,6 +74,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
   const [showInvModal, setShowInvModal] = useState(false)
   const [showColModal, setShowColModal] = useState(false)
   const [showShipmentModal, setShowShipmentModal] = useState(false)
+  const [showProductCorrection, setShowProductCorrection] = useState(false)
   const [editingInvitation, setEditingInvitation] = useState<Invitation | null>(null)
   const [editingCollaboration, setEditingCollaboration] = useState<Collaboration | null>(null)
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null)
@@ -94,6 +99,13 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     () => mergeOpportunityProducts(products, drawerProductOptions),
     [products, drawerProductOptions]
   )
+  const managedProductOptions = useMemo(
+    () => products.filter(product => product.status !== '归档').map(product => product.name),
+    [products]
+  )
+  const productFormOptions = (currentProduct?: string) => [
+    ...new Set([currentProduct?.trim(), ...managedProductOptions].filter((name): name is string => Boolean(name))),
+  ]
   const productOpportunities = useMemo(() => {
     if (drawerOpportunityProducts.length === 0) return []
     return buildProductOpportunitySummary({
@@ -112,15 +124,19 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
 
   useEffect(() => { loadSubData() }, [kol.id])
 
+  const fetchSubData = async () => {
+    const [invData, colData] = await Promise.all([
+      getInvitationsByKOL(kol.id),
+      getCollaborationsByKOL(kol.id),
+    ])
+    setInvitations(invData)
+    setCollaborations(colData)
+  }
+
   const loadSubData = async () => {
     setLoadingSub(true)
     try {
-      const [invData, colData] = await Promise.all([
-        getInvitationsByKOL(kol.id),
-        getCollaborationsByKOL(kol.id),
-      ])
-      setInvitations(invData)
-      setCollaborations(colData)
+      await fetchSubData()
     } catch (err) {
       showToast(err instanceof Error ? err.message : '加载详情数据失败')
     } finally { setLoadingSub(false) }
@@ -176,6 +192,35 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     await save('tags', tags)
   }
 
+  const handleProductCorrection = async (plan: ProductCorrectionPlan, targetProduct: string) => {
+    const result = await applyProductCorrection(plan, targetProduct)
+    setLoadingSub(true)
+    const refreshes = await Promise.allSettled([
+      fetchSubData(),
+      Promise.resolve().then(() => onInvitationsChange()),
+      Promise.resolve().then(() => onShipmentsChange()),
+      Promise.resolve().then(() => onCollaborationsChange()),
+    ])
+    setLoadingSub(false)
+
+    const refreshFailureCount = refreshes.filter(refresh => refresh.status === 'rejected').length
+    if (refreshFailureCount > 0) {
+      const writeSummary = result.failures.length > 0
+        ? `已修正 ${result.succeeded} 条，${result.failures.length} 条写入失败`
+        : `已修正 ${result.succeeded} 条`
+      showToast(`${writeSummary}，但数据刷新失败`)
+      throw new Error(`${writeSummary}，但有 ${refreshFailureCount} 个数据源刷新失败。请刷新页面后确认最新结果。`)
+    }
+
+    if (result.failures.length > 0) {
+      showToast(`已修正 ${result.succeeded} 条，${result.failures.length} 条失败`)
+    } else {
+      showToast(`已将 ${result.succeeded} 条记录修正为 ${targetProduct}`)
+    }
+
+    return { succeeded: result.succeeded, failures: result.failures.length }
+  }
+
   const ensureShipmentForInvitation = async (invitation: Invitation) => {
     if (!isInvitationApprovedForShipment(invitation)) {
       console.log('⏭️ 跳过自动创建寄样记录:', {
@@ -188,7 +233,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
 
     const existingShipments = await getShipmentsByKOL(kol.id)
     const hasSamePendingShipment = existingShipments.some(s =>
-      s.product === invitation.product && s.status === '待寄出' && !s.tracking_number?.trim()
+      sameProduct(s.product, invitation.product) && s.status === '待寄出' && !s.tracking_number?.trim()
     )
 
     if (hasSamePendingShipment) {
@@ -588,7 +633,12 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
               </SectionCard>
 
               <SectionCard icon={Package} title="产品机会"
-                action={<HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus}>发起邀约</HeaderButton>}
+                action={(
+                  <div className="flex items-center gap-2">
+                    <HeaderButton onClick={() => setShowProductCorrection(true)} icon={ArrowRightLeft} tone="neutral" disabled={loadingSub}>修正产品</HeaderButton>
+                    <HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus}>发起邀约</HeaderButton>
+                  </div>
+                )}
               >
                 {productOpportunities.length === 0 ? (
                   <div className="rounded-[14px] border border-dashed border-black/[0.08] bg-[#F5F5F7] px-4 py-6 text-center">
@@ -781,10 +831,21 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
         {toast && <div className="fixed bottom-6 right-6 z-[60] rounded-[12px] bg-[#1D1D1F] px-5 py-2.5 text-sm font-bold text-white shadow-lg">{toast}</div>}
       </div>
 
-      {showInvModal && <AddInvitationModal kolId={kol.id} invitation={editingInvitation} productOptions={drawerProductOptions} onClose={() => { setShowInvModal(false); setEditingInvitation(null) }} onSubmit={handleAddInvitation} />}
-      {showColModal && <AddCollaborationModal kolId={kol.id} collaboration={editingCollaboration} productOptions={drawerProductOptions} contentShape={contentShape} onClose={() => { setShowColModal(false); setEditingCollaboration(null) }} onSubmit={handleAddCollaboration} />}
-      {showShipmentModal && <AddShipmentModal kolId={kol.id} shipment={editingShipment} productOptions={drawerProductOptions} onClose={() => { setShowShipmentModal(false); setEditingShipment(null) }} onSubmit={handleSaveShipment} />}
+      {showInvModal && <AddInvitationModal kolId={kol.id} invitation={editingInvitation} productOptions={productFormOptions(editingInvitation?.product)} onClose={() => { setShowInvModal(false); setEditingInvitation(null) }} onSubmit={handleAddInvitation} />}
+      {showColModal && <AddCollaborationModal kolId={kol.id} collaboration={editingCollaboration} productOptions={productFormOptions(editingCollaboration?.product)} contentShape={contentShape} onClose={() => { setShowColModal(false); setEditingCollaboration(null) }} onSubmit={handleAddCollaboration} />}
+      {showShipmentModal && <AddShipmentModal kolId={kol.id} shipment={editingShipment} productOptions={productFormOptions(editingShipment?.product)} onClose={() => { setShowShipmentModal(false); setEditingShipment(null) }} onSubmit={handleSaveShipment} />}
       {editingProgress && <EditProgressModal shipment={editingProgress} onClose={() => setEditingProgress(null)} onSubmit={handleSaveProgress} />}
+      {showProductCorrection && (
+        <CorrectProductModal
+          kolId={kol.id}
+          invitations={invitations}
+          shipments={allKolShipments}
+          collaborations={collaborations}
+          products={products}
+          onClose={() => setShowProductCorrection(false)}
+          onSubmit={handleProductCorrection}
+        />
+      )}
     </div>
   )
 }
@@ -810,9 +871,9 @@ function FieldGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-2">{children}</div>
 }
 
-function HeaderButton({ icon: Icon, children, onClick }: { icon: LucideIcon; children: string; onClick: () => void }) {
+function HeaderButton({ icon: Icon, children, onClick, tone = 'primary', disabled = false }: { icon: LucideIcon; children: string; onClick: () => void; tone?: 'primary' | 'neutral'; disabled?: boolean }) {
   return (
-    <button onClick={onClick} className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#1D1D1F] px-3 text-xs font-bold text-white transition active:scale-95">
+    <button onClick={onClick} disabled={disabled} className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] px-3 text-xs font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${tone === 'primary' ? 'bg-[#1D1D1F] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-gray-200'}`}>
       <Icon className="h-3.5 w-3.5" /> {children}
     </button>
   )

@@ -77,6 +77,23 @@ describe('buildCompletionCollaborationPayload', () => {
       .toBe('collab-2')
   })
 
+  it('falls back to a single collaboration whose product differs only by casing', () => {
+    const collaboration: Collaboration = {
+      id: 'collab-lowercase',
+      kol_id: 'kol-1',
+      product: ' by53 ',
+      publish_date: '2026-06-01',
+      work_url: '',
+      views: null,
+      comments: null,
+      likes: null,
+      fee: '',
+      notes: '',
+    }
+
+    expect(findCollaborationForShipment([collaboration], baseShipment)?.id).toBe('collab-lowercase')
+  })
+
   it('adds the shipment marker to existing history notes without deleting user notes', () => {
     const existing: Collaboration = {
       id: 'collab-1',
