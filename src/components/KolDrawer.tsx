@@ -39,11 +39,12 @@ interface Props {
   onShipmentsChange: () => Promise<void> | void
 }
 
-const opportunityOrder: OpportunityStatus[] = ['未触达', '待回复', '已同意', '寄样中', '内容中', '已完成', '已拒绝', '不推进']
+const opportunityOrder: OpportunityStatus[] = ['未触达', '待回复', '已同意', '寄样中', '内容中', '已完成', '未回复', '已拒绝', '不推进']
 
 const opportunityTone: Record<OpportunityStatus, string> = {
   未触达: 'bg-gray-100 text-gray-600',
   待回复: 'bg-amber-50 text-amber-700',
+  未回复: 'bg-neutral-100 text-neutral-600',
   已同意: 'bg-blue-50 text-blue-700',
   已拒绝: 'bg-red-50 text-red-700',
   不推进: 'bg-slate-100 text-slate-600',
@@ -56,6 +57,7 @@ const opportunityHint = (status: OpportunityStatus) => {
   const map: Record<OpportunityStatus, string> = {
     未触达: '尚未触达该产品，可发起新邀约',
     待回复: '已触达，等待回复或需要跟进',
+    未回复: '邀约已超过 14 天，仍未收到回复',
     已同意: '已同意合作，下一步安排寄样',
     寄样中: '样品流转中，等待签收',
     内容中: '样品已签收，进入内容跟进',

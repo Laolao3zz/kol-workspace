@@ -22,6 +22,7 @@ interface Props {
 const statusTone: Record<OpportunityStatus, string> = {
   未触达: 'bg-gray-100 text-gray-600',
   待回复: 'bg-amber-50 text-amber-700',
+  未回复: 'bg-neutral-100 text-neutral-600',
   已同意: 'bg-blue-50 text-blue-700',
   已拒绝: 'bg-red-50 text-red-700',
   不推进: 'bg-slate-100 text-slate-600',
@@ -33,6 +34,7 @@ const statusTone: Record<OpportunityStatus, string> = {
 const statusDot: Record<OpportunityStatus, string> = {
   未触达: 'bg-gray-300',
   待回复: 'bg-[#FFB000]',
+  未回复: 'bg-neutral-400',
   已同意: 'bg-[#0066FF]',
   已拒绝: 'bg-[#FF3B30]',
   不推进: 'bg-slate-400',
@@ -41,7 +43,7 @@ const statusDot: Record<OpportunityStatus, string> = {
   已完成: 'bg-[#34C759]',
 }
 
-const statusOrder: OpportunityStatus[] = ['未触达', '待回复', '已同意', '寄样中', '内容中', '已完成', '已拒绝', '不推进']
+const statusOrder: OpportunityStatus[] = ['未触达', '待回复', '已同意', '寄样中', '内容中', '已完成', '未回复', '已拒绝', '不推进']
 
 const fmtFollowers = (value: string) => value?.trim() || '-'
 
@@ -252,7 +254,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                       <button
                         key={`${selected.product}-${row.kol.id}-${status}`}
                         onClick={() => onSelectKol(row.kol)}
-                        className={`rounded-[14px] border border-black/[0.06] bg-white p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition hover:border-[#0066FF]/30 hover:shadow-md ${status === '已拒绝' || status === '不推进' ? 'opacity-65' : ''}`}
+                        className={`rounded-[14px] border border-black/[0.06] bg-white p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition hover:border-[#0066FF]/30 hover:shadow-md ${status === '未回复' || status === '已拒绝' || status === '不推进' ? 'opacity-65' : ''}`}
                       >
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-xs font-extrabold text-white">

@@ -2,7 +2,7 @@ import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types
 import { countCompletedCollaborations, hasRealCollaborationSignal } from './kolStatus'
 import { getProductName, hasProductRecordForKol, sameProduct, shouldShowProductForKol } from './productMatching'
 
-export type OpportunityStatus = '未触达' | '待回复' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
+export type OpportunityStatus = '未触达' | '待回复' | '未回复' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
 export type OpportunityStatusFilter = OpportunityStatus | '全部'
 
 export interface DashboardMetricSources {
@@ -30,8 +30,8 @@ export interface ProductOpportunitySummary {
 
 export type ProductOpportunityRow = ProductOpportunitySummary['rows'][number]
 
-const opportunityStatuses: OpportunityStatus[] = ['未触达', '待回复', '已同意', '已拒绝', '不推进', '寄样中', '内容中', '已完成']
-const PENDING_REPLY_LOOKBACK_DAYS = 45
+const opportunityStatuses: OpportunityStatus[] = ['未触达', '待回复', '未回复', '已同意', '已拒绝', '不推进', '寄样中', '内容中', '已完成']
+const PENDING_REPLY_WINDOW_DAYS = 14
 
 export function filterOpportunityRowsByStatus(
   rows: ProductOpportunityRow[],
@@ -72,6 +72,11 @@ function isPendingInvitation(invitation: Invitation): boolean {
   return !invitation.replied || !invitation.reply_result?.trim() || invitation.reply_result === '未回复'
 }
 
+function isWithinPendingReplyWindow(invitation: Invitation, currentDate: string): boolean {
+  const ageDays = daysBetween(invitation.invited_at || '', currentDate)
+  return ageDays <= PENDING_REPLY_WINDOW_DAYS
+}
+
 function hasLaterWorkflowForInvitation(
   invitation: Invitation,
   shipments: Shipment[],
@@ -95,8 +100,7 @@ export function isActionablePendingInvitation(
   if (!isPendingInvitation(invitation)) return false
   if (hasLaterWorkflowForInvitation(invitation, shipments, collaborations)) return false
 
-  const ageDays = daysBetween(invitation.invited_at || '', currentDate)
-  return ageDays <= PENDING_REPLY_LOOKBACK_DAYS
+  return isWithinPendingReplyWindow(invitation, currentDate)
 }
 
 export function getActionablePendingInvitations(
@@ -164,7 +168,8 @@ function opportunityStatusForKol(
   product: string,
   invitations: Invitation[],
   shipments: Shipment[],
-  collaborations: Collaboration[]
+  collaborations: Collaboration[],
+  currentDate: string
 ): OpportunityStatus {
   if (hasCollaborationForProduct(collaborations, product)) return '已完成'
 
@@ -178,7 +183,9 @@ function opportunityStatusForKol(
 
   const latestInvitation = latestInvitationForProduct(invitations, product)
   if (!latestInvitation) return '未触达'
-  if (!latestInvitation.replied || latestInvitation.reply_result === '未回复') return '待回复'
+  if (isPendingInvitation(latestInvitation)) {
+    return isWithinPendingReplyWindow(latestInvitation, currentDate) ? '待回复' : '未回复'
+  }
   if (latestInvitation.decision === '我方拒绝') return '不推进'
   if (latestInvitation.reply_result?.includes('拒绝')) return '已拒绝'
   if (latestInvitation.reply_result?.includes('同意')) return '已同意'
@@ -187,8 +194,10 @@ function opportunityStatusForKol(
 }
 
 export function buildProductOpportunitySummary(
-  sources: DashboardMetricSources & { products: Array<string | Product> }
+  sources: DashboardMetricSources & { products: Array<string | Product>; currentDate?: string }
 ): ProductOpportunitySummary[] {
+  const currentDate = sources.currentDate || todayISO()
+
   return sources.products.map(product => {
     const productName = getProductName(product)
     const rows = sources.kols.flatMap(kol => {
@@ -208,7 +217,8 @@ export function buildProductOpportunitySummary(
           productName,
           invitations,
           shipments,
-          collaborations
+          collaborations,
+          currentDate
         ),
       }]
     })

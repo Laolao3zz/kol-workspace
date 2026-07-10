@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
-import { buildDashboardMetrics, buildProductOpportunitySummary, countActiveShipments, filterOpportunityRowsByStatus } from './workspaceViews'
+import {
+  buildDashboardMetrics,
+  buildProductOpportunitySummary,
+  countActiveShipments,
+  filterOpportunityRowsByStatus,
+  isActionablePendingInvitation,
+} from './workspaceViews'
 
 const kol = (id: string, overrides: Partial<KOL> = {}): KOL => ({
   id,
@@ -128,6 +134,22 @@ describe('workspace view helpers', () => {
     expect(metrics.pendingReplies).toBe(1)
   })
 
+  it('keeps unanswered invitations actionable through day 14 and expires them on day 15', () => {
+    expect(isActionablePendingInvitation(
+      invitation({ invited_at: '2026-06-26' }),
+      [],
+      [],
+      '2026-07-10'
+    )).toBe(true)
+
+    expect(isActionablePendingInvitation(
+      invitation({ invited_at: '2026-06-25' }),
+      [],
+      [],
+      '2026-07-10'
+    )).toBe(false)
+  })
+
   it('does not count completed waiting-archive shipments as active progress', () => {
     const shipments = [
       shipment({ kol_id: 'k1', product: 'Pending', status: '待寄出' }),
@@ -230,6 +252,33 @@ describe('workspace view helpers', () => {
     const newLaunch = summary.find(item => item.product === 'New Launch')
     expect(newLaunch?.rows[0].status).toBe('待回复')
     expect(newLaunch?.counts['待回复']).toBe(1)
+  })
+
+  it('marks unanswered product invitations as overdue after 14 days', () => {
+    const summary = buildProductOpportunitySummary({
+      products: ['K1'],
+      kols: [kol('pending'), kol('overdue')],
+      invitations: {
+        pending: [invitation({
+          kol_id: 'pending',
+          product: 'K1',
+          invited_at: '2026-06-26',
+        })],
+        overdue: [invitation({
+          kol_id: 'overdue',
+          product: 'K1',
+          invited_at: '2026-06-25',
+        })],
+      },
+      shipments: [],
+      collaborationsByKol: {},
+      currentDate: '2026-07-10',
+    })
+
+    expect(summary[0].rows.find(row => row.kol.id === 'pending')?.status).toBe('待回复')
+    expect(summary[0].rows.find(row => row.kol.id === 'overdue')?.status).toBe('未回复')
+    expect(summary[0].counts['待回复']).toBe(1)
+    expect(summary[0].counts['未回复']).toBe(1)
   })
 
   it('filters product opportunities by product target KOL tags', () => {
