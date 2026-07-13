@@ -4,6 +4,7 @@ import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError, logWarning } from '../utils/logger'
 import { collectAllPages } from '../utils/pagination'
+import { AUTO_CREATED_SHIPMENT_NOTE, isAutoCreatedPendingShipment } from '../utils/invitationWorkflow'
 
 export type ShipmentInput = Omit<Shipment, 'id' | 'created_at' | 'updated_at'>
 
@@ -54,6 +55,17 @@ function normalizeShipmentPayload(shipment: Partial<Shipment>): Partial<Shipment
   if ('archived_at' in shipment) payload.archived_at = nullableDate(shipment.archived_at)
 
   return payload
+}
+
+async function getShipmentBySourceInvitation(sourceInvitationId: string): Promise<Shipment | null> {
+  const { data, error } = await getSupabase()
+    .from('shipments')
+    .select('*')
+    .eq('source_invitation_id', sourceInvitationId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data as Shipment | null
 }
 
 export async function getShipments(): Promise<Shipment[]> {
@@ -123,8 +135,36 @@ export async function createShipment(shipment: ShipmentInput): Promise<Shipment>
 
     const payload = normalizeShipmentPayload(shipment)
 
+    const sourceInvitationId = payload.source_invitation_id?.trim()
+
     if (isDemoMode()) {
+      if (sourceInvitationId) {
+        const existing = demoDatabase.getShipmentsByKOL(shipment.kol_id)
+          .find(candidate => candidate.source_invitation_id === sourceInvitationId)
+        if (existing) return existing
+      }
       return demoDatabase.createShipment(payload as Partial<Shipment> & Pick<Shipment, 'kol_id' | 'product'>)
+    }
+
+    if (sourceInvitationId) {
+      const existing = await getShipmentBySourceInvitation(sourceInvitationId)
+      if (existing) return existing
+
+      const { data, error } = await getSupabase()
+        .from('shipments')
+        .insert([payload])
+        .select()
+        .single()
+
+      if (!error) return data as Shipment
+
+      try {
+        const recovered = await getShipmentBySourceInvitation(sourceInvitationId)
+        if (recovered) return recovered
+      } catch {
+        // Preserve the insert error because it is the operation the caller requested.
+      }
+      throw error
     }
 
     const result = await retryOperation(
@@ -144,6 +184,43 @@ export async function createShipment(shipment: ShipmentInput): Promise<Shipment>
     return result as Shipment
   } catch (error) {
     logError('createShipment', error, { shipment })
+    throw error
+  }
+}
+
+export async function deleteAutoCreatedPendingShipment(expected: Shipment): Promise<boolean> {
+  try {
+    if (!isAutoCreatedPendingShipment(expected)) return false
+
+    if (isDemoMode()) {
+      const current = demoDatabase.getShipmentsByKOL(expected.kol_id)
+        .find(shipment => shipment.id === expected.id)
+      if (!current || current.source_invitation_id !== expected.source_invitation_id || !isAutoCreatedPendingShipment(current)) {
+        return false
+      }
+      demoDatabase.deleteShipment(current.id)
+      return true
+    }
+
+    let query = getSupabase()
+      .from('shipments')
+      .delete()
+      .eq('id', expected.id)
+      .eq('status', '待寄出')
+      .eq('notes', AUTO_CREATED_SHIPMENT_NOTE)
+      .is('sample_date', null)
+      .is('archived_at', null)
+      .or('tracking_number.is.null,tracking_number.eq.')
+
+    query = expected.source_invitation_id?.trim()
+      ? query.eq('source_invitation_id', expected.source_invitation_id)
+      : query.is('source_invitation_id', null)
+
+    const { data, error } = await query.select('id')
+    if (error) throw error
+    return Boolean(data?.length)
+  } catch (error) {
+    logError('deleteAutoCreatedPendingShipment', error, { shipmentId: expected.id })
     throw error
   }
 }

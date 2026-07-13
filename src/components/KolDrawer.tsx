@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import { KOL, Invitation, Collaboration, Shipment, Product, PLATFORMS } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
 import { getCollaborationsByKOL, createCollaboration, deleteCollaboration, ensureCompletionCollaboration, updateCollaboration } from '../services/collaborationService'
-import { createShipment, updateShipment, deleteShipment, getShipmentsByKOL } from '../services/shipmentService'
+import { createShipment, updateShipment, deleteShipment, deleteAutoCreatedPendingShipment, getShipmentsByKOL } from '../services/shipmentService'
 import { countCompletedCollaborations, deriveKolStatus, hasPublishReadyCollaborationSignal, hasRealCollaborationSignal } from '../utils/kolStatus'
 import InlineEdit from './InlineEdit'
 import MailPanel from './MailPanel'
@@ -297,14 +297,17 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
       : false
     console.log('📦 寄样记录创建结果:', createdShipment ? '已创建' : '未创建')
 
-    const workflowShipments = createdShipment ? await getShipmentsByKOL(kol.id) : kolShipments
+    const workflowShipments = await getShipmentsByKOL(kol.id)
     const staleAutoShipments = findStaleAutoCreatedPendingShipments(workflowShipments, nextInvitations)
-    if (staleAutoShipments.length > 0) {
-      await Promise.all(staleAutoShipments.map(shipment => deleteShipment(shipment.id)))
+    const deletionResults = staleAutoShipments.length > 0
+      ? await Promise.all(staleAutoShipments.map(deleteAutoCreatedPendingShipment))
+      : []
+    const deletedShipment = deletionResults.some(Boolean)
+    if (deletedShipment) {
       console.log('🧹 已清理失效的自动待寄出记录:', staleAutoShipments.map(shipment => shipment.id))
     }
 
-    const shipmentsChanged = createdShipment || staleAutoShipments.length > 0
+    const shipmentsChanged = createdShipment || deletedShipment
     const nextShipments = shipmentsChanged ? await getShipmentsByKOL(kol.id) : workflowShipments
     if (shipmentsChanged) {
       await onShipmentsChange()
@@ -466,16 +469,17 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
       // 重新获取最新的 shipments 数据，并清理已失去有效同意邀约的自动待寄出记录
       const latestShipments = await getShipmentsByKOL(kol.id)
       const staleAutoShipments = findStaleAutoCreatedPendingShipments(latestShipments, next)
-      if (staleAutoShipments.length > 0) {
-        await Promise.all(staleAutoShipments.map(shipment => deleteShipment(shipment.id)))
-      }
-      const nextShipments = staleAutoShipments.length > 0 ? await getShipmentsByKOL(kol.id) : latestShipments
+      const deletionResults = staleAutoShipments.length > 0
+        ? await Promise.all(staleAutoShipments.map(deleteAutoCreatedPendingShipment))
+        : []
+      const deletedShipment = deletionResults.some(Boolean)
+      const nextShipments = deletedShipment ? await getShipmentsByKOL(kol.id) : latestShipments
 
       // 重新计算并更新 KOL 状态
       await syncDerivedKolStatus(next, nextShipments, collaborations)
 
       // 通知父组件刷新邀约数据
-      if (staleAutoShipments.length > 0) {
+      if (deletedShipment) {
         await onShipmentsChange()
       }
       await onInvitationsChange()

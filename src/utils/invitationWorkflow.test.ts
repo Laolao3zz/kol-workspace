@@ -137,4 +137,13 @@ describe('invitation workflow helpers', () => {
 
     expect(stale).toEqual([])
   })
+
+  it('does not remove an auto-created shipment after a sample date is scheduled', () => {
+    const stale = findStaleAutoCreatedPendingShipments(
+      [linkedShipment('source_inv', { sample_date: '2026-07-20' })],
+      [invitation({ id: 'source_inv', decision: '我方拒绝' })]
+    )
+
+    expect(stale).toEqual([])
+  })
 })

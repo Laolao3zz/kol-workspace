@@ -50,9 +50,9 @@ Expected: PASS.
 - Modify: `src/services/shipmentService.ts`
 - Test: `src/utils/invitationWorkflow.test.ts`
 
-- [ ] **Step 1: Add a failing payload assertion**
+- [ ] **Step 1: Add failing relation and idempotency assertions**
 
-Extend the workflow test fixtures with `source_invitation_id` and assert linked rows are retained only while their exact source invitation remains approved.
+Extend the workflow test fixtures with `source_invitation_id` and assert linked rows are retained only while their exact source invitation remains approved. Add service-boundary tests proving a lost insert response can recover the existing linked shipment and stale cleanup only deletes a row that is still an untouched auto-created pending shipment.
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
@@ -60,9 +60,9 @@ Run: `npm.cmd test -- src/utils/invitationWorkflow.test.ts`
 
 Expected: FAIL because the linked cleanup behavior is absent.
 
-- [ ] **Step 3: Implement relation-aware orchestration**
+- [ ] **Step 3: Implement relation-aware, concurrency-safe orchestration**
 
-Add `source_invitation_id?: string | null` to `Shipment`. Pass the original invitation into workflow synchronization, call automatic creation only for an approval transition, and include `source_invitation_id: invitation.id` in the created shipment.
+Add `source_invitation_id?: string | null` to `Shipment`. Pass the original invitation into workflow synchronization, call automatic creation only for an approval transition, and include `source_invitation_id: invitation.id` in the created shipment. Query current shipments before cleanup, recover unique conflicts by returning the existing linked shipment, and conditionally delete stale rows only while their current database fields still describe an untouched auto-created pending shipment.
 
 - [ ] **Step 4: Run focused tests and verify GREEN**
 

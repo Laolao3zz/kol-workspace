@@ -18,11 +18,13 @@ function productKey(product: string): string {
   return product.trim().toLocaleLowerCase()
 }
 
-function isAutoCreatedPendingShipment(shipment: Shipment): boolean {
+export function isAutoCreatedPendingShipment(shipment: Shipment): boolean {
   return Boolean(
     shipment.status === '待寄出' &&
     !shipment.tracking_number?.trim() &&
-    shipment.notes?.includes(AUTO_CREATED_SHIPMENT_NOTE)
+    !shipment.sample_date &&
+    !shipment.archived_at &&
+    shipment.notes?.trim() === AUTO_CREATED_SHIPMENT_NOTE
   )
 }
 
