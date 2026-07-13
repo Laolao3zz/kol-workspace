@@ -27,6 +27,7 @@ import CorrectProductModal from './CorrectProductModal'
 import { applyProductCorrection } from '../services/productCorrectionService'
 import type { ProductCorrectionPlan } from '../utils/productCorrection'
 import { sameProduct } from '../utils/productMatching'
+import { toExternalProfileUrl } from '../utils/profileUrl'
 
 interface Props {
   kol: KOL
@@ -91,6 +92,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
   const publishReadyCollaborations = collaborations.filter(hasPublishReadyCollaborationSignal)
   const completedCollaborationCount = countCompletedCollaborations(collaborations)
   const contentShape = getKolContentShape(kol)
+  const homepageHref = toExternalProfileUrl(kol.homepage_url)
   const metricLabels = getContentShapeMetricLabels(contentShape)
   const drawerProductOptions = collectProductOptions({
     products: productOptions,
@@ -619,10 +621,10 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                 <span>{kol.followers || '-'}</span>
                 <span>·</span>
                 <span>{kol.country || '-'}</span>
-                {kol.homepage_url && (
+                {homepageHref && (
                   <>
                     <span>·</span>
-                    <a href={kol.homepage_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#0066FF] hover:underline">
+                    <a href={homepageHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#0066FF] hover:underline">
                       主页 <ExternalLink className="h-3 w-3" />
                     </a>
                   </>

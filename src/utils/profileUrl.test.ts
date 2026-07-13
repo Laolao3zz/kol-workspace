@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { inferKolProfileFromUrl, normalizeProfileUrl } from './profileUrl'
+import { inferKolProfileFromUrl, normalizeProfileUrl, toExternalProfileUrl } from './profileUrl'
 
 describe('profileUrl helpers', () => {
   it('infers YouTube channel handle URLs', () => {
@@ -26,5 +26,16 @@ describe('profileUrl helpers', () => {
   it('normalizes URLs for duplicate comparison', () => {
     expect(normalizeProfileUrl('https://www.youtube.com/@Creator/?view=1')).toBe('youtube.com/@creator')
     expect(normalizeProfileUrl(' youtube.com/@Creator/ ')).toBe('youtube.com/@creator')
+  })
+
+  it('builds a safe external link when the stored homepage omits the scheme', () => {
+    expect(toExternalProfileUrl('youtube.com/@creator')).toBe('https://youtube.com/@creator')
+    expect(toExternalProfileUrl(' https://example.com/profile?from=kol ')).toBe('https://example.com/profile?from=kol')
+  })
+
+  it('rejects unsafe protocols and non-url labels', () => {
+    expect(toExternalProfileUrl('javascript:alert(1)')).toBeNull()
+    expect(toExternalProfileUrl('not a url')).toBeNull()
+    expect(toExternalProfileUrl('creator-channel')).toBeNull()
   })
 })

@@ -85,3 +85,24 @@ export function normalizeProfileUrl(value: string): string {
   const path = cleanPath(url.pathname).toLowerCase()
   return `${host}${path}`
 }
+
+export function toExternalProfileUrl(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const hasScheme = /^[a-z][a-z\d+.-]*:/i.test(trimmed)
+  const candidate = trimmed.startsWith('//')
+    ? `https:${trimmed}`
+    : hasScheme
+      ? trimmed
+      : `https://${trimmed}`
+
+  try {
+    const url = new URL(candidate)
+    if (!['http:', 'https:'].includes(url.protocol)) return null
+    if (!url.hostname.includes('.') || url.username || url.password) return null
+    return url.href
+  } catch {
+    return null
+  }
+}
