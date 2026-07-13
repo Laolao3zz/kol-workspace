@@ -638,6 +638,7 @@ export const demoDatabase = {
     const record: Shipment = {
       id: nextId('shipment'),
       kol_id: shipment.kol_id,
+      source_invitation_id: shipment.source_invitation_id?.trim() || null,
       product: shipment.product?.trim() || '',
       sample_date: shipment.sample_date || null,
       tracking_number: shipment.tracking_number?.trim() || '',

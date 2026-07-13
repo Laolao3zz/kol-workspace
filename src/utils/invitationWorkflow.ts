@@ -39,6 +39,11 @@ export function findStaleAutoCreatedPendingShipments(
 
   return shipments.filter(shipment =>
     isAutoCreatedPendingShipment(shipment) &&
-    !approvedProducts.has(productKey(shipment.product))
+    (shipment.source_invitation_id?.trim()
+      ? !invitations.some(invitation =>
+          invitation.id === shipment.source_invitation_id &&
+          isInvitationApprovedForShipment(invitation)
+        )
+      : !approvedProducts.has(productKey(shipment.product)))
   )
 }

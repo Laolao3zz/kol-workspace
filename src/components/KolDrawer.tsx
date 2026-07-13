@@ -18,6 +18,7 @@ import {
   AUTO_CREATED_SHIPMENT_NOTE,
   findStaleAutoCreatedPendingShipments,
   isInvitationApprovedForShipment,
+  shouldCreateShipmentForInvitation,
 } from '../utils/invitationWorkflow'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
 import { buildProductOpportunitySummary, type OpportunityStatus } from '../utils/workspaceViews'
@@ -234,6 +235,14 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     }
 
     const existingShipments = await getShipmentsByKOL(kol.id)
+    const hasShipmentForInvitation = existingShipments.some(s =>
+      s.source_invitation_id === invitation.id
+    )
+    if (hasShipmentForInvitation) {
+      console.log('⏭️ 该邀约已有关联寄样记录，跳过创建')
+      return false
+    }
+
     const hasSamePendingShipment = existingShipments.some(s =>
       sameProduct(s.product, invitation.product) && s.status === '待寄出' && !s.tracking_number?.trim()
     )
@@ -248,6 +257,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     try {
       await createShipment({
         kol_id: kol.id,
+        source_invitation_id: invitation.id,
         product: invitation.product,
         sample_date: null,
         tracking_number: '',
@@ -269,15 +279,22 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     }
   }
 
-  const syncInvitationWorkflow = async (savedInvitation: Invitation, nextInvitations: Invitation[]) => {
+  const syncInvitationWorkflow = async (
+    savedInvitation: Invitation,
+    nextInvitations: Invitation[],
+    previousInvitation: Invitation | null
+  ) => {
+    const shouldCreate = shouldCreateShipmentForInvitation(previousInvitation, savedInvitation)
     console.log('🔄 syncInvitationWorkflow 开始', {
       invitation: savedInvitation,
       reply_result: savedInvitation.reply_result,
       decision: savedInvitation.decision,
-      shouldCreate: isInvitationApprovedForShipment(savedInvitation)
+      shouldCreate,
     })
 
-    const createdShipment = await ensureShipmentForInvitation(savedInvitation)
+    const createdShipment = shouldCreate
+      ? await ensureShipmentForInvitation(savedInvitation)
+      : false
     console.log('📦 寄样记录创建结果:', createdShipment ? '已创建' : '未创建')
 
     const workflowShipments = createdShipment ? await getShipmentsByKOL(kol.id) : kolShipments
@@ -414,12 +431,13 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
   const handleAddInvitation = async (data: InvitationFormData) => {
     try {
       if (editingInvitation) {
+        const previousInvitation = editingInvitation
         const saved = await updateInvitation(editingInvitation.id, data)
         const next = invitations.map(inv => inv.id === saved.id ? saved : inv)
         setInvitations(next)
         setShowInvModal(false)
         setEditingInvitation(null)
-        await syncInvitationWorkflow(saved, next)
+        await syncInvitationWorkflow(saved, next, previousInvitation)
         await onInvitationsChange()
         showToast('邀约已更新')
         return
@@ -429,7 +447,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
       const updated = [inv, ...invitations]
       setInvitations(updated)
       setShowInvModal(false)
-      await syncInvitationWorkflow(inv, updated)
+      await syncInvitationWorkflow(inv, updated, null)
       if (INVITATION_ENTRY_STATUSES.includes(kol.status) && (!inv.replied || inv.reply_result === '未回复')) {
         await pushStatus('已邀约')
       }

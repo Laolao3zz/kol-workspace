@@ -39,6 +39,7 @@ function normalizeShipmentPayload(shipment: Partial<Shipment>): Partial<Shipment
   const payload: Partial<Shipment> = {}
 
   if ('kol_id' in shipment) payload.kol_id = shipment.kol_id
+  if ('source_invitation_id' in shipment) payload.source_invitation_id = shipment.source_invitation_id?.trim() || null
   if ('product' in shipment) payload.product = shipment.product?.trim() || ''
   if ('sample_date' in shipment) payload.sample_date = nullableDate(shipment.sample_date)
   if ('tracking_number' in shipment) payload.tracking_number = shipment.tracking_number?.trim() || ''

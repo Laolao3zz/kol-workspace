@@ -42,6 +42,9 @@ const shipment = (overrides: Partial<Shipment> = {}): Shipment => ({
   ...overrides,
 })
 
+const linkedShipment = (sourceInvitationId: string, overrides: Partial<Shipment> = {}): Shipment & { source_invitation_id: string } =>
+  Object.assign(shipment(overrides), { source_invitation_id: sourceInvitationId })
+
 describe('invitation workflow helpers', () => {
   it('recognizes only continue-pushing agreed invitations as shipment-approved', () => {
     expect(isInvitationApprovedForShipment(invitation())).toBe(true)
@@ -88,6 +91,36 @@ describe('invitation workflow helpers', () => {
         invitation({ id: 'old_inv', decision: '我方拒绝' }),
         invitation({ id: 'new_inv', product: 'BY53', decision: '继续推进' }),
       ]
+    )
+
+    expect(stale).toEqual([])
+  })
+
+  it('marks a linked auto-created pending shipment stale when its source invitation is withdrawn', () => {
+    const stale = findStaleAutoCreatedPendingShipments(
+      [linkedShipment('source_inv')],
+      [
+        invitation({ id: 'source_inv', decision: '我方拒绝' }),
+        invitation({ id: 'other_inv', decision: '继续推进' }),
+      ]
+    )
+
+    expect(stale.map(item => item.id)).toEqual(['shipment_1'])
+  })
+
+  it('marks a linked auto-created pending shipment stale when its source invitation no longer exists', () => {
+    const stale = findStaleAutoCreatedPendingShipments(
+      [linkedShipment('missing_inv')],
+      [invitation({ id: 'other_inv', decision: '继续推进' })]
+    )
+
+    expect(stale.map(item => item.id)).toEqual(['shipment_1'])
+  })
+
+  it('keeps a linked auto-created pending shipment while its exact source invitation remains approved', () => {
+    const stale = findStaleAutoCreatedPendingShipments(
+      [linkedShipment('source_inv')],
+      [invitation({ id: 'source_inv', product: 'K1', decision: '继续推进' })]
     )
 
     expect(stale).toEqual([])

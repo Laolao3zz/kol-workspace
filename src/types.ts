@@ -60,6 +60,7 @@ export interface Product {
 export interface Shipment {
   id: string
   kol_id: string
+  source_invitation_id?: string | null
   product: string
   sample_date: string | null
   tracking_number: string
