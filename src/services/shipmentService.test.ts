@@ -25,7 +25,6 @@ const input = (sourceInvitationId: string) => ({
   completed_at: null,
   archived_at: null,
 })
-
 describe('shipmentService linked workflow safety', () => {
   it('returns the existing shipment when the same invitation is created twice', async () => {
     const sourceInvitationId = `inv-${Date.now()}-idempotent`
@@ -68,4 +67,3 @@ describe('shipmentService linked workflow safety', () => {
     expect(remaining).toBeUndefined()
   })
 })
-
