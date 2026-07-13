@@ -6,6 +6,14 @@ export function isInvitationApprovedForShipment(invitation: Invitation): boolean
   return invitation.reply_result === '同意合作' && invitation.decision === '继续推进'
 }
 
+export function shouldCreateShipmentForInvitation(
+  previous: Invitation | null | undefined,
+  next: Invitation
+): boolean {
+  return isInvitationApprovedForShipment(next) &&
+    (!previous || !isInvitationApprovedForShipment(previous))
+}
+
 function productKey(product: string): string {
   return product.trim().toLocaleLowerCase()
 }

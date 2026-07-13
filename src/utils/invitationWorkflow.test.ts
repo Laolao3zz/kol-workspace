@@ -4,6 +4,7 @@ import {
   AUTO_CREATED_SHIPMENT_NOTE,
   findStaleAutoCreatedPendingShipments,
   isInvitationApprovedForShipment,
+  shouldCreateShipmentForInvitation,
 } from './invitationWorkflow'
 
 const invitation = (overrides: Partial<Invitation> = {}): Invitation => ({
@@ -46,6 +47,29 @@ describe('invitation workflow helpers', () => {
     expect(isInvitationApprovedForShipment(invitation())).toBe(true)
     expect(isInvitationApprovedForShipment(invitation({ decision: '我方拒绝' }))).toBe(false)
     expect(isInvitationApprovedForShipment(invitation({ reply_result: '拒绝合作', decision: '待评估' }))).toBe(false)
+  })
+
+  it('creates a shipment for a newly approved invitation', () => {
+    expect(shouldCreateShipmentForInvitation(null, invitation())).toBe(true)
+  })
+
+  it('creates a shipment when an existing invitation becomes approved', () => {
+    const previous = invitation({ decision: '待评估' })
+
+    expect(shouldCreateShipmentForInvitation(previous, invitation())).toBe(true)
+  })
+
+  it('does not create another shipment when an approved invitation remains approved', () => {
+    const previous = invitation({ notes: 'initial note', quoted_fee: '$100' })
+    const next = invitation({ notes: 'updated note', quoted_fee: '$120' })
+
+    expect(shouldCreateShipmentForInvitation(previous, next)).toBe(false)
+  })
+
+  it('does not create a shipment when the next invitation is not approved', () => {
+    const next = invitation({ decision: '我方拒绝' })
+
+    expect(shouldCreateShipmentForInvitation(invitation(), next)).toBe(false)
   })
 
   it('finds stale auto-created pending shipments when approval is withdrawn', () => {
