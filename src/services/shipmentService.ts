@@ -4,7 +4,7 @@ import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError, logWarning } from '../utils/logger'
 import { collectAllPages } from '../utils/pagination'
-import { AUTO_CREATED_SHIPMENT_NOTE, isAutoCreatedPendingShipment } from '../utils/invitationWorkflow'
+import { isAutoCreatedPendingShipment, isInvitationApprovedForShipment } from '../utils/invitationWorkflow'
 
 export type ShipmentInput = Omit<Shipment, 'id' | 'created_at' | 'updated_at'>
 
@@ -198,27 +198,24 @@ export async function deleteAutoCreatedPendingShipment(expected: Shipment): Prom
       if (!current || current.source_invitation_id !== expected.source_invitation_id || !isAutoCreatedPendingShipment(current)) {
         return false
       }
+      if (!current.source_invitation_id) return false
+      const invitations = demoDatabase.getInvitationsByKOL(current.kol_id)
+      const hasApprovedInvitation = invitations.some(invitation =>
+        invitation.id === current.source_invitation_id && isInvitationApprovedForShipment(invitation)
+      )
+      if (hasApprovedInvitation) return false
       demoDatabase.deleteShipment(current.id)
       return true
     }
 
-    let query = getSupabase()
-      .from('shipments')
-      .delete()
-      .eq('id', expected.id)
-      .eq('status', '待寄出')
-      .eq('notes', AUTO_CREATED_SHIPMENT_NOTE)
-      .is('sample_date', null)
-      .is('archived_at', null)
-      .or('tracking_number.is.null,tracking_number.eq.')
-
-    query = expected.source_invitation_id?.trim()
-      ? query.eq('source_invitation_id', expected.source_invitation_id)
-      : query.is('source_invitation_id', null)
-
-    const { data, error } = await query.select('id')
+    const { data, error } = await getSupabase().rpc('delete_stale_auto_shipment', {
+      p_shipment_id: expected.id,
+      p_expected_updated_at: expected.updated_at,
+      p_expected_product: expected.product,
+      p_expected_source_invitation_id: expected.source_invitation_id || null,
+    })
     if (error) throw error
-    return Boolean(data?.length)
+    return data === true
   } catch (error) {
     logError('deleteAutoCreatedPendingShipment', error, { shipmentId: expected.id })
     throw error

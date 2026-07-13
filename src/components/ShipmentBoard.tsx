@@ -2,12 +2,13 @@ import { AlertTriangle, Archive, CheckCircle2, Clock3, PackageCheck, Pencil, Sen
 import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Collaboration, Invitation, KOL, PROGRESS_STATUSES, Shipment } from '../types'
-import { createCollaboration, ensureCompletionCollaboration, getCollaborationsByKOL, updateCollaboration } from '../services/collaborationService'
+import { ensureCompletionCollaboration, getCollaborationsByKOL, saveCollaborationForShipment, updateCollaboration } from '../services/collaborationService'
 import { updateShipment } from '../services/shipmentService'
 import ArchiveCollaborationModal, { ArchiveFormData } from './ArchiveCollaborationModal'
 import { findCollaborationForShipment, stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
 import { getKolContentShape } from '../utils/contentShape'
 import { sameProduct } from '../utils/productMatching'
+import { runPostPersistWorkflow } from '../utils/persistedWrite'
 
 interface Props {
   kols: KOL[]
@@ -170,21 +171,35 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
 
   const handleComplete = async (shipment: Shipment) => {
     const completedAt = todayISO()
+    setBoardError('')
+    setCompletingShipmentId(shipment.id)
     try {
-      setBoardError('')
-      setCompletingShipmentId(shipment.id)
-      const saved = await updateShipment(shipment.id, {
-        status: '已签收',
-        delivered_at: shipment.delivered_at || completedAt,
-        progress_status: '已完成',
-        completed_at: completedAt,
-      })
-      await ensureCompletionCollaboration(saved)
-      await syncKolStatus(saved.kol_id, '合作完成')
-      await onCollaborationsChange()
-      await onShipmentsChange()
-    } catch (err) {
-      setBoardError(err instanceof Error ? err.message : '合作完成保存失败，状态未变更')
+      let saved: Shipment
+      try {
+        saved = await updateShipment(shipment.id, {
+          status: '已签收',
+          delivered_at: shipment.delivered_at || completedAt,
+          progress_status: '已完成',
+          completed_at: completedAt,
+        })
+      } catch (error) {
+        setBoardError(error instanceof Error ? error.message : '合作完成状态保存失败')
+        return
+      }
+
+      const outcome = await runPostPersistWorkflow([
+        () => ensureCompletionCollaboration(saved),
+        () => syncKolStatus(saved.kol_id, '合作完成'),
+        () => Promise.resolve().then(() => onCollaborationsChange()),
+        () => Promise.resolve().then(() => onShipmentsChange()),
+      ], [
+        () => Promise.resolve().then(() => onCollaborationsChange()),
+        () => Promise.resolve().then(() => onShipmentsChange()),
+      ])
+      if (!outcome.completed) {
+        const detail = outcome.error instanceof Error ? outcome.error.message : '关联数据同步失败'
+        setBoardError(`寄样已标记完成，但关联数据同步失败：${detail}`)
+      }
     } finally {
       setCompletingShipmentId(null)
     }
@@ -204,31 +219,55 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
 
   const handleArchive = async (data: ArchiveFormData) => {
     if (!archivingShipment) return
+    setBoardError('')
+    const collaborationPayload = {
+      ...data,
+      shipment_id: archivingShipment.id,
+      publish_date: data.publish_date || archivingShipment.completed_at || todayISO(),
+      notes: stripShipmentHistoryMarkers(data.notes || '系统归档'),
+    }
+
     try {
-      setBoardError('')
-      const collaborationPayload = {
-        ...data,
-        shipment_id: archivingShipment.id,
-        publish_date: data.publish_date || archivingShipment.completed_at || todayISO(),
-        notes: stripShipmentHistoryMarkers(data.notes || '系统归档'),
-      }
       if (archiveExistingCollaboration) {
         await updateCollaboration(archiveExistingCollaboration.id, collaborationPayload)
       } else {
-        await createCollaboration({
+        await saveCollaborationForShipment({
           kol_id: archivingShipment.kol_id,
           product: archivingShipment.product,
           ...collaborationPayload,
         })
       }
-      const archived = await updateShipment(archivingShipment.id, { archived_at: new Date().toISOString() })
-      await syncKolStatus(archived.kol_id, '合作完成')
-      await onCollaborationsChange()
-      await onShipmentsChange()
-      setArchivingShipment(null)
-      setArchiveExistingCollaboration(null)
-    } catch (err) {
-      setBoardError(err instanceof Error ? err.message : '正式归档失败')
+    } catch (error) {
+      setBoardError(error instanceof Error ? error.message : '合作历史归档失败，寄样尚未归档')
+      return
+    }
+
+    let archived: Shipment
+    try {
+      archived = await updateShipment(archivingShipment.id, { archived_at: new Date().toISOString() })
+    } catch (error) {
+      await Promise.allSettled([
+        Promise.resolve().then(() => onCollaborationsChange()),
+        Promise.resolve().then(() => onShipmentsChange()),
+      ])
+      const detail = error instanceof Error ? error.message : '寄样归档状态保存失败'
+      setBoardError(`合作历史已保存，但寄样归档状态同步失败：${detail}`)
+      return
+    }
+
+    setArchivingShipment(null)
+    setArchiveExistingCollaboration(null)
+    const outcome = await runPostPersistWorkflow([
+      () => syncKolStatus(archived.kol_id, '合作完成'),
+      () => Promise.resolve().then(() => onCollaborationsChange()),
+      () => Promise.resolve().then(() => onShipmentsChange()),
+    ], [
+      () => Promise.resolve().then(() => onCollaborationsChange()),
+      () => Promise.resolve().then(() => onShipmentsChange()),
+    ])
+    if (!outcome.completed) {
+      const detail = outcome.error instanceof Error ? outcome.error.message : '关联数据同步失败'
+      setBoardError(`归档已保存，但关联数据同步失败：${detail}`)
     }
   }
 

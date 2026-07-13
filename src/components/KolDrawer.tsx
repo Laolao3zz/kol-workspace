@@ -18,6 +18,7 @@ import {
   AUTO_CREATED_SHIPMENT_NOTE,
   findStaleAutoCreatedPendingShipments,
   isInvitationApprovedForShipment,
+  shouldReconcileApprovedInvitation,
   shouldCreateShipmentForInvitation,
 } from '../utils/invitationWorkflow'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
@@ -26,8 +27,8 @@ import { buildProductOpportunitySummary, type OpportunityStatus } from '../utils
 import CorrectProductModal from './CorrectProductModal'
 import { applyProductCorrection } from '../services/productCorrectionService'
 import type { ProductCorrectionPlan } from '../utils/productCorrection'
-import { sameProduct } from '../utils/productMatching'
-import { toExternalProfileUrl } from '../utils/profileUrl'
+import { toExternalProfileUrl, toSafeExternalUrl } from '../utils/profileUrl'
+import { runPostPersistWorkflow } from '../utils/persistedWrite'
 
 interface Props {
   kol: KOL
@@ -238,20 +239,8 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     }
 
     const existingShipments = await getShipmentsByKOL(kol.id)
-    const hasShipmentForInvitation = existingShipments.some(s =>
-      s.source_invitation_id === invitation.id
-    )
-    if (hasShipmentForInvitation) {
+    if (!shouldReconcileApprovedInvitation(invitation, existingShipments)) {
       console.log('⏭️ 该邀约已有关联寄样记录，跳过创建')
-      return false
-    }
-
-    const hasSamePendingShipment = existingShipments.some(s =>
-      sameProduct(s.product, invitation.product) && s.status === '待寄出' && !s.tracking_number?.trim()
-    )
-
-    if (hasSamePendingShipment) {
-      console.log('⏭️ 已存在相同产品的待寄出记录，跳过创建')
       return false
     }
 
@@ -435,62 +424,101 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
   }
 
   const handleAddInvitation = async (data: InvitationFormData) => {
-    try {
-      if (editingInvitation) {
-        const previousInvitation = editingInvitation
-        const saved = await updateInvitation(editingInvitation.id, data)
-        const next = invitations.map(inv => inv.id === saved.id ? saved : inv)
-        setInvitations(next)
-        setShowInvModal(false)
-        setEditingInvitation(null)
-        await syncInvitationWorkflow(saved, next, previousInvitation)
-        await onInvitationsChange()
-        showToast('邀约已更新')
+    const recoveryRefreshes = [
+      () => Promise.resolve().then(() => onInvitationsChange()),
+      () => Promise.resolve().then(() => onShipmentsChange()),
+    ]
+
+    if (editingInvitation) {
+      const previousInvitation = editingInvitation
+      let saved: Invitation
+      try {
+        saved = await updateInvitation(editingInvitation.id, data)
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : '邀约更新失败')
         return
       }
 
-      const inv = await createInvitation(data)
-      const updated = [inv, ...invitations]
-      setInvitations(updated)
+      const next = invitations.map(inv => inv.id === saved.id ? saved : inv)
+      setInvitations(next)
       setShowInvModal(false)
-      await syncInvitationWorkflow(inv, updated, null)
-      if (INVITATION_ENTRY_STATUSES.includes(kol.status) && (!inv.replied || inv.reply_result === '未回复')) {
-        await pushStatus('已邀约')
+      setEditingInvitation(null)
+
+      const outcome = await runPostPersistWorkflow([
+        () => syncInvitationWorkflow(saved, next, previousInvitation),
+        () => Promise.resolve().then(() => onInvitationsChange()),
+      ], recoveryRefreshes)
+      if (!outcome.completed) {
+        const detail = outcome.error instanceof Error ? outcome.error.message : '关联数据同步失败'
+        showToast(`邀约已更新，但关联数据同步失败：${detail}`)
+        return
       }
-      await onInvitationsChange()
-      showToast('邀约已添加')
-    } catch (err) { showToast(err instanceof Error ? err.message : editingInvitation ? '更新失败' : '添加失败') }
+
+      showToast('邀约已更新')
+      return
+    }
+
+    let invitation: Invitation
+    try {
+      invitation = await createInvitation(data)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '邀约添加失败')
+      return
+    }
+
+    const updated = [invitation, ...invitations]
+    setInvitations(updated)
+    setShowInvModal(false)
+
+    const outcome = await runPostPersistWorkflow([
+      () => syncInvitationWorkflow(invitation, updated, null),
+      async () => {
+        if (INVITATION_ENTRY_STATUSES.includes(kol.status) && (!invitation.replied || invitation.reply_result === '未回复')) {
+          await pushStatus('已邀约')
+        }
+      },
+      () => Promise.resolve().then(() => onInvitationsChange()),
+    ], recoveryRefreshes)
+    if (!outcome.completed) {
+      const detail = outcome.error instanceof Error ? outcome.error.message : '关联数据同步失败'
+      showToast(`邀约已添加，但关联数据同步失败：${detail}`)
+      return
+    }
+
+    showToast('邀约已添加')
   }
 
   const handleDeleteInvitation = async (id: string) => {
     if (!confirm('删除该邀约记录？')) return
     try {
       await deleteInvitation(id)
-      const next = invitations.filter(i => i.id !== id)
-      setInvitations(next)
-
-      // 重新获取最新的 shipments 数据，并清理已失去有效同意邀约的自动待寄出记录
-      const latestShipments = await getShipmentsByKOL(kol.id)
-      const staleAutoShipments = findStaleAutoCreatedPendingShipments(latestShipments, next)
-      const deletionResults = staleAutoShipments.length > 0
-        ? await Promise.all(staleAutoShipments.map(deleteAutoCreatedPendingShipment))
-        : []
-      const deletedShipment = deletionResults.some(Boolean)
-      const nextShipments = deletedShipment ? await getShipmentsByKOL(kol.id) : latestShipments
-
-      // 重新计算并更新 KOL 状态
-      await syncDerivedKolStatus(next, nextShipments, collaborations)
-
-      // 通知父组件刷新邀约数据
-      if (deletedShipment) {
-        await onShipmentsChange()
-      }
-      await onInvitationsChange()
-
-      showToast('邀约已删除')
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : '删除失败')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '邀约删除失败')
+      return
     }
+
+    const next = invitations.filter(invitation => invitation.id !== id)
+    setInvitations(next)
+
+    const outcome = await runPostPersistWorkflow([
+      async () => {
+        const nextShipments = await getShipmentsByKOL(kol.id)
+        await syncDerivedKolStatus(next, nextShipments, collaborations)
+      },
+      () => Promise.resolve().then(() => onShipmentsChange()),
+      () => Promise.resolve().then(() => onInvitationsChange()),
+    ], [
+      () => Promise.resolve().then(() => onShipmentsChange()),
+      () => Promise.resolve().then(() => onInvitationsChange()),
+    ])
+
+    if (!outcome.completed) {
+      const detail = outcome.error instanceof Error ? outcome.error.message : '关联数据同步失败'
+      showToast(`邀约已删除，但关联数据同步失败：${detail}`)
+      return
+    }
+
+    showToast('邀约已删除')
   }
 
   const handleAddCollaboration = async (data: CollaborationFormData) => {
@@ -816,7 +844,9 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                         已有系统归档记录，但缺少发布日期、作品链接或{metricLabels.viewsInput}。请在进度看板完成归档后补填作品信息，补齐后会出现在合作历史列表。
                       </div>
                     )}
-                    {publishReadyCollaborations.map(col => (
+                    {publishReadyCollaborations.map(col => {
+                      const workHref = toSafeExternalUrl(col.work_url)
+                      return (
                       <div key={col.id} className="group rounded-[12px] border border-black/[0.06] bg-white p-3 transition hover:bg-[#F5F5F7]">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <span className="text-sm font-extrabold text-[#1D1D1F]">{col.product}</span>
@@ -836,10 +866,11 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                           {col.likes !== null && col.likes !== undefined ? <span className="rounded-full bg-[#F5F5F7] px-2.5 py-1 text-xs font-bold">{metricLabels.likes} {fmt(col.likes)}</span> : null}
                           {col.fee ? <span className="rounded-full bg-[#F5F5F7] px-2.5 py-1 text-xs font-bold">{col.fee}</span> : null}
                         </div>
-                        {col.work_url && <a href={col.work_url} target="_blank" rel="noreferrer" className="block truncate text-[11px] font-semibold text-[#0066FF] hover:underline">{col.work_url}</a>}
+                        {workHref && <a href={workHref} target="_blank" rel="noreferrer" className="block truncate text-[11px] font-semibold text-[#0066FF] hover:underline">{workHref}</a>}
                         {stripShipmentHistoryMarkers(col.notes) && <p className="mt-2 border-t border-black/[0.06] pt-2 text-[11px] font-medium text-[#86868B]">{stripShipmentHistoryMarkers(col.notes)}</p>}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </SectionCard>

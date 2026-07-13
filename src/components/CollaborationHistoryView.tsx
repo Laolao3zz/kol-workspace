@@ -6,6 +6,7 @@ import { hasPublishReadyCollaborationSignal } from '../utils/kolStatus'
 import { sameProduct } from '../utils/productMatching'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
 import { stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
+import { toSafeExternalUrl } from '../utils/profileUrl'
 
 interface Props {
   kols: KOL[]
@@ -117,6 +118,7 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, pr
             <tbody className="divide-y divide-black/[0.04]">
               {filtered.map(row => {
                 const metricLabels = getContentShapeMetricLabels(getKolContentShape(row.kol))
+                const workHref = toSafeExternalUrl(row.collaboration.work_url)
                 return (
                 <tr key={row.collaboration.id} className="transition hover:bg-[#F5F5F7]">
                   <td className="px-4 py-3">
@@ -133,8 +135,8 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, pr
                   </td>
                   <td className="px-4 py-3 text-xs font-semibold text-[#6E6E73]">{row.collaboration.publish_date || '-'}</td>
                   <td className="px-4 py-3">
-                    {row.collaboration.work_url ? (
-                      <a href={row.collaboration.work_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-[#0066FF] hover:bg-blue-100">
+                    {workHref ? (
+                      <a href={workHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-[#0066FF] hover:bg-blue-100">
                         <ExternalLink className="h-3.5 w-3.5" /> 查看
                       </a>
                     ) : <span className="text-xs font-semibold text-[#AEAEB2]">-</span>}

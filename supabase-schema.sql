@@ -89,8 +89,44 @@ CREATE TABLE IF NOT EXISTS shipments (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 兼容已存在的旧表：CREATE TABLE IF NOT EXISTS 不会为旧表补列。
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS source_invitation_id UUID;
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS progress_status TEXT DEFAULT '待制作';
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS progress_notes TEXT;
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS expected_publish_date DATE;
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS completed_at DATE;
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS quoted_fee TEXT;
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS decision TEXT DEFAULT '待评估';
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS decision_reason TEXT;
+ALTER TABLE public.collaborations
+  ADD COLUMN IF NOT EXISTS shipment_id UUID;
+
 DO $$
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'shipments_source_invitation_id_fkey'
+      AND conrelid = 'public.shipments'::regclass
+  ) THEN
+    ALTER TABLE public.shipments
+      ADD CONSTRAINT shipments_source_invitation_id_fkey
+      FOREIGN KEY (source_invitation_id)
+      REFERENCES public.invitations(id)
+      ON DELETE SET NULL;
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'collaborations_shipment_id_fkey'
@@ -129,6 +165,99 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_shipments_source_invitation_unique
   ON shipments (source_invitation_id) WHERE source_invitation_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_collaborations_shipment_unique
   ON collaborations (shipment_id) WHERE shipment_id IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.delete_stale_auto_shipment(
+  p_shipment_id UUID,
+  p_expected_updated_at TIMESTAMPTZ,
+  p_expected_product TEXT,
+  p_expected_source_invitation_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_shipment public.shipments%ROWTYPE;
+  v_source_invitation_id UUID;
+  v_reply_result TEXT;
+  v_decision TEXT;
+  v_has_approved_invitation BOOLEAN := false;
+BEGIN
+  SELECT shipment.source_invitation_id INTO v_source_invitation_id
+  FROM public.shipments AS shipment
+  WHERE shipment.id = p_shipment_id;
+  IF NOT FOUND OR v_source_invitation_id IS NULL THEN RETURN false; END IF;
+  SELECT invitation.reply_result, invitation.decision INTO v_reply_result, v_decision
+  FROM public.invitations AS invitation
+  WHERE invitation.id = v_source_invitation_id FOR SHARE;
+  v_has_approved_invitation := FOUND AND v_reply_result = '同意合作' AND v_decision = '继续推进';
+  SELECT * INTO v_shipment FROM public.shipments WHERE id = p_shipment_id FOR UPDATE;
+  IF NOT FOUND THEN RETURN false; END IF;
+  IF v_shipment.updated_at IS DISTINCT FROM p_expected_updated_at
+     OR v_shipment.product IS DISTINCT FROM p_expected_product
+     OR v_shipment.source_invitation_id IS DISTINCT FROM p_expected_source_invitation_id
+     OR v_shipment.status IS DISTINCT FROM '待寄出'
+     OR btrim(coalesce(v_shipment.tracking_number, '')) <> ''
+     OR v_shipment.sample_date IS NOT NULL
+     OR v_shipment.delivered_at IS NOT NULL
+     OR v_shipment.archived_at IS NOT NULL
+     OR v_shipment.completed_at IS NOT NULL
+     OR v_shipment.expected_publish_date IS NOT NULL
+     OR v_shipment.progress_status IS DISTINCT FROM '待制作'
+     OR btrim(coalesce(v_shipment.progress_notes, '')) <> ''
+     OR v_shipment.updated_at IS DISTINCT FROM v_shipment.created_at
+     OR btrim(coalesce(v_shipment.notes, '')) <> '邀约同意且我方继续推进后自动生成' THEN
+    RETURN false;
+  END IF;
+  IF v_has_approved_invitation THEN RETURN false; END IF;
+  DELETE FROM public.shipments WHERE id = v_shipment.id;
+  RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.delete_invitation_with_stale_shipment(
+  p_invitation_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_invitation_id UUID;
+  v_deleted_shipment_count INTEGER := 0;
+BEGIN
+  SELECT invitation.id INTO v_invitation_id
+  FROM public.invitations AS invitation
+  WHERE invitation.id = p_invitation_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('deleted', false, 'already_missing', true, 'shipment_deleted', false);
+  END IF;
+  PERFORM shipment.id FROM public.shipments AS shipment
+  WHERE shipment.source_invitation_id = p_invitation_id
+  FOR UPDATE;
+  DELETE FROM public.shipments AS shipment
+  WHERE shipment.source_invitation_id = p_invitation_id
+    AND shipment.status = '待寄出'
+    AND btrim(coalesce(shipment.tracking_number, '')) = ''
+    AND shipment.sample_date IS NULL
+    AND shipment.delivered_at IS NULL
+    AND shipment.archived_at IS NULL
+    AND shipment.completed_at IS NULL
+    AND shipment.expected_publish_date IS NULL
+    AND shipment.progress_status = '待制作'
+    AND btrim(coalesce(shipment.progress_notes, '')) = ''
+    AND shipment.updated_at IS NOT DISTINCT FROM shipment.created_at
+    AND btrim(coalesce(shipment.notes, '')) = '邀约同意且我方继续推进后自动生成';
+  GET DIAGNOSTICS v_deleted_shipment_count = ROW_COUNT;
+  DELETE FROM public.invitations WHERE id = p_invitation_id;
+  RETURN jsonb_build_object(
+    'deleted', true,
+    'already_missing', false,
+    'shipment_deleted', v_deleted_shipment_count > 0
+  );
+END;
+$$;
 
 -- ============================================================
 -- V3 升级：删除冗余字段，统一状态体系

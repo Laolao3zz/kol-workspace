@@ -118,9 +118,11 @@ The standalone SQL must add columns, foreign keys, partial unique indexes, backf
 
 - [ ] **Step 3: Inspect the SQL for destructive statements**
 
-Run: `rg -n "DROP|TRUNCATE|DELETE FROM|CREATE POLICY|GRANT|REVOKE" supabase-workflow-links.sql`
+Run: `rg -n "DROP|TRUNCATE|CREATE POLICY|GRANT|REVOKE" supabase-workflow-links.sql`
 
 Expected: no output.
+
+Only the two guarded workflow RPC bodies contain `DELETE FROM`; defining those functions does not delete data during migration.
 
 ### Task 5: Safe Homepage Navigation
 

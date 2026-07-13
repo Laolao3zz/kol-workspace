@@ -14,8 +14,15 @@ export function shouldCreateShipmentForInvitation(
     (!previous || !isInvitationApprovedForShipment(previous))
 }
 
-function productKey(product: string): string {
-  return product.trim().toLocaleLowerCase()
+export function shouldReconcileApprovedInvitation(
+  invitation: Invitation,
+  shipments: Shipment[]
+): boolean {
+  if (!isInvitationApprovedForShipment(invitation)) return false
+
+  return !shipments.some(shipment =>
+    shipment.source_invitation_id?.trim() === invitation.id
+  )
 }
 
 export function isAutoCreatedPendingShipment(shipment: Shipment): boolean {
@@ -23,7 +30,13 @@ export function isAutoCreatedPendingShipment(shipment: Shipment): boolean {
     shipment.status === '待寄出' &&
     !shipment.tracking_number?.trim() &&
     !shipment.sample_date &&
+    !shipment.delivered_at &&
     !shipment.archived_at &&
+    !shipment.completed_at &&
+    !shipment.expected_publish_date &&
+    shipment.progress_status === '待制作' &&
+    !shipment.progress_notes?.trim() &&
+    shipment.updated_at === shipment.created_at &&
     shipment.notes?.trim() === AUTO_CREATED_SHIPMENT_NOTE
   )
 }
@@ -32,20 +45,12 @@ export function findStaleAutoCreatedPendingShipments(
   shipments: Shipment[],
   invitations: Invitation[]
 ): Shipment[] {
-  const approvedProducts = new Set(
-    invitations
-      .filter(isInvitationApprovedForShipment)
-      .map(invitation => productKey(invitation.product))
-      .filter(Boolean)
-  )
-
   return shipments.filter(shipment =>
     isAutoCreatedPendingShipment(shipment) &&
-    (shipment.source_invitation_id?.trim()
-      ? !invitations.some(invitation =>
-          invitation.id === shipment.source_invitation_id &&
-          isInvitationApprovedForShipment(invitation)
-        )
-      : !approvedProducts.has(productKey(shipment.product)))
+    Boolean(shipment.source_invitation_id?.trim()) &&
+    !invitations.some(invitation =>
+      invitation.id === shipment.source_invitation_id &&
+      isInvitationApprovedForShipment(invitation)
+    )
   )
 }

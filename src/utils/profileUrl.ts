@@ -86,8 +86,8 @@ export function normalizeProfileUrl(value: string): string {
   return `${host}${path}`
 }
 
-export function toExternalProfileUrl(value: string): string | null {
-  const trimmed = value.trim()
+export function toSafeExternalUrl(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
   if (!trimmed) return null
 
   const hasScheme = /^[a-z][a-z\d+.-]*:/i.test(trimmed)
@@ -105,4 +105,8 @@ export function toExternalProfileUrl(value: string): string | null {
   } catch {
     return null
   }
+}
+
+export function toExternalProfileUrl(value: string | null | undefined): string | null {
+  return toSafeExternalUrl(value)
 }

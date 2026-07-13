@@ -4,6 +4,7 @@ import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError } from '../utils/logger'
 import { collectAllPages } from '../utils/pagination'
+import { isAutoCreatedPendingShipment } from '../utils/invitationWorkflow'
 
 const nullableDate = (value: unknown): string | null => {
   if (typeof value !== 'string') return value == null ? null : String(value)
@@ -89,13 +90,24 @@ export async function createInvitation(inv: Omit<Invitation, 'id'>): Promise<Inv
 export async function deleteInvitation(id: string): Promise<void> {
   try {
     if (isDemoMode()) {
+      const linkedShipments = demoDatabase.getShipments()
+        .filter(shipment => shipment.source_invitation_id === id)
+      linkedShipments.forEach(shipment => {
+        if (isAutoCreatedPendingShipment(shipment)) {
+          demoDatabase.deleteShipment(shipment.id)
+        } else {
+          demoDatabase.updateShipment(shipment.id, { source_invitation_id: null })
+        }
+      })
       demoDatabase.deleteInvitation(id)
       return
     }
 
     await retryOperation(
       async () => {
-        const { error } = await getSupabase().from('invitations').delete().eq('id', id)
+        const { error } = await getSupabase().rpc('delete_invitation_with_stale_shipment', {
+          p_invitation_id: id,
+        })
         if (error) throw error
         return true
       },

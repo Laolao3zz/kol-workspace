@@ -10,6 +10,7 @@ import {
 import { retryOperation } from '../utils/retry'
 import { logError } from '../utils/logger'
 import { collectAllPages } from '../utils/pagination'
+import { toSafeExternalUrl } from '../utils/profileUrl'
 
 const nullableDate = (value: unknown): string | null => {
   if (typeof value !== 'string') return value == null ? null : String(value)
@@ -32,7 +33,14 @@ function normalizeCollaborationPayload(
   if ('shipment_id' in collab) payload.shipment_id = collab.shipment_id?.trim() || null
   if ('product' in collab) payload.product = collab.product?.trim() || ''
   if ('publish_date' in collab) payload.publish_date = nullableDate(collab.publish_date)
-  if ('work_url' in collab) payload.work_url = collab.work_url?.trim() || ''
+  if ('work_url' in collab) {
+    const workUrl = collab.work_url?.trim() || ''
+    const safeWorkUrl = workUrl ? toSafeExternalUrl(workUrl) : ''
+    if (workUrl && !safeWorkUrl) {
+      throw new Error('作品链接必须是有效的 HTTP/HTTPS 地址')
+    }
+    payload.work_url = safeWorkUrl || ''
+  }
   if ('views' in collab) payload.views = nullableNumber(collab.views)
   if ('comments' in collab) payload.comments = nullableNumber(collab.comments)
   if ('likes' in collab) payload.likes = nullableNumber(collab.likes)
@@ -101,14 +109,56 @@ export async function getCollaborationsByKOL(kolId: string): Promise<Collaborati
   }
 }
 
+async function getCollaborationByShipmentId(shipmentId: string): Promise<Collaboration | null> {
+  if (isDemoMode()) {
+    return demoDatabase.getCollaborations().find(collaboration => collaboration.shipment_id === shipmentId) || null
+  }
+
+  const { data, error } = await getSupabase()
+    .from('collaborations')
+    .select('*')
+    .eq('shipment_id', shipmentId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data as Collaboration | null
+}
+
 export async function createCollaboration(
   collab: Omit<Collaboration, 'id'>
 ): Promise<Collaboration> {
   try {
     const payload = normalizeCollaborationPayload(collab)
+    const shipmentId = payload.shipment_id?.trim()
 
     if (isDemoMode()) {
+      if (shipmentId) {
+        const existing = demoDatabase.getCollaborations()
+          .find(collaboration => collaboration.shipment_id === shipmentId)
+        if (existing) return existing
+      }
       return demoDatabase.createCollaboration(payload as Partial<Collaboration> & Pick<Collaboration, 'kol_id' | 'product'>)
+    }
+
+    if (shipmentId) {
+      const existing = await getCollaborationByShipmentId(shipmentId)
+      if (existing) return existing
+
+      const { data, error } = await getSupabase()
+        .from('collaborations')
+        .insert([payload])
+        .select()
+        .single()
+
+      if (!error) return data as Collaboration
+
+      try {
+        const recovered = await getCollaborationByShipmentId(shipmentId)
+        if (recovered) return recovered
+      } catch {
+        // Preserve the insert error because it is the operation the caller requested.
+      }
+      throw error
     }
 
     const result = await retryOperation(
@@ -130,6 +180,23 @@ export async function createCollaboration(
     logError('createCollaboration', error, { collab })
     throw error
   }
+}
+
+export async function saveCollaborationForShipment(
+  collaboration: Omit<Collaboration, 'id'>
+): Promise<Collaboration> {
+  const shipmentId = collaboration.shipment_id?.trim()
+  if (!shipmentId) {
+    throw new Error('按寄样保存合作历史时必须提供 shipment_id')
+  }
+
+  const existing = await getCollaborationByShipmentId(shipmentId)
+  if (existing) {
+    return updateCollaboration(existing.id, collaboration)
+  }
+
+  const createdOrRecovered = await createCollaboration(collaboration)
+  return updateCollaboration(createdOrRecovered.id, collaboration)
 }
 
 export async function updateCollaboration(
@@ -196,7 +263,11 @@ export async function ensureCompletionCollaboration(shipment: Shipment): Promise
       return updateCollaboration(existing.id, mergeCompletionCollaborationPayload(existing, payload))
     }
 
-    return createCollaboration(payload)
+    const createdOrRecovered = await createCollaboration(payload)
+    return updateCollaboration(
+      createdOrRecovered.id,
+      mergeCompletionCollaborationPayload(createdOrRecovered, payload)
+    )
   } catch (error) {
     logError('ensureCompletionCollaboration', error, { shipmentId: shipment.id, kolId: shipment.kol_id })
     throw error

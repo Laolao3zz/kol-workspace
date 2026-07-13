@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Shipment } from '../types'
 import { AUTO_CREATED_SHIPMENT_NOTE } from '../utils/invitationWorkflow'
+import { createInvitation, deleteInvitation } from './invitationService'
 import {
   createShipment,
   deleteAutoCreatedPendingShipment,
@@ -65,5 +66,45 @@ describe('shipmentService linked workflow safety', () => {
     await expect(deleteAutoCreatedPendingShipment(created as Shipment)).resolves.toBe(true)
     const remaining = (await getShipmentsByKOL(created.kol_id)).find(shipment => shipment.id === created.id)
     expect(remaining).toBeUndefined()
+  })
+
+  it('does not delete a pending shipment when its source invitation is currently approved', async () => {
+    const invitation = await createInvitation({
+      kol_id: 'demo-kol-001',
+      product: 'K1',
+      invited_at: '2026-07-13',
+      email_subject: '',
+      replied: true,
+      reply_result: '同意合作',
+      quoted_fee: '',
+      decision: '继续推进',
+      decision_reason: '',
+      notes: '',
+    })
+    const created = await createShipment(input(invitation.id))
+
+    try {
+      await expect(deleteAutoCreatedPendingShipment(created)).resolves.toBe(false)
+      const remaining = (await getShipmentsByKOL(created.kol_id)).find(shipment => shipment.id === created.id)
+      expect(remaining?.id).toBe(created.id)
+    } finally {
+      await deleteShipment(created.id)
+      await deleteInvitation(invitation.id)
+    }
+  })
+
+  it('keeps a legacy pending shipment without a source invitation for manual review', async () => {
+    const created = await createShipment({
+      ...input(`inv-${Date.now()}-legacy`),
+      source_invitation_id: null,
+    })
+
+    try {
+      await expect(deleteAutoCreatedPendingShipment(created)).resolves.toBe(false)
+      const remaining = (await getShipmentsByKOL(created.kol_id)).find(shipment => shipment.id === created.id)
+      expect(remaining?.id).toBe(created.id)
+    } finally {
+      await deleteShipment(created.id)
+    }
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { inferKolProfileFromUrl, normalizeProfileUrl, toExternalProfileUrl } from './profileUrl'
+import { inferKolProfileFromUrl, normalizeProfileUrl, toExternalProfileUrl, toSafeExternalUrl } from './profileUrl'
 
 describe('profileUrl helpers', () => {
   it('infers YouTube channel handle URLs', () => {
@@ -37,5 +37,11 @@ describe('profileUrl helpers', () => {
     expect(toExternalProfileUrl('javascript:alert(1)')).toBeNull()
     expect(toExternalProfileUrl('not a url')).toBeNull()
     expect(toExternalProfileUrl('creator-channel')).toBeNull()
+  })
+
+  it('treats nullable database URL fields as missing links', () => {
+    expect(toSafeExternalUrl(null)).toBeNull()
+    expect(toSafeExternalUrl(undefined)).toBeNull()
+    expect(toExternalProfileUrl(null)).toBeNull()
   })
 })

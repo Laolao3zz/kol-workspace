@@ -9,6 +9,34 @@ ALTER TABLE public.shipments
 ALTER TABLE public.collaborations
   ADD COLUMN IF NOT EXISTS shipment_id UUID;
 
+-- 兼容旧库：RPC 会读取这些 V5/V6 字段，先补齐再创建函数。
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS progress_status TEXT DEFAULT '待制作';
+
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS progress_notes TEXT;
+
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS expected_publish_date DATE;
+
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS completed_at DATE;
+
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+
+ALTER TABLE public.shipments
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS quoted_fee TEXT;
+
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS decision TEXT DEFAULT '待评估';
+
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS decision_reason TEXT;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -33,6 +61,61 @@ BEGIN
       FOREIGN KEY (shipment_id)
       REFERENCES public.shipments(id)
       ON DELETE SET NULL;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.collaborations AS collaboration
+    CROSS JOIN LATERAL regexp_matches(
+      coalesce(collaboration.notes, ''),
+      '\[shipment:([^]]+)\]',
+      'g'
+    ) AS marker(match)
+    LEFT JOIN public.shipments AS shipment
+      ON lower(shipment.id::text) = lower(marker.match[1])
+    WHERE shipment.id IS NULL
+  ) THEN
+    RAISE EXCEPTION '发现无法解析或不存在的 shipment 标记，请先人工处理后重试';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.collaborations AS collaboration
+    CROSS JOIN LATERAL regexp_matches(
+      coalesce(collaboration.notes, ''),
+      '\[shipment:([^]]+)\]',
+      'g'
+    ) AS marker(match)
+    INNER JOIN public.shipments AS shipment
+      ON lower(shipment.id::text) = lower(marker.match[1])
+    WHERE collaboration.kol_id IS DISTINCT FROM shipment.kol_id
+       OR (
+         collaboration.shipment_id IS NOT NULL
+         AND collaboration.shipment_id IS DISTINCT FROM shipment.id
+       )
+  ) THEN
+    RAISE EXCEPTION '发现 shipment marker 与合作历史的 KOL 或既有关联不一致，请先人工处理后重试';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.collaborations AS collaboration
+    CROSS JOIN LATERAL (
+      SELECT count(*) AS marker_count
+      FROM regexp_matches(coalesce(collaboration.notes, ''), '\[shipment:[^]]+\]', 'g')
+    ) AS markers
+    WHERE markers.marker_count > 1
+  ) THEN
+    RAISE EXCEPTION '发现合作备注包含多个 shipment 标记，请先人工拆分后重试';
   END IF;
 END $$;
 
@@ -69,6 +152,19 @@ BEGIN
   END IF;
 END $$;
 
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT source_invitation_id
+    FROM public.shipments
+    WHERE source_invitation_id IS NOT NULL
+    GROUP BY source_invitation_id
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION '发现同一邀约关联了多条寄样记录，请先处理重复记录后重试';
+  END IF;
+END $$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_shipments_source_invitation_unique
   ON public.shipments (source_invitation_id)
   WHERE source_invitation_id IS NOT NULL;
@@ -83,6 +179,133 @@ SET notes = NULLIF(
   ''
 )
 WHERE notes ~ '\[shipment:[^]]+\]';
+
+CREATE OR REPLACE FUNCTION public.delete_stale_auto_shipment(
+  p_shipment_id UUID,
+  p_expected_updated_at TIMESTAMPTZ,
+  p_expected_product TEXT,
+  p_expected_source_invitation_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_shipment public.shipments%ROWTYPE;
+  v_source_invitation_id UUID;
+  v_reply_result TEXT;
+  v_decision TEXT;
+  v_has_approved_invitation BOOLEAN := false;
+BEGIN
+  SELECT shipment.source_invitation_id
+  INTO v_source_invitation_id
+  FROM public.shipments AS shipment
+  WHERE shipment.id = p_shipment_id;
+
+  IF NOT FOUND OR v_source_invitation_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  SELECT invitation.reply_result, invitation.decision
+  INTO v_reply_result, v_decision
+  FROM public.invitations AS invitation
+  WHERE invitation.id = v_source_invitation_id
+  FOR SHARE;
+
+  v_has_approved_invitation := FOUND
+    AND v_reply_result = '同意合作'
+    AND v_decision = '继续推进';
+
+  SELECT * INTO v_shipment
+  FROM public.shipments
+  WHERE id = p_shipment_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  IF v_shipment.updated_at IS DISTINCT FROM p_expected_updated_at
+     OR v_shipment.product IS DISTINCT FROM p_expected_product
+     OR v_shipment.source_invitation_id IS DISTINCT FROM p_expected_source_invitation_id
+     OR v_shipment.status IS DISTINCT FROM '待寄出'
+     OR btrim(coalesce(v_shipment.tracking_number, '')) <> ''
+     OR v_shipment.sample_date IS NOT NULL
+     OR v_shipment.delivered_at IS NOT NULL
+     OR v_shipment.archived_at IS NOT NULL
+     OR v_shipment.completed_at IS NOT NULL
+     OR v_shipment.expected_publish_date IS NOT NULL
+     OR v_shipment.progress_status IS DISTINCT FROM '待制作'
+     OR btrim(coalesce(v_shipment.progress_notes, '')) <> ''
+     OR v_shipment.updated_at IS DISTINCT FROM v_shipment.created_at
+     OR btrim(coalesce(v_shipment.notes, '')) <> '邀约同意且我方继续推进后自动生成' THEN
+    RETURN false;
+  END IF;
+
+  IF v_has_approved_invitation THEN
+    RETURN false;
+  END IF;
+
+  DELETE FROM public.shipments WHERE id = v_shipment.id;
+  RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.delete_invitation_with_stale_shipment(
+  p_invitation_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_invitation_id UUID;
+  v_deleted_shipment_count INTEGER := 0;
+BEGIN
+  SELECT invitation.id
+  INTO v_invitation_id
+  FROM public.invitations AS invitation
+  WHERE invitation.id = p_invitation_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object(
+      'deleted', false,
+      'already_missing', true,
+      'shipment_deleted', false
+    );
+  END IF;
+
+  PERFORM shipment.id
+  FROM public.shipments AS shipment
+  WHERE shipment.source_invitation_id = p_invitation_id
+  FOR UPDATE;
+
+  DELETE FROM public.shipments AS shipment
+  WHERE shipment.source_invitation_id = p_invitation_id
+    AND shipment.status = '待寄出'
+    AND btrim(coalesce(shipment.tracking_number, '')) = ''
+    AND shipment.sample_date IS NULL
+    AND shipment.delivered_at IS NULL
+    AND shipment.archived_at IS NULL
+    AND shipment.completed_at IS NULL
+    AND shipment.expected_publish_date IS NULL
+    AND shipment.progress_status = '待制作'
+    AND btrim(coalesce(shipment.progress_notes, '')) = ''
+    AND shipment.updated_at IS NOT DISTINCT FROM shipment.created_at
+    AND btrim(coalesce(shipment.notes, '')) = '邀约同意且我方继续推进后自动生成';
+  GET DIAGNOSTICS v_deleted_shipment_count = ROW_COUNT;
+
+  DELETE FROM public.invitations
+  WHERE id = p_invitation_id;
+
+  RETURN jsonb_build_object(
+    'deleted', true,
+    'already_missing', false,
+    'shipment_deleted', v_deleted_shipment_count > 0
+  );
+END;
+$$;
 
 COMMIT;
 

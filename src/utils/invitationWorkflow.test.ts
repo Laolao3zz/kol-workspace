@@ -4,6 +4,7 @@ import {
   AUTO_CREATED_SHIPMENT_NOTE,
   findStaleAutoCreatedPendingShipments,
   isInvitationApprovedForShipment,
+  shouldReconcileApprovedInvitation,
   shouldCreateShipmentForInvitation,
 } from './invitationWorkflow'
 
@@ -69,22 +70,31 @@ describe('invitation workflow helpers', () => {
     expect(shouldCreateShipmentForInvitation(previous, next)).toBe(false)
   })
 
+  it('requests a reconciliation when an approved invitation has no shipment', () => {
+    const approved = invitation()
+
+    expect(shouldReconcileApprovedInvitation(approved, [])).toBe(true)
+    expect(shouldReconcileApprovedInvitation(approved, [linkedShipment(approved.id)])).toBe(false)
+    expect(shouldReconcileApprovedInvitation(approved, [shipment({ source_invitation_id: null })])).toBe(true)
+    expect(shouldReconcileApprovedInvitation(approved, [linkedShipment('another_invitation')])).toBe(true)
+  })
+
   it('does not create a shipment when the next invitation is not approved', () => {
     const next = invitation({ decision: '我方拒绝' })
 
     expect(shouldCreateShipmentForInvitation(invitation(), next)).toBe(false)
   })
 
-  it('finds stale auto-created pending shipments when approval is withdrawn', () => {
+  it('leaves legacy auto-created shipments without a source relation for manual review', () => {
     const stale = findStaleAutoCreatedPendingShipments(
       [shipment()],
       [invitation({ decision: '我方拒绝' })]
     )
 
-    expect(stale.map(item => item.id)).toEqual(['shipment_1'])
+    expect(stale).toEqual([])
   })
 
-  it('keeps auto-created pending shipments while an approved invitation still exists for the product', () => {
+  it('does not infer a legacy shipment relation from an approved product match', () => {
     const stale = findStaleAutoCreatedPendingShipments(
       [shipment()],
       [
@@ -141,6 +151,18 @@ describe('invitation workflow helpers', () => {
   it('does not remove an auto-created shipment after a sample date is scheduled', () => {
     const stale = findStaleAutoCreatedPendingShipments(
       [linkedShipment('source_inv', { sample_date: '2026-07-20' })],
+      [invitation({ id: 'source_inv', decision: '我方拒绝' })]
+    )
+
+    expect(stale).toEqual([])
+  })
+
+  it('does not remove an auto-created shipment after any shipment edit', () => {
+    const stale = findStaleAutoCreatedPendingShipments(
+      [linkedShipment('source_inv', {
+        shipping_details: 'Updated address',
+        updated_at: '2026-07-02',
+      })],
       [invitation({ id: 'source_inv', decision: '我方拒绝' })]
     )
 

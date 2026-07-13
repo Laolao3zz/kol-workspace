@@ -25,19 +25,21 @@ Automatic shipment creation is event-based:
 - New approved invitation: create or reuse the shipment for that invitation.
 - Existing invitation changes from not approved to approved: create or reuse it.
 - Existing approved invitation only changes notes, fee, subject, or date: do not create a shipment.
-- Approval is withdrawn: remove only an untouched auto-created pending shipment linked to that invitation; retain shipments already in transit or manually created.
+- Approval is withdrawn: remove only an untouched auto-created pending shipment linked to that invitation; retain edited, in-transit, legacy, and manually created shipments.
 
-The service sends `source_invitation_id` on automatic creation, and database uniqueness provides the final duplicate guard. Legacy records continue to use the existing conservative product fallback during stale-pending cleanup.
+The service sends `source_invitation_id` on automatic creation, and database uniqueness provides the final duplicate guard. Legacy records with no source ID are never guessed from product text and are left for manual review instead of automatic deletion.
+
+Invitation deletion and untouched-shipment cleanup run in one database transaction. Both cleanup functions lock the invitation before the shipment, preventing the opposite lock order that could deadlock. Follow-up refresh failures are reported as partial success so a completed invitation write is never presented as a failed save.
 
 ## Collaboration Workflow
 
-Completion and archive look up collaborations by `shipment_id`, with legacy marker parsing retained only for migration compatibility. Same-KOL/same-product history is never treated as the same shipment merely because it is the only product match.
+Completion and archive look up collaborations by `shipment_id`, with legacy marker parsing retained only for migration compatibility. Same-KOL/same-product history is never treated as the same shipment merely because it is the only product match. Both completion and formal archive recover a concurrent unique conflict by reading and updating the collaboration that won the insert race.
 
 Internal markers are stripped before notes reach the archive form, KOL drawer, or collaboration history. New notes never receive a marker. The dedicated relation field carries identity.
 
 ## Homepage Links
 
-A shared helper converts a host-like value such as `youtube.com/@creator` to `https://youtube.com/@creator`, preserves existing HTTP(S) links, and rejects invalid or non-HTTP(S) schemes. The drawer only renders a clickable homepage action when this helper returns a safe URL.
+A shared helper converts a host-like value such as `youtube.com/@creator` to `https://youtube.com/@creator`, preserves existing HTTP(S) links, and rejects invalid or non-HTTP(S) schemes. Nullable homepage and work URL fields are treated as missing, and the UI renders links only when this helper returns a safe URL.
 
 ## Compatibility And Rollout
 
@@ -47,7 +49,6 @@ No live database writes are performed by this implementation session. The user a
 
 ## Verification
 
-- Unit tests cover approval transitions, metadata-only edits, linked stale shipment cleanup, shipment-specific collaboration matching, marker stripping, and safe homepage URLs.
+- Unit tests cover approval transitions, metadata-only edits, linked stale shipment cleanup, legacy manual-review behavior, shipment-specific collaboration matching, marker stripping, migration contracts, and safe nullable external URLs.
 - Full Vitest suite and production build must pass.
 - A final diff review must confirm that no RLS or permission policy changed.
-
