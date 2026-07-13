@@ -277,14 +277,16 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     previousInvitation: Invitation | null
   ) => {
     const shouldCreate = shouldCreateShipmentForInvitation(previousInvitation, savedInvitation)
+    const shouldEnsure = isInvitationApprovedForShipment(savedInvitation)
     console.log('🔄 syncInvitationWorkflow 开始', {
       invitation: savedInvitation,
       reply_result: savedInvitation.reply_result,
       decision: savedInvitation.decision,
       shouldCreate,
+      shouldEnsure,
     })
 
-    const createdShipment = shouldCreate
+    const createdShipment = shouldEnsure
       ? await ensureShipmentForInvitation(savedInvitation)
       : false
     console.log('📦 寄样记录创建结果:', createdShipment ? '已创建' : '未创建')

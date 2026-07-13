@@ -24,7 +24,7 @@ Automatic shipment creation is event-based:
 
 - New approved invitation: create or reuse the shipment for that invitation.
 - Existing invitation changes from not approved to approved: create or reuse it.
-- Existing approved invitation only changes notes, fee, subject, or date: do not create a shipment.
+- Existing approved invitation only changes notes, fee, subject, or date: reuse its exact linked shipment; if a concurrent or earlier failure left the approved invitation without one, repair the missing relation idempotently.
 - Approval is withdrawn: remove only an untouched auto-created pending shipment linked to that invitation; retain edited, in-transit, legacy, and manually created shipments.
 
 The service sends `source_invitation_id` on automatic creation, and database uniqueness provides the final duplicate guard. Legacy records with no source ID are never guessed from product text and are left for manual review instead of automatic deletion.
