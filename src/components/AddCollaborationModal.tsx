@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Collaboration } from '../types'
 import type { ContentShape } from '../utils/contentShape'
 import { getContentShapeMetricLabels } from '../utils/contentShape'
+import { stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
 
 interface Props {
   kolId: string
@@ -37,7 +38,7 @@ export default function AddCollaborationModal({ kolId, collaboration, productOpt
     comments: collaboration?.comments || 0,
     likes: collaboration?.likes || 0,
     fee: collaboration?.fee || '',
-    notes: collaboration?.notes || '',
+    notes: stripShipmentHistoryMarkers(collaboration?.notes),
   })
 
   useEffect(() => {
@@ -49,7 +50,12 @@ export default function AddCollaborationModal({ kolId, collaboration, productOpt
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.product.trim() || !form.publish_date.trim()) return
-    onSubmit({ ...form, product: form.product.trim(), publish_date: form.publish_date.trim() })
+    onSubmit({
+      ...form,
+      product: form.product.trim(),
+      publish_date: form.publish_date.trim(),
+      notes: stripShipmentHistoryMarkers(form.notes),
+    })
   }
 
   return (

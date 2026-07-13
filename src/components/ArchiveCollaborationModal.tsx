@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { Collaboration, Shipment } from '../types'
 import type { ContentShape } from '../utils/contentShape'
 import { getContentShapeMetricLabels } from '../utils/contentShape'
+import { stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
 
 export interface ArchiveFormData {
   publish_date: string | null
@@ -39,7 +40,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, contentS
     comments: existing?.comments ?? null,
     likes: existing?.likes ?? null,
     fee: existing?.fee || '',
-    notes: existing?.notes || shipment.progress_notes || '',
+    notes: stripShipmentHistoryMarkers(existing?.notes || shipment.progress_notes),
   })
 
   const handleSubmit = () => {
@@ -50,7 +51,7 @@ export default function ArchiveCollaborationModal({ shipment, existing, contentS
       comments: form.comments,
       likes: form.likes,
       fee: form.fee.trim(),
-      notes: form.notes.trim(),
+      notes: stripShipmentHistoryMarkers(form.notes),
     })
   }
 

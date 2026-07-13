@@ -21,6 +21,7 @@ import {
   shouldCreateShipmentForInvitation,
 } from '../utils/invitationWorkflow'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
+import { stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
 import { buildProductOpportunitySummary, type OpportunityStatus } from '../utils/workspaceViews'
 import CorrectProductModal from './CorrectProductModal'
 import { applyProductCorrection } from '../services/productCorrectionService'
@@ -834,7 +835,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                           {col.fee ? <span className="rounded-full bg-[#F5F5F7] px-2.5 py-1 text-xs font-bold">{col.fee}</span> : null}
                         </div>
                         {col.work_url && <a href={col.work_url} target="_blank" rel="noreferrer" className="block truncate text-[11px] font-semibold text-[#0066FF] hover:underline">{col.work_url}</a>}
-                        {col.notes && <p className="mt-2 border-t border-black/[0.06] pt-2 text-[11px] font-medium text-[#86868B]">{col.notes}</p>}
+                        {stripShipmentHistoryMarkers(col.notes) && <p className="mt-2 border-t border-black/[0.06] pt-2 text-[11px] font-medium text-[#86868B]">{stripShipmentHistoryMarkers(col.notes)}</p>}
                       </div>
                     ))}
                   </div>

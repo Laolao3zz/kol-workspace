@@ -687,6 +687,7 @@ export const demoDatabase = {
     const record: Collaboration = {
       id: nextId('collaboration'),
       kol_id: collaboration.kol_id,
+      shipment_id: collaboration.shipment_id?.trim() || null,
       product: collaboration.product?.trim() || '',
       publish_date: collaboration.publish_date || null,
       work_url: collaboration.work_url?.trim() || '',

@@ -34,6 +34,7 @@ export interface Invitation {
 export interface Collaboration {
   id: string
   kol_id: string
+  shipment_id?: string | null
   product: string
   publish_date: string | null
   work_url: string

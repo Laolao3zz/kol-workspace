@@ -5,6 +5,7 @@ import type { Collaboration, KOL } from '../types'
 import { hasPublishReadyCollaborationSignal } from '../utils/kolStatus'
 import { sameProduct } from '../utils/productMatching'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
+import { stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
 
 interface Props {
   kols: KOL[]
@@ -52,7 +53,7 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, pr
       row.kol.platform,
       row.kol.country,
       row.collaboration.product,
-      row.collaboration.notes,
+      stripShipmentHistoryMarkers(row.collaboration.notes),
       row.collaboration.fee,
     ].some(value => String(value || '').toLowerCase().includes(q))
     const matchesProduct = !product || sameProduct(row.collaboration.product, product)
@@ -142,7 +143,7 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, pr
                   <td className="px-4 py-3 text-right text-sm font-bold tabular-nums text-[#6E6E73]" title={metricLabels.likes}>{formatNumber(row.collaboration.likes)}</td>
                   <td className="px-4 py-3 text-right text-sm font-bold tabular-nums text-[#6E6E73]">{formatNumber(row.collaboration.comments)}</td>
                   <td className="max-w-[260px] px-4 py-3 text-xs font-medium text-[#6E6E73]">
-                    <span className="line-clamp-2">{row.collaboration.notes || '-'}</span>
+                    <span className="line-clamp-2">{stripShipmentHistoryMarkers(row.collaboration.notes) || '-'}</span>
                   </td>
                 </tr>
                 )

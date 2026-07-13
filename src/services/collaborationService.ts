@@ -5,6 +5,7 @@ import {
   buildCompletionCollaborationPayload,
   findCollaborationForShipment,
   mergeCompletionCollaborationPayload,
+  stripShipmentHistoryMarkers,
 } from '../utils/collaborationArchive'
 import { retryOperation } from '../utils/retry'
 import { logError } from '../utils/logger'
@@ -28,6 +29,7 @@ function normalizeCollaborationPayload(
   const payload: Partial<Collaboration> = {}
 
   if ('kol_id' in collab) payload.kol_id = collab.kol_id
+  if ('shipment_id' in collab) payload.shipment_id = collab.shipment_id?.trim() || null
   if ('product' in collab) payload.product = collab.product?.trim() || ''
   if ('publish_date' in collab) payload.publish_date = nullableDate(collab.publish_date)
   if ('work_url' in collab) payload.work_url = collab.work_url?.trim() || ''
@@ -35,7 +37,7 @@ function normalizeCollaborationPayload(
   if ('comments' in collab) payload.comments = nullableNumber(collab.comments)
   if ('likes' in collab) payload.likes = nullableNumber(collab.likes)
   if ('fee' in collab) payload.fee = collab.fee?.trim() || ''
-  if ('notes' in collab) payload.notes = collab.notes?.trim() || ''
+  if ('notes' in collab) payload.notes = stripShipmentHistoryMarkers(collab.notes)
 
   return payload
 }

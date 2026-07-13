@@ -5,7 +5,7 @@ import { Collaboration, Invitation, KOL, PROGRESS_STATUSES, Shipment } from '../
 import { createCollaboration, ensureCompletionCollaboration, getCollaborationsByKOL, updateCollaboration } from '../services/collaborationService'
 import { updateShipment } from '../services/shipmentService'
 import ArchiveCollaborationModal, { ArchiveFormData } from './ArchiveCollaborationModal'
-import { findCollaborationForShipment, withShipmentHistoryMarker } from '../utils/collaborationArchive'
+import { findCollaborationForShipment, stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
 import { getKolContentShape } from '../utils/contentShape'
 import { sameProduct } from '../utils/productMatching'
 
@@ -208,8 +208,9 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
       setBoardError('')
       const collaborationPayload = {
         ...data,
+        shipment_id: archivingShipment.id,
         publish_date: data.publish_date || archivingShipment.completed_at || todayISO(),
-        notes: withShipmentHistoryMarker(data.notes || '系统归档', archivingShipment.id),
+        notes: stripShipmentHistoryMarkers(data.notes || '系统归档'),
       }
       if (archiveExistingCollaboration) {
         await updateCollaboration(archiveExistingCollaboration.id, collaborationPayload)
