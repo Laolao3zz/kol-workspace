@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS invitations (
 CREATE TABLE IF NOT EXISTS collaborations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   kol_id UUID REFERENCES kols(id) ON DELETE CASCADE,
+  shipment_id UUID,
   product TEXT,
   publish_date DATE,
   work_url TEXT,
@@ -71,6 +72,7 @@ CREATE TABLE IF NOT EXISTS emails (
 CREATE TABLE IF NOT EXISTS shipments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   kol_id UUID REFERENCES kols(id) ON DELETE CASCADE,
+  source_invitation_id UUID REFERENCES invitations(id) ON DELETE SET NULL,
   product TEXT NOT NULL,
   sample_date DATE,
   tracking_number TEXT,
@@ -86,6 +88,19 @@ CREATE TABLE IF NOT EXISTS shipments (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'collaborations_shipment_id_fkey'
+      AND conrelid = 'public.collaborations'::regclass
+  ) THEN
+    ALTER TABLE public.collaborations
+      ADD CONSTRAINT collaborations_shipment_id_fkey
+      FOREIGN KEY (shipment_id) REFERENCES public.shipments(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- RLS 策略：公开访问，允许所有读写操作
 ALTER TABLE kols ENABLE ROW LEVEL SECURITY;
@@ -110,6 +125,10 @@ CREATE INDEX IF NOT EXISTS idx_emails_kol_id ON emails (kol_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_kol_id ON shipments (kol_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments (status);
 CREATE INDEX IF NOT EXISTS idx_shipments_created_at ON shipments (created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shipments_source_invitation_unique
+  ON shipments (source_invitation_id) WHERE source_invitation_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_collaborations_shipment_unique
+  ON collaborations (shipment_id) WHERE shipment_id IS NOT NULL;
 
 -- ============================================================
 -- V3 升级：删除冗余字段，统一状态体系
