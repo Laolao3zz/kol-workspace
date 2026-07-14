@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AUTO_CREATED_SHIPMENT_NOTE } from '../utils/invitationWorkflow'
-import { createInvitation, deleteInvitation, getInvitationsByKOL } from './invitationService'
+import { createInvitation, deleteInvitation, getInvitations, getInvitationsByKOL } from './invitationService'
 import { createShipment, deleteShipment, getShipmentsByKOL, updateShipment } from './shipmentService'
 
 const createApprovedInvitation = () => createInvitation({
@@ -34,6 +34,13 @@ const createLinkedShipment = (sourceInvitationId: string) => createShipment({
 })
 
 describe('invitationService workflow deletion', () => {
+  it('loads invitations across all KOLs', async () => {
+    const invitations = await getInvitations()
+
+    expect(invitations.length).toBeGreaterThan(0)
+    expect(new Set(invitations.map(item => item.kol_id)).size).toBeGreaterThan(1)
+  })
+
   it('deletes an untouched auto shipment together with its source invitation', async () => {
     const invitation = await createApprovedInvitation()
     const shipment = await createLinkedShipment(invitation.id)

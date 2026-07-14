@@ -6,12 +6,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { KOL, Invitation, Shipment, Collaboration, Product } from '../types'
 import { getKOLs, updateKOL } from '../services/kolService'
-import { getInvitationsByKOL } from '../services/invitationService'
-import { getShipments } from '../services/shipmentService'
-import { getCollaborations } from '../services/collaborationService'
+import { getInvitations, getInvitationsByKOL } from '../services/invitationService'
+import { getShipments, getShipmentsByKOL } from '../services/shipmentService'
+import { getCollaborations, getCollaborationsByKOL } from '../services/collaborationService'
 import { getProducts } from '../services/productService'
 import { applyKolSnapshot } from '../utils/kolStatus'
 import { logError } from '../utils/logger'
+import { groupRecordsByKol, replaceRecordsForKol } from '../utils/kolRecords'
 
 interface UseKolDataReturn {
   kols: KOL[]
@@ -67,58 +68,37 @@ export function useKolData(): UseKolDataReturn {
     return snapshot
   }, [])
 
-  const groupShipmentsByKol = useCallback((shipmentList: Shipment[]) => {
-    return shipmentList.reduce<Record<string, Shipment[]>>((map, shipment) => {
-      map[shipment.kol_id] = [...(map[shipment.kol_id] || []), shipment]
-      return map
-    }, {})
-  }, [])
-
-  const groupCollaborationsByKol = useCallback((collaborationList: Collaboration[]) => {
-    return collaborationList.reduce<Record<string, Collaboration[]>>((map, collaboration) => {
-      map[collaboration.kol_id] = [...(map[collaboration.kol_id] || []), collaboration]
-      return map
-    }, {})
-  }, [])
-
   const normalizeKols = useCallback((
     kolList: KOL[],
     shipmentList: Shipment[],
     invMap: Record<string, Invitation[]>,
     colMap: Record<string, Collaboration[]>
   ) => {
-    const shipmentMap = groupShipmentsByKol(shipmentList)
+    const shipmentMap = groupRecordsByKol(shipmentList)
     return kolList.map(kol => applyKolSnapshot(
       kol,
       invMap[kol.id] || [],
       shipmentMap[kol.id] || [],
       colMap[kol.id] || []
     ))
-  }, [groupShipmentsByKol])
+  }, [])
 
   const refreshAll = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const [kolData, productData, shipmentData, collaborationData] = await Promise.all([
+      const [kolData, productData, invitationData, shipmentData, collaborationData] = await Promise.all([
         getKOLs(),
         getProducts(),
+        getInvitations(),
         getShipments(),
         getCollaborations(),
       ])
 
-      const colMap = groupCollaborationsByKol(collaborationData)
-      const invMap: Record<string, Invitation[]> = {}
-
-      await Promise.all(kolData.map(async kol => {
-        try {
-          invMap[kol.id] = await getInvitationsByKOL(kol.id)
-        } catch (err) {
-          logError('refreshAll:getInvitations', err, { kolId: kol.id })
-          invMap[kol.id] = []
-        }
-      }))
+      const kolIds = kolData.map(kol => kol.id)
+      const colMap = groupRecordsByKol(collaborationData, kolIds)
+      const invMap = groupRecordsByKol(invitationData, kolIds)
 
       commitData({
         kols: normalizeKols(kolData, shipmentData, invMap, colMap),
@@ -134,31 +114,32 @@ export function useKolData(): UseKolDataReturn {
     } finally {
       setLoading(false)
     }
-  }, [commitData, groupCollaborationsByKol, normalizeKols])
+  }, [commitData, normalizeKols])
 
   const refreshKol = useCallback(async (kolId: string) => {
     try {
       const [invData, shipmentData, colData] = await Promise.all([
         getInvitationsByKOL(kolId),
-        getShipments(),
-        getCollaborations(),
+        getShipmentsByKOL(kolId),
+        getCollaborationsByKOL(kolId),
       ])
 
       const current = stateRef.current
       const nextInvitations = { ...current.invitations, [kolId]: invData }
-      const colMap = groupCollaborationsByKol(colData)
+      const nextShipments = replaceRecordsForKol(current.shipments, kolId, shipmentData)
+      const nextCollaborations = { ...current.collaborationsByKol, [kolId]: colData }
 
       commitData({
         invitations: nextInvitations,
-        shipments: shipmentData,
-        collaborationsByKol: colMap,
-        kols: normalizeKols(current.kols, shipmentData, nextInvitations, colMap),
+        shipments: nextShipments,
+        collaborationsByKol: nextCollaborations,
+        kols: normalizeKols(current.kols, nextShipments, nextInvitations, nextCollaborations),
       })
     } catch (err) {
       logError('refreshKol', err, { kolId })
       throw err
     }
-  }, [commitData, groupCollaborationsByKol, normalizeKols])
+  }, [commitData, normalizeKols])
 
   const refreshProducts = useCallback(async () => {
     try {
@@ -202,7 +183,7 @@ export function useKolData(): UseKolDataReturn {
     try {
       const data = await getCollaborations()
       const current = stateRef.current
-      const colMap = groupCollaborationsByKol(data)
+      const colMap = groupRecordsByKol(data, current.kols.map(kol => kol.id))
       commitData({
         collaborationsByKol: colMap,
         kols: normalizeKols(current.kols, current.shipments, current.invitations, colMap),
@@ -211,7 +192,7 @@ export function useKolData(): UseKolDataReturn {
       logError('refreshCollaborations', err)
       throw err
     }
-  }, [commitData, groupCollaborationsByKol, normalizeKols])
+  }, [commitData, normalizeKols])
 
   const updateKolOptimistic = useCallback(async (id: string, updates: Partial<KOL>) => {
     // 保存原始数据用于回滚

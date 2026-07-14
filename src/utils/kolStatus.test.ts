@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Collaboration, Invitation, KOL, Shipment } from '../types'
-import { deriveKolStatus } from './kolStatus'
+import { deriveKolStatus, getLatestInvitation } from './kolStatus'
 
 const baseKol: KOL = {
   id: 'kol_1',
@@ -70,6 +70,14 @@ const shipment = (overrides: Partial<Shipment> = {}): Shipment => ({
 })
 
 describe('deriveKolStatus', () => {
+  it('uses creation time to select the latest invitation sent on the same day', () => {
+    const earlier = invitation({ id: 'inv-earlier', created_at: '2026-07-01T08:00:00Z' })
+    const later = invitation({ id: 'inv-later', created_at: '2026-07-01T09:00:00Z' })
+
+    expect(getLatestInvitation([later, earlier])).toBe(later)
+    expect(getLatestInvitation([earlier, later])).toBe(later)
+  })
+
   it('keeps company-declined invitations as invitation-level outcomes', () => {
     const status = deriveKolStatus(baseKol, [
       invitation({ decision: '我方拒绝', decision_reason: '本产品不匹配' }),

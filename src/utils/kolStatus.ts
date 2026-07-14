@@ -1,7 +1,9 @@
 import type { Collaboration, Invitation, KOL, Shipment } from '../types'
 
 const shipmentTime = (shipment: Shipment) => shipment.sample_date || shipment.delivered_at || shipment.created_at || ''
-const invitationTime = (invitation: Invitation) => invitation.invited_at || ''
+export const invitationTimelineKey = (invitation: Invitation) =>
+  `${invitation.invited_at || ''}|${invitation.created_at || ''}`
+const invitationDay = (invitation: Invitation) => invitation.invited_at || ''
 const collaborationTime = (collaboration: Collaboration) => collaboration.publish_date || ''
 const positiveNumber = (value: unknown) => Number(value || 0) > 0
 
@@ -12,7 +14,9 @@ export function getLatestShipment(shipments: Shipment[] = []): Shipment | null {
 
 export function getLatestInvitation(invitations: Invitation[] = []): Invitation | null {
   if (invitations.length === 0) return null
-  return invitations.reduce((latest, invitation) => invitationTime(invitation) > invitationTime(latest) ? invitation : latest)
+  return invitations.reduce((latest, invitation) =>
+    invitationTimelineKey(invitation) > invitationTimelineKey(latest) ? invitation : latest
+  )
 }
 
 export function hasRealCollaborationSignal(collaboration: Collaboration): boolean {
@@ -72,7 +76,7 @@ export function deriveKolStatus(
   const latestInvitation = getLatestInvitation(invitations)
   const invitationIsCurrent = latestInvitation && (
     !latestCollaboration ||
-    invitationTime(latestInvitation) >= collaborationTime(latestCollaboration)
+    invitationDay(latestInvitation) >= collaborationTime(latestCollaboration)
   )
 
   if (latestInvitation && invitationIsCurrent) {

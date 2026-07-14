@@ -1,5 +1,5 @@
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
-import { countCompletedCollaborations, hasRealCollaborationSignal } from './kolStatus'
+import { countCompletedCollaborations, hasRealCollaborationSignal, invitationTimelineKey } from './kolStatus'
 import { getProductName, hasProductRecordForKol, sameProduct, shouldShowProductForKol } from './productMatching'
 
 export type OpportunityStatus = '未触达' | '待回复' | '未回复' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
@@ -173,9 +173,8 @@ export function buildDashboardMetrics(sources: DashboardMetricSources): Dashboar
 function latestInvitationForProduct(invitations: Invitation[], product: string): Invitation | null {
   const matches = invitations.filter(invitation => sameProduct(invitation.product, product))
   if (matches.length === 0) return null
-  const timelineKey = (invitation: Invitation) => `${invitation.invited_at || ''}|${invitation.created_at || ''}`
   return matches.reduce((latest, invitation) =>
-    timelineKey(invitation) > timelineKey(latest) ? invitation : latest
+    invitationTimelineKey(invitation) > invitationTimelineKey(latest) ? invitation : latest
   )
 }
 

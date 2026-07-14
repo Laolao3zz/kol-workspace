@@ -29,6 +29,35 @@ function normalizeInvitationPayload(invitation: Partial<Invitation>): Partial<In
   return payload
 }
 
+export async function getInvitations(): Promise<Invitation[]> {
+  try {
+    if (isDemoMode()) {
+      return demoDatabase.getInvitations()
+    }
+
+    const result = await retryOperation(
+      async () => collectAllPages(async (from, to) => {
+        const { data, error } = await getSupabase()
+          .from('invitations')
+          .select('*')
+          .order('invited_at', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+
+        if (error) throw error
+        return data || []
+      }),
+      { maxRetries: 2 }
+    )
+
+    return result as Invitation[]
+  } catch (error) {
+    logError('getInvitations', error)
+    throw error
+  }
+}
+
 export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> {
   try {
     if (isDemoMode()) {
@@ -42,6 +71,7 @@ export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> 
           .select('*')
           .eq('kol_id', kolId)
           .order('invited_at', { ascending: false })
+          .order('created_at', { ascending: false })
           .order('id', { ascending: true })
           .range(from, to)
 
