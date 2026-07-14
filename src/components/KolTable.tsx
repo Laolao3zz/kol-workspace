@@ -304,7 +304,7 @@ export default function KolTable({
 
   return (
     <>
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-black/[0.06] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         <div className="shrink-0 border-b border-black/[0.06] px-5 py-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-w-[220px] flex-1 items-center gap-3">
@@ -429,7 +429,7 @@ export default function KolTable({
                 <tr>
                   <td colSpan={13} className="px-4 py-16 text-center">
                     <div className="mx-auto flex max-w-sm flex-col items-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#F5F5F7] text-[#86868B]">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-[10px] bg-[#F5F5F7] text-[#86868B]">
                         <Users className="h-5 w-5" />
                       </div>
                       <p className="mt-3 text-sm font-bold text-[#1D1D1F]">{kols.length === 0 ? '暂无 KOL 数据' : '没有匹配的 KOL'}</p>

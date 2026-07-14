@@ -671,8 +671,8 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative ml-auto flex w-[92%] max-w-[1320px] flex-col overflow-hidden bg-[#F5F5F7] shadow-2xl">
-        <div className="shrink-0 border-b border-black/[0.06] bg-white px-8 py-5">
+      <div className="relative ml-auto flex w-[92%] max-w-[1420px] flex-col overflow-hidden bg-[#F4F5F7] shadow-2xl">
+        <div className="shrink-0 border-b border-black/[0.07] bg-white px-6 py-4">
           <div className="flex items-center gap-5">
             <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] text-sm font-extrabold ${getAvatarTone(kol.name)}`}>
             {kol.name.slice(0, 2).toUpperCase()}
@@ -716,9 +716,9 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <div className="space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 xl:p-5">
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <div className="xl:sticky xl:top-0">
               <SectionCard icon={UserRound} title="基础身份">
                 {kol.blacklisted_at && (
                   <div className="mb-4 rounded-[12px] border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-800">
@@ -726,7 +726,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                     <div className="mt-1 leading-5">{kol.blacklist_reason || '未填写'} · {kol.blacklisted_at.slice(0, 10)}</div>
                   </div>
                 )}
-                <div className="mb-4 grid grid-cols-2 gap-2 text-xs font-semibold text-[#6E6E73] md:grid-cols-4">
+                <div className="mb-4 grid grid-cols-2 gap-2 text-xs font-semibold text-[#6E6E73]">
                   <DetailPill label="内容形态" value={contentShape} />
                   <DetailPill label="当前流程" value={kol.status || '-'} />
                   <DetailPill label="合作次数" value={`${completedCollaborationCount} 次`} />
@@ -751,7 +751,9 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                   <InlineEdit label="KOL 备注" value={kol.notes || ''} onSave={v => save('notes', v)} type="textarea" />
                 </FieldGrid>
               </SectionCard>
+            </div>
 
+            <div className="space-y-4">
               <SectionCard icon={Package} title="当前合作链路"
                 action={<HeaderButton onClick={() => { setEditingShipment(null); setShowShipmentModal(true) }} icon={Plus}>新增寄样</HeaderButton>}
               >
@@ -768,7 +770,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                     )}
                   </div>
                 ) : (
-                  <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
+                  <div className="space-y-3">
                     {kolShipments.map(shipment => {
                       const contentLabel = shipmentProgressLabel(shipment)
                       const steps = [
@@ -830,9 +832,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                   </div>
                 )}
               </SectionCard>
-            </div>
 
-            <div className="space-y-5">
               <SectionCard icon={Package} title="产品机会"
                 action={(
                   <div className="flex items-center gap-2">
@@ -847,7 +847,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                     <p className="mt-1 text-xs font-medium text-[#86868B]">新增产品邀约、寄样或合作记录后会自动汇总。</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
                     {productOpportunities.map(item => (
                       <div key={item.product} className="rounded-[12px] border border-black/[0.06] bg-white p-3">
                         <div className="flex items-start justify-between gap-3">
@@ -871,7 +871,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                 ) : invitations.length === 0 ? (
                   <p className="py-4 text-center text-xs font-semibold text-[#86868B]">暂无邀约</p>
                 ) : (
-                  <div className="max-h-[320px] space-y-2 overflow-y-auto">
+                  <div className="space-y-2">
                     {invitations.map(inv => (
                       <div key={inv.id} className="group flex items-center gap-3 rounded-[12px] border border-black/[0.06] bg-white p-3 transition hover:bg-[#F5F5F7]">
                         <div className="h-2 w-2 shrink-0 rounded-full bg-[#0066FF]" />
@@ -903,7 +903,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                 ) : completedCollaborations.length === 0 ? (
                   <p className="py-4 text-center text-xs font-semibold text-[#86868B]">暂无已完成合作记录</p>
                 ) : (
-                  <div className="max-h-[320px] space-y-2 overflow-y-auto">
+                  <div className="space-y-2">
                     {publishReadyCollaborations.length === 0 && completedCollaborations.some(col => col.notes?.includes('系统归档')) && (
                       <div className="rounded-[12px] border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700">
                         已有系统归档记录，但缺少发布日期、作品链接或{metricLabels.viewsInput}。请在进度看板完成归档后补填作品信息，补齐后会出现在合作历史列表。
@@ -1008,15 +1008,15 @@ function SectionCard({ icon: Icon, title, action, children }: {
   icon: LucideIcon; title: string; action?: React.ReactNode; children: React.ReactNode
 }) {
   return (
-    <div className="overflow-hidden rounded-[16px] border border-black/[0.06] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-      <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3">
+    <div className="overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <div className="flex items-center justify-between border-b border-black/[0.06] px-4 py-3">
         <h3 className="flex items-center gap-2 text-sm font-extrabold text-[#1D1D1F]">
-          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#F5F5F7] text-[#1D1D1F]"><Icon className="h-4 w-4" /></span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-[#F4F5F7] text-[#1D1D1F]"><Icon className="h-4 w-4" /></span>
           {title}
         </h3>
         {action}
       </div>
-      <div className="p-5">{children}</div>
+      <div className="p-4">{children}</div>
     </div>
   )
 }

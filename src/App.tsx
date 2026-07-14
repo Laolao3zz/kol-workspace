@@ -150,7 +150,7 @@ function App() {
   return (
     <ErrorBoundary>
       <div
-        className="flex h-screen overflow-hidden bg-[#F5F5F7] text-[#1D1D1F]"
+        className="flex h-screen overflow-hidden bg-[#F4F5F7] text-[#1D1D1F]"
         style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}
       >
         {error && (
@@ -182,7 +182,7 @@ function App() {
             )}
 
             {viewMode === 'table' && (
-              <div className="flex-1 overflow-auto p-5">
+              <div className="flex-1 overflow-auto p-5 xl:px-6">
                 <KolTable
                   kols={kols}
                   invitations={invitations}
@@ -201,7 +201,7 @@ function App() {
             )}
 
             {viewMode === 'progress' && (
-              <div className="flex-1 overflow-hidden p-5">
+              <div className="flex-1 overflow-hidden p-5 xl:px-6">
                 <ShipmentBoard
                   kols={kols}
                   invitations={invitations}
@@ -269,7 +269,7 @@ function App() {
 
 function Sidebar({ active, onNav, kolsCount, progressCount }: { active: ViewMode; onNav: (mode: ViewMode) => void; kolsCount: number; progressCount: number }) {
   return (
-    <aside className="flex min-h-screen w-[224px] shrink-0 flex-col border-r border-black/[0.06] bg-white">
+    <aside className="flex min-h-screen w-[216px] shrink-0 flex-col border-r border-black/[0.07] bg-white">
       <div className="px-5 pb-5 pt-6">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#0066FF] text-white shadow-[0_4px_12px_rgba(0,102,255,0.35)]">
@@ -282,7 +282,7 @@ function Sidebar({ active, onNav, kolsCount, progressCount }: { active: ViewMode
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3">
+      <nav className="flex-1 space-y-1 px-3">
         <div className="mb-2 px-3 text-[10px] font-bold text-[#AEAEB2]">导航</div>
         {NAV_ITEMS.map(item => {
           const Icon = item.icon
@@ -291,12 +291,12 @@ function Sidebar({ active, onNav, kolsCount, progressCount }: { active: ViewMode
             <button
               key={item.id}
               onClick={() => onNav(item.id)}
-              className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-[13px] font-semibold transition-colors ${selected ? 'bg-[#1D1D1F] text-white' : 'text-[#6E6E73] hover:bg-[#F5F5F7]'}`}
+              className={`flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-semibold transition-colors ${selected ? 'bg-[#EAF2FF] text-[#005FE8]' : 'text-[#626268] hover:bg-[#F4F5F7] hover:text-[#1D1D1F]'}`}
             >
               <Icon className="h-4 w-4 shrink-0" />
               <span className="flex-1 text-left">{item.label}</span>
               {(item.id === 'table' || item.id === 'progress') && (
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${selected ? 'bg-white/20 text-white' : 'bg-[#F5F5F7] text-[#6E6E73]'}`}>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${selected ? 'bg-white text-[#005FE8]' : 'bg-[#F4F5F7] text-[#6E6E73]'}`}>
                   {item.id === 'table' ? kolsCount : progressCount}
                 </span>
               )}
@@ -306,7 +306,7 @@ function Sidebar({ active, onNav, kolsCount, progressCount }: { active: ViewMode
       </nav>
 
       <div className="border-t border-black/[0.06] px-3 pb-5 pt-4">
-        <div className="flex cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5 transition-colors hover:bg-[#F5F5F7]">
+        <div className="flex cursor-pointer items-center gap-3 rounded-[8px] px-3 py-2.5 transition-colors hover:bg-[#F4F5F7]">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5856D6] text-xs font-bold text-white">运</div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-bold text-[#1D1D1F]">运营工作台</div>
@@ -323,7 +323,7 @@ function PageHeader({ page, onAddKol, onQuickInvite }: { page: ViewMode; onAddKo
   const meta = PAGE_META[page]
   const sub = page === 'dashboard' ? formatTodayLabel() : meta.sub
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.06] bg-white px-8">
+    <div className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.07] bg-white px-6">
       <div className="flex items-center gap-3">
         <h1 className="text-[18px] font-extrabold text-[#1D1D1F]">{meta.title}</h1>
         <span className="text-sm text-[#AEAEB2]">·</span>
@@ -331,12 +331,12 @@ function PageHeader({ page, onAddKol, onQuickInvite }: { page: ViewMode; onAddKo
       </div>
       <div className="flex items-center gap-2">
         {page === 'dashboard' && (
-          <button onClick={onQuickInvite} className="flex items-center gap-1.5 rounded-[10px] bg-[#0066FF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] transition active:scale-95">
+          <button onClick={onQuickInvite} className="flex items-center gap-1.5 rounded-[8px] bg-[#0066FF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(0,102,255,0.25)] transition hover:bg-[#0057DB] active:scale-[0.98]">
             <Plus className="h-3.5 w-3.5" /> 快速邀约
           </button>
         )}
         {page === 'table' && (
-          <button onClick={onAddKol} className="flex items-center gap-1.5 rounded-[10px] bg-[#0066FF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] transition active:scale-95">
+          <button onClick={onAddKol} className="flex items-center gap-1.5 rounded-[8px] bg-[#0066FF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(0,102,255,0.25)] transition hover:bg-[#0057DB] active:scale-[0.98]">
             <Plus className="h-3.5 w-3.5" /> 添加 KOL
           </button>
         )}

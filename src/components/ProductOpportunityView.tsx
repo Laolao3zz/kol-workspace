@@ -249,7 +249,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                     <button
                       type="button"
                       onClick={() => setShowUntouched(true)}
-                      className="flex w-full items-center gap-2 rounded-[14px] border border-black/[0.06] bg-white px-4 py-3 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition hover:border-[#0066FF]/30"
+                      className="flex w-full items-center gap-2 rounded-[8px] border border-black/[0.07] bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition hover:border-[#0066FF]/30"
                     >
                       <ChevronRight className="h-4 w-4 text-[#86868B]" />
                       <span className={`h-2 w-2 rounded-full ${statusDot[status]}`} />
@@ -285,7 +285,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                       return (
                       <article
                         key={`${selected.product}-${row.kol.id}-${status}`}
-                        className={`relative rounded-[14px] border bg-white p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition hover:shadow-md ${checked ? 'border-[#0066FF]/50 ring-2 ring-blue-50' : 'border-black/[0.06] hover:border-[#0066FF]/30'} ${status === '未回复' || status === '已拒绝' || status === '不推进' ? 'opacity-65' : ''}`}
+                        className={`relative rounded-[8px] border bg-white p-4 text-left transition hover:bg-[#FAFBFC] ${checked ? 'border-[#0066FF]/50 ring-2 ring-blue-50' : 'border-black/[0.07] hover:border-[#0066FF]/30'} ${status === '未回复' || status === '已拒绝' || status === '不推进' ? 'opacity-65' : ''}`}
                       >
                         <button type="button" onClick={() => toggleSelectedKol(row.kol)} disabled={Boolean(row.kol.blacklisted_at)} className="absolute right-3 top-3 z-10" title={row.kol.blacklisted_at ? '已拉黑，不能邀约' : '选择邀约'}>
                           <span className={`flex h-5 w-5 items-center justify-center rounded border text-[11px] font-bold ${checked ? 'border-[#0066FF] bg-[#0066FF] text-white' : 'border-black/15 bg-white text-transparent'} ${row.kol.blacklisted_at ? 'cursor-not-allowed opacity-30' : ''}`}>✓</span>
@@ -321,7 +321,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
             })}
 
             {filteredRows.length === 0 && (
-              <div className="flex h-64 flex-col items-center justify-center rounded-[18px] border border-dashed border-black/[0.08] bg-white text-center">
+              <div className="flex h-64 flex-col items-center justify-center rounded-[10px] border border-dashed border-black/[0.08] bg-white text-center">
                 <Search className="mb-3 h-6 w-6 text-[#AEAEB2]" />
                 <div className="text-sm font-extrabold text-[#1D1D1F]">没有匹配结果</div>
               </div>
@@ -486,7 +486,7 @@ function ProductLibraryPanel({
   }
 
   return (
-    <aside className="flex min-h-0 flex-col overflow-hidden rounded-[16px] border border-black/[0.06] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+    <aside className="flex min-h-0 flex-col overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3">
         <div>
           <div className="text-sm font-extrabold text-[#1D1D1F]">产品库</div>

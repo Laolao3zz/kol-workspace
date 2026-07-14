@@ -110,7 +110,7 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, on
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-8 py-5">
-        <div className="overflow-hidden rounded-[16px] border border-black/[0.06] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+        <div className="overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
           <table className="min-w-[980px] w-full text-left text-sm">
             <thead className="bg-[#FBFBFD]">
               <tr className="border-b border-black/[0.06] text-[11px] font-bold text-[#86868B]">
@@ -169,7 +169,7 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, on
                 <tr>
                   <td colSpan={8} className="px-4 py-16 text-center">
                     <div className="mx-auto flex max-w-sm flex-col items-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#F5F5F7] text-[#86868B]">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-[10px] bg-[#F5F5F7] text-[#86868B]">
                         <Eye className="h-5 w-5" />
                       </div>
                       <p className="mt-3 text-sm font-extrabold text-[#1D1D1F]">暂无合作历史</p>
@@ -187,7 +187,7 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, on
 
 function HistoryStat({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: string }) {
   return (
-    <div className="flex min-w-[150px] items-center gap-3 rounded-[14px] border border-black/[0.06] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+    <div className="flex min-w-[150px] items-center gap-3 rounded-[8px] border border-black/[0.07] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       <span className="text-[#86868B]">{icon}</span>
       <div>
         <div className={`text-base font-extrabold tabular-nums ${tone}`}>{value}</div>

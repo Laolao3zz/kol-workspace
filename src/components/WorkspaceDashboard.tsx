@@ -73,10 +73,7 @@ function relativeTime(date?: string | null) {
 
 function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div
-      className={`rounded-2xl bg-white ${className}`}
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)' }}
-    >
+    <div className={`overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] ${className}`}>
       {children}
     </div>
   )
@@ -91,25 +88,26 @@ function Avatar({ name, size = 'sm' }: { name: string; size?: 'sm' | 'md' }) {
   )
 }
 
-function MetricCard({ label, value, sub, color, accent }: { label: string; value: number; sub: string; color: string; accent: string }) {
+function MetricCard({ label, value, sub, color, onClick }: { label: string; value: number; sub: string; color: string; onClick: () => void }) {
   return (
-    <div
-      className="relative overflow-hidden rounded-2xl bg-white px-4 py-4"
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05)' }}
+    <button
+      type="button"
+      onClick={onClick}
+      className="group min-w-0 border-r border-black/[0.06] px-4 py-3.5 text-left transition-colors last:border-r-0 hover:bg-[#F7F8FA] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0066FF]"
     >
-      <div className="absolute inset-0 rounded-2xl opacity-60" style={{ background: accent }} />
-      <div className="relative">
-        <div className="mb-2 text-[11px] font-bold text-[#6E6E73]">{label}</div>
-        <div className="text-3xl font-extrabold tabular-nums" style={{ color }}>{value}</div>
-        <div className="mt-1 text-[11px] font-medium text-[#AEAEB2]">{sub}</div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-[11px] font-bold text-[#6E6E73]">{label}</span>
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#C7C7CC] transition group-hover:translate-x-0.5 group-hover:text-[#0066FF]" />
       </div>
-    </div>
+      <div className="mt-1.5 text-[26px] font-extrabold leading-none tabular-nums" style={{ color }}>{value}</div>
+      <div className="mt-1.5 truncate text-[11px] font-medium text-[#9A9AA0]">{sub}</div>
+    </button>
   )
 }
 
 function SectionHeader({ dot, title, count, actionLabel, onClick }: { dot: string; title: string; count: number; actionLabel: string; onClick: () => void }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+    <div className="flex items-center justify-between border-b border-black/[0.06] px-4 py-3">
       <div className="flex items-center gap-2.5">
         <div className={`h-2 w-2 rounded-full ${dot}`} />
         <span className="text-[14px] font-bold text-[#1D1D1F]">{title}</span>
@@ -124,7 +122,7 @@ function SectionHeader({ dot, title, count, actionLabel, onClick }: { dot: strin
 
 function EmptyState({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <div className="flex min-h-[116px] items-center justify-center gap-2 px-5 py-10 text-sm font-medium text-[#AEAEB2]">
+    <div className="flex min-h-[96px] items-center justify-center gap-2 px-4 py-7 text-xs font-medium text-[#AEAEB2]">
       {icon}
       <span>{text}</span>
     </div>
@@ -216,22 +214,22 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
   const recentActivities = buildRecentActivities(kols, pendingReplies, pendingShipments, overdueContent, collaborationsByKol)
 
   const stats = [
-    { label: 'KOL 总量', value: metrics.totalKols, sub: '资源池总数', color: '#1D1D1F', accent: '#F5F5F7' },
-    { label: '邀约中', value: pendingReplies.length, sub: `${pendingReplies.length} 待回复`, color: '#0066FF', accent: '#E8F0FF' },
-    { label: '待寄样', value: pendingShipments.length, sub: '需尽快处理', color: '#FF9F0A', accent: '#FFF5E6' },
-    { label: '运输中', value: metrics.inTransit, sub: `${inTransitSoon} 即将签收`, color: '#0066FF', accent: '#E8F0FF' },
-    { label: '内容跟进', value: metrics.contentFollowUp, sub: `${overdueContent.length} 逾期`, color: '#FF3B30', accent: '#FFF0EE' },
-    { label: '待归档', value: metrics.waitingArchive, sub: '需补充数据', color: '#6E6E73', accent: '#F5F5F7' },
-    { label: '已完成', value: metrics.completedCollaborations, sub: '历史记录数', color: '#30D158', accent: '#EDFAF0' },
+    { label: 'KOL 总量', value: metrics.totalKols, sub: '查看资源池', color: '#1D1D1F', onClick: () => onNavigate('table') },
+    { label: '待回复', value: pendingReplies.length, sub: '邀约跟进', color: '#0066FF', onClick: () => onNavigate('table', { invitationStatus: 'pending' }) },
+    { label: '待寄出', value: pendingShipments.length, sub: '补充物流信息', color: '#C76B00', onClick: () => onNavigate('progress') },
+    { label: '运输中', value: metrics.inTransit, sub: `${inTransitSoon} 件在途`, color: '#0066FF', onClick: () => onNavigate('progress') },
+    { label: '内容跟进', value: metrics.contentFollowUp, sub: `${overdueContent.length} 件逾期`, color: '#D92D20', onClick: () => onNavigate('progress') },
+    { label: '待归档', value: metrics.waitingArchive, sub: '补充作品数据', color: '#6E6E73', onClick: () => onNavigate('history') },
+    { label: '已完成', value: metrics.completedCollaborations, sub: '查看合作历史', color: '#168653', onClick: () => onNavigate('history') },
   ]
 
   return (
-    <div className="flex-1 space-y-6 overflow-y-auto px-8 py-6">
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-7">
+    <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+      <div className="grid grid-cols-7 overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         {stats.map(stat => <MetricCard key={stat.label} {...stat} />)}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2 2xl:grid-cols-4">
         <Card>
           <SectionHeader dot="bg-amber-400" title="待回复邀约" count={pendingReplies.length} actionLabel="全部" onClick={() => onNavigate('table', { invitationStatus: 'pending' })} />
           <div className="py-1">
@@ -279,9 +277,7 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
             {overdueContent.length === 0 && <EmptyState icon={<AlertTriangle className="h-5 w-5" />} text="暂无内容跟进风险" />}
           </div>
         </Card>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card>
           <SectionHeader dot="bg-blue-400" title="待寄出样品" count={pendingShipments.length} actionLabel="查看" onClick={() => onNavigate('progress')} />
           <div className="py-1">
@@ -330,13 +326,13 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
       </div>
 
       <Card className="overflow-hidden">
-        <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+        <div className="flex items-center gap-2.5 border-b border-black/[0.06] px-4 py-3">
           <TrendingUp className="h-4 w-4 text-[#0066FF]" />
           <span className="text-[14px] font-bold text-[#1D1D1F]">近期动态</span>
         </div>
         <div className="py-1">
           {recentActivities.map(activity => (
-            <div key={activity.id} className="mx-2 flex items-center justify-between rounded-xl px-5 py-3">
+            <div key={activity.id} className="mx-1 flex items-center justify-between rounded-[8px] px-4 py-2.5 hover:bg-[#F7F8FA]">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center">{activity.icon}</span>
                 <span className="truncate text-[13px] font-medium text-[#1D1D1F]">{activity.text}</span>

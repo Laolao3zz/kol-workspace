@@ -289,7 +289,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
             {columns.map(column => {
               const Icon = column.icon
               return (
-                <div key={column.key} className="flex min-h-0 flex-col overflow-hidden rounded-[16px] border border-black/[0.06] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                <div key={column.key} className="flex min-h-0 flex-col overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
                   <div className={`shrink-0 border-b border-black/[0.06] px-4 py-3 ${column.tint}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -313,7 +313,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
 
                   <div className="min-h-0 flex-1 overflow-y-auto p-3">
                     {column.shipments.length === 0 ? (
-                      <div className="flex h-full min-h-[180px] flex-col items-center justify-center rounded-[14px] border border-dashed border-black/[0.08] text-center">
+                      <div className="flex h-full min-h-[180px] flex-col items-center justify-center rounded-[8px] border border-dashed border-black/[0.08] text-center">
                         <Icon className="mb-2 h-5 w-5 text-[#AEAEB2]" />
                         <p className="text-xs font-bold text-[#86868B]">暂无记录</p>
                       </div>
@@ -329,7 +329,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
                           const label = progressLabel(shipment)
 
                           return (
-                            <article key={shipment.id} className={`rounded-[14px] border bg-white p-4 shadow-sm transition hover:shadow-md ${overdue ? 'border-red-200 shadow-red-50' : 'border-black/[0.06]'}`}>
+                            <article key={shipment.id} className={`rounded-[8px] border bg-white p-4 transition hover:border-[#0066FF]/25 hover:bg-[#FAFBFC] ${overdue ? 'border-red-200 bg-red-50/20' : 'border-black/[0.07]'}`}>
                               <button onClick={() => kol && onSelect(kol)} className="block w-full text-left">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
