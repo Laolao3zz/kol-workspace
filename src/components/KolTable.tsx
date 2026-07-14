@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Copy, MailPlus, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react'
+import { AlertTriangle, Ban, CheckCircle2, ChevronLeft, ChevronRight, Copy, MailPlus, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Collaboration, Invitation, KOL, PLATFORMS, Shipment } from '../types'
 import { createInvitation } from '../services/invitationService'
@@ -103,6 +103,7 @@ export default function KolTable({
   const [filterTag, setFilterTag] = useState('')
   const [filterInvProduct, setFilterInvProduct] = useState('')
   const [filterInvStatus, setFilterInvStatus] = useState('')
+  const [filterBlacklist, setFilterBlacklist] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showBatchInvite, setShowBatchInvite] = useState(false)
   const [batchProduct, setBatchProduct] = useState('')
@@ -169,23 +170,29 @@ export default function KolTable({
       }
       if (filterInvStatus === 'agreed') matchInvStatus = Boolean(latest?.replied && latest.reply_result.includes('同意') && latest.decision !== '我方拒绝')
       if (filterInvStatus === 'rejected') matchInvStatus = Boolean(latest?.replied && (latest.reply_result.includes('拒绝') || latest.decision === '我方拒绝'))
+      const matchBlacklist = filterBlacklist === 'blacklisted'
+        ? Boolean(kol.blacklisted_at)
+        : filterBlacklist === 'available'
+          ? !kol.blacklisted_at
+          : true
 
-      return matchSearch && matchContentShape && matchPlatform && matchTag && matchInvProduct && matchInvStatus
+      return matchSearch && matchContentShape && matchPlatform && matchTag && matchInvProduct && matchInvStatus && matchBlacklist
     })
-  }, [kols, search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, invitations, shipments, allCollaborations])
+  }, [kols, search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, filterBlacklist, invitations, shipments, allCollaborations])
 
   useEffect(() => {
     setPage(1)
     setSelectedIds(new Set())
-  }, [search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, pageSize])
+  }, [search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, filterBlacklist, pageSize])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const pageStart = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1
   const pageEnd = Math.min(safePage * pageSize, filtered.length)
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
-  const allPageSelected = paged.length > 0 && paged.every(kol => selectedIds.has(kol.id))
-  const selectedKols = useMemo(() => kols.filter(kol => selectedIds.has(kol.id)), [kols, selectedIds])
+  const selectablePageKols = paged.filter(kol => !kol.blacklisted_at)
+  const allPageSelected = selectablePageKols.length > 0 && selectablePageKols.every(kol => selectedIds.has(kol.id))
+  const selectedKols = useMemo(() => kols.filter(kol => selectedIds.has(kol.id) && !kol.blacklisted_at), [kols, selectedIds])
   const batchOutreach = useMemo(() => buildBatchOutreachSelection(selectedKols), [selectedKols])
 
   const stats = useMemo(() => ({
@@ -210,9 +217,9 @@ export default function KolTable({
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (allPageSelected) {
-        paged.forEach(kol => next.delete(kol.id))
+        selectablePageKols.forEach(kol => next.delete(kol.id))
       } else {
-        paged.forEach(kol => next.add(kol.id))
+        selectablePageKols.forEach(kol => next.add(kol.id))
       }
       return next
     })
@@ -355,6 +362,15 @@ export default function KolTable({
               <option value="rejected">已拒绝/不推进</option>
               <option value="none">无邀约</option>
             </select>
+            <select
+              value={filterBlacklist}
+              onChange={event => setFilterBlacklist(event.target.value)}
+              className="h-9 rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] outline-none focus:border-[#0066FF]/40"
+            >
+              <option value="">全部名单</option>
+              <option value="available">可联系</option>
+              <option value="blacklisted">已拉黑</option>
+            </select>
             {selectedIds.size > 0 && (
               <button
                 onClick={() => {
@@ -439,6 +455,8 @@ export default function KolTable({
                           type="checkbox"
                           checked={selectedIds.has(kol.id)}
                           onChange={() => toggleSelect(kol.id)}
+                          disabled={Boolean(kol.blacklisted_at)}
+                          title={kol.blacklisted_at ? '已拉黑，不能加入批量邀约' : '选择 KOL'}
                           className="h-4 w-4 rounded border-gray-300 text-[#0066FF] focus:ring-[#0066FF]"
                         />
                       </td>
@@ -448,7 +466,10 @@ export default function KolTable({
                             {kol.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="truncate text-[13px] font-extrabold text-[#1D1D1F]">{kol.name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-[13px] font-extrabold text-[#1D1D1F]">{kol.name}</span>
+                              {kol.blacklisted_at && <Ban className="h-3.5 w-3.5 shrink-0 text-red-600" aria-label="已拉黑" />}
+                            </div>
                             <div className="truncate text-[11px] font-medium text-[#86868B]">{kol.homepage_url || '-'}</div>
                           </div>
                         </div>

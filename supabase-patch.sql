@@ -30,6 +30,9 @@ ALTER TABLE invitations ADD COLUMN IF NOT EXISTS decision_reason TEXT;
 -- kols 表：确保 tags 字段存在
 ALTER TABLE kols ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
 ALTER TABLE kols ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE kols ADD COLUMN IF NOT EXISTS blacklisted_at TIMESTAMPTZ;
+ALTER TABLE kols ADD COLUMN IF NOT EXISTS blacklist_reason TEXT;
+CREATE INDEX IF NOT EXISTS idx_kols_blacklisted_at ON kols (blacklisted_at) WHERE blacklisted_at IS NOT NULL;
 
 -- products 表：真实产品主数据与产品机会匹配
 CREATE TABLE IF NOT EXISTS products (

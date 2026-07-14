@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS kols (
   country TEXT,
   tags TEXT[] DEFAULT '{}',
   notes TEXT,
+  blacklisted_at TIMESTAMPTZ,
+  blacklist_reason TEXT,
   status TEXT DEFAULT '未首触',
   sample_product TEXT,
   sample_date DATE,
@@ -112,6 +114,10 @@ ALTER TABLE public.invitations
   ADD COLUMN IF NOT EXISTS decision_reason TEXT;
 ALTER TABLE public.collaborations
   ADD COLUMN IF NOT EXISTS shipment_id UUID;
+ALTER TABLE public.kols
+  ADD COLUMN IF NOT EXISTS blacklisted_at TIMESTAMPTZ;
+ALTER TABLE public.kols
+  ADD COLUMN IF NOT EXISTS blacklist_reason TEXT;
 
 DO $$
 BEGIN
@@ -155,6 +161,7 @@ CREATE POLICY "Allow all access" ON shipments FOR ALL USING (true) WITH CHECK (t
 -- 索引
 CREATE INDEX IF NOT EXISTS idx_kols_name ON kols (name);
 CREATE INDEX IF NOT EXISTS idx_kols_status ON kols (status);
+CREATE INDEX IF NOT EXISTS idx_kols_blacklisted_at ON kols (blacklisted_at) WHERE blacklisted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_invitations_kol_id ON invitations (kol_id);
 CREATE INDEX IF NOT EXISTS idx_collaborations_kol_id ON collaborations (kol_id);
 CREATE INDEX IF NOT EXISTS idx_emails_kol_id ON emails (kol_id);

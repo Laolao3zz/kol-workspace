@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, CheckCircle2, ExternalLink, Mail, Package, Pencil, Plus, Trash2, Truck, UserRound, X } from 'lucide-react'
+import { ArrowRightLeft, Ban, BarChart3, ChevronDown, ChevronRight, CheckCircle2, ExternalLink, Mail, Package, Pencil, Plus, ShieldCheck, Trash2, Truck, UserRound, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { KOL, Invitation, Collaboration, Shipment, Product, PLATFORMS } from '../types'
 import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
@@ -81,6 +81,9 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
   const [showColModal, setShowColModal] = useState(false)
   const [showShipmentModal, setShowShipmentModal] = useState(false)
   const [showProductCorrection, setShowProductCorrection] = useState(false)
+  const [showBlacklistModal, setShowBlacklistModal] = useState(false)
+  const [blacklistReason, setBlacklistReason] = useState('')
+  const [savingBlacklist, setSavingBlacklist] = useState(false)
   const [editingInvitation, setEditingInvitation] = useState<Invitation | null>(null)
   const [editingCollaboration, setEditingCollaboration] = useState<Collaboration | null>(null)
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null)
@@ -197,6 +200,39 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
   const saveTags = async (raw: string) => {
     const tags = raw.split(',').map(s => s.trim()).filter(Boolean)
     await save('tags', tags)
+  }
+
+  const openBlacklistModal = () => {
+    setBlacklistReason(kol.blacklist_reason || '')
+    setShowBlacklistModal(true)
+  }
+
+  const blacklistKol = async () => {
+    const reason = blacklistReason.trim()
+    if (!reason || savingBlacklist) return
+    setSavingBlacklist(true)
+    try {
+      await onUpdate(kol.id, {
+        blacklisted_at: new Date().toISOString(),
+        blacklist_reason: reason,
+      })
+      setShowBlacklistModal(false)
+      showToast('已加入黑名单')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '拉黑失败')
+    } finally {
+      setSavingBlacklist(false)
+    }
+  }
+
+  const restoreKol = async () => {
+    if (!confirm(`将「${kol.name}」移出黑名单？`)) return
+    try {
+      await onUpdate(kol.id, { blacklisted_at: null, blacklist_reason: '' })
+      showToast('已移出黑名单')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '解除拉黑失败')
+    }
   }
 
   const handleProductCorrection = async (plan: ProductCorrectionPlan, targetProduct: string) => {
@@ -643,6 +679,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                 <h2 className="truncate text-xl font-extrabold text-[#1D1D1F]">{kol.name}</h2>
                 <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${contentShape === '网站' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>{contentShape}</span>
                 <span className={statusLabel(kol.status)}>当前流程：{kol.status || '-'}</span>
+                {kol.blacklisted_at && <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700"><Ban className="h-3 w-3" /> 已拉黑</span>}
                 {completedCollaborationCount > 0 && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">合作过 {completedCollaborationCount} 次</span>}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#86868B]">
@@ -661,6 +698,15 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                 )}
               </div>
             </div>
+            {kol.blacklisted_at ? (
+              <button onClick={restoreKol} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100" title="恢复为可联系 KOL">
+                <ShieldCheck className="h-3.5 w-3.5" /> 解除拉黑
+              </button>
+            ) : (
+              <button onClick={openBlacklistModal} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border border-red-100 bg-red-50 px-3 text-xs font-bold text-red-700 transition hover:bg-red-100" title="加入黑名单">
+                <Ban className="h-3.5 w-3.5" /> 拉黑
+              </button>
+            )}
             <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-white text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]" title="关闭">
               <X className="h-4 w-4" />
             </button>
@@ -671,6 +717,12 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <div className="space-y-5">
               <SectionCard icon={UserRound} title="基础身份">
+                {kol.blacklisted_at && (
+                  <div className="mb-4 rounded-[12px] border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-800">
+                    <div className="font-extrabold">黑名单原因</div>
+                    <div className="mt-1 leading-5">{kol.blacklist_reason || '未填写'} · {kol.blacklisted_at.slice(0, 10)}</div>
+                  </div>
+                )}
                 <div className="mb-4 grid grid-cols-2 gap-2 text-xs font-semibold text-[#6E6E73] md:grid-cols-4">
                   <DetailPill label="内容形态" value={contentShape} />
                   <DetailPill label="当前流程" value={kol.status || '-'} />
@@ -774,7 +826,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                 action={(
                   <div className="flex items-center gap-2">
                     <HeaderButton onClick={() => setShowProductCorrection(true)} icon={ArrowRightLeft} tone="neutral" disabled={loadingSub}>修正产品</HeaderButton>
-                    <HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus}>发起邀约</HeaderButton>
+                    <HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus} disabled={Boolean(kol.blacklisted_at)}>发起邀约</HeaderButton>
                   </div>
                 )}
               >
@@ -801,7 +853,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
               </SectionCard>
 
               <SectionCard icon={Mail} title="邀约记录"
-                action={<HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus}>发起邀约</HeaderButton>}
+                action={<HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus} disabled={Boolean(kol.blacklisted_at)}>发起邀约</HeaderButton>}
               >
                 {loadingSub ? (
                   <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-12 rounded-[12px] bg-[#F5F5F7] animate-pulse" />) }</div>
@@ -905,6 +957,37 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
           onClose={() => setShowProductCorrection(false)}
           onSubmit={handleProductCorrection}
         />
+      )}
+      {showBlacklistModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={savingBlacklist ? undefined : () => setShowBlacklistModal(false)} />
+          <div className="relative w-[460px] max-w-[calc(100vw-32px)] rounded-[18px] border border-black/[0.06] bg-white p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-red-50 text-red-700"><Ban className="h-4 w-4" /></span>
+              <div>
+                <h3 className="text-base font-extrabold text-[#1D1D1F]">拉黑 {kol.name}</h3>
+                <p className="mt-1 text-xs font-medium leading-5 text-[#86868B]">历史记录仍会保留；该 KOL 将不再进入新产品机会，也不能批量邀约。</p>
+              </div>
+            </div>
+            <label className="mt-5 block">
+              <span className="mb-1.5 block text-xs font-bold text-[#6E6E73]">拉黑原因</span>
+              <textarea
+                autoFocus
+                value={blacklistReason}
+                onChange={event => setBlacklistReason(event.target.value)}
+                rows={4}
+                placeholder="例如：长期不回复、多次失约、内容质量不符合要求"
+                className="w-full resize-none rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 py-2 text-sm font-medium outline-none transition focus:border-red-300 focus:bg-white"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setShowBlacklistModal(false)} disabled={savingBlacklist} className="h-9 rounded-[9px] px-4 text-xs font-bold text-[#6E6E73] hover:bg-[#F5F5F7] disabled:opacity-50">取消</button>
+              <button type="button" onClick={blacklistKol} disabled={savingBlacklist || !blacklistReason.trim()} className="h-9 rounded-[9px] bg-red-600 px-4 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40">
+                {savingBlacklist ? '正在保存...' : '确认拉黑'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

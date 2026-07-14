@@ -351,6 +351,23 @@ describe('workspace view helpers', () => {
     expect(sbc?.rows.find(row => row.kol.id === 'storage')?.status).toBe('未触达')
   })
 
+  it('excludes blacklisted KOLs from new opportunities but preserves their history', () => {
+    const summary = buildProductOpportunitySummary({
+      products: [product('Pocket SBC Kit')],
+      kols: [
+        kol('blocked-new', { blacklisted_at: '2026-07-14T00:00:00.000Z' }),
+        kol('blocked-history', { blacklisted_at: '2026-07-14T00:00:00.000Z' }),
+      ],
+      invitations: {
+        'blocked-history': [invitation({ kol_id: 'blocked-history', product: 'Pocket SBC Kit' })],
+      },
+      shipments: [],
+      collaborationsByKol: {},
+    })
+
+    expect(summary[0].rows.map(row => row.kol.id)).toEqual(['blocked-history'])
+  })
+
   it('filters product opportunity rows by selected status', () => {
     const rows = [
       { kol: kol('untouched'), status: '未触达' as const },

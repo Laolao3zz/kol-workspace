@@ -37,4 +37,15 @@ describe('kolService', () => {
 
     expect((updated as KOLWithNotes).notes).toBe('Send new product briefs in advance.')
   })
+
+  it('preserves blacklist fields while still removing legacy shipment fields', () => {
+    expect(sanitizeKOLUpdates({
+      blacklisted_at: '2026-07-14T00:00:00.000Z',
+      blacklist_reason: 'Repeated missed commitments',
+      sample_product: 'X1',
+    })).toEqual({
+      blacklisted_at: '2026-07-14T00:00:00.000Z',
+      blacklist_reason: 'Repeated missed commitments',
+    })
+  })
 })

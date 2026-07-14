@@ -544,6 +544,8 @@ export const demoDatabase = {
       country: kol.country?.trim() || '',
       tags: Array.isArray(kol.tags) ? kol.tags : [],
       notes: kol.notes?.trim() || '',
+      blacklisted_at: kol.blacklisted_at || null,
+      blacklist_reason: kol.blacklist_reason?.trim() || '',
       status: kol.status || '未首触',
       sample_product: kol.sample_product?.trim() || '',
       sample_date: kol.sample_date || null,

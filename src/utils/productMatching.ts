@@ -52,11 +52,12 @@ export function hasProductRecordForKol(
 }
 
 export function shouldShowProductForKol(
-  kol: Pick<KOL, 'tags' | 'platform'>,
+  kol: Pick<KOL, 'tags' | 'platform' | 'blacklisted_at'>,
   product: ProductLike,
   hasExistingProductRecord = false
 ): boolean {
   if (hasExistingProductRecord) return true
+  if (kol.blacklisted_at) return false
   if (typeof product === 'string') return true
   if (product.status === '归档') return false
 

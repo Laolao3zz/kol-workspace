@@ -8,6 +8,8 @@ export interface KOL {
   country: string
   tags: string[]
   notes?: string
+  blacklisted_at?: string | null
+  blacklist_reason?: string
   status: string
   sample_product: string
   sample_date: string | null

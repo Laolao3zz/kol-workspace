@@ -73,6 +73,8 @@ const KOL_UPDATE_FIELDS: Array<keyof KOL> = [
   'country',
   'tags',
   'notes',
+  'blacklisted_at',
+  'blacklist_reason',
   'status',
 ]
 
