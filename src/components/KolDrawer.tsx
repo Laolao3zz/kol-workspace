@@ -882,7 +882,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                   {showMail ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   <Mail className="h-4 w-4" /> 邮件往来
                 </button>
-                {showMail && <div className="mt-3 max-h-[400px] overflow-hidden rounded-[16px] border border-black/[0.06] bg-white p-4 shadow-sm"><MailPanel kolEmail={kol.email} kolId={kol.id} /></div>}
+                {showMail && <div className="mt-3 h-[400px] overflow-hidden rounded-[16px] border border-black/[0.06] bg-white p-4 shadow-sm"><MailPanel kolName={kol.name} kolEmail={kol.email} kolId={kol.id} /></div>}
               </div>
             </div>
           </div>
