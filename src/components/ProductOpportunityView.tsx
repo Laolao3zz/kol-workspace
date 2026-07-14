@@ -134,6 +134,21 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
   const selectedKols = kols.filter(kol => selectedKolIds.has(kol.id) && !kol.blacklisted_at)
   const selectableFilteredKols = filteredRows.map(row => row.kol).filter(kol => !kol.blacklisted_at)
   const allFilteredSelected = selectableFilteredKols.length > 0 && selectableFilteredKols.every(kol => selectedKolIds.has(kol.id))
+  const selectableKolsForStatus = (status: OpportunityStatus) => queryFilteredRows
+    .filter(row => row.status === status && !row.kol.blacklisted_at)
+    .map(row => row.kol)
+
+  const toggleStatusSelection = (status: OpportunityStatus) => {
+    const statusKols = selectableKolsForStatus(status)
+    if (statusKols.length === 0) return
+    setSelectedKolIds(current => {
+      const next = new Set(current)
+      const allSelected = statusKols.every(kol => next.has(kol.id))
+      statusKols.forEach(kol => allSelected ? next.delete(kol.id) : next.add(kol.id))
+      return next
+    })
+  }
+
   const toggleSelectedKol = (kol: KOL) => {
     if (kol.blacklisted_at) return
     setSelectedKolIds(current => {
@@ -199,8 +214,22 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                 </button>
               )
             })}
+            <select
+              value=""
+              onChange={event => toggleStatusSelection(event.target.value as OpportunityStatus)}
+              className="ml-auto h-8 rounded-[9px] border border-black/[0.08] bg-white px-3 text-[11px] font-bold text-[#525257] outline-none transition hover:border-[#0066FF]/30 focus:border-[#0066FF]/40"
+              aria-label="按状态全选 KOL"
+            >
+              <option value="" disabled>按状态全选</option>
+              {statusOrder.map(status => {
+                const count = selectableKolsForStatus(status).length
+                if (count === 0) return null
+                const allSelected = selectableKolsForStatus(status).every(kol => selectedKolIds.has(kol.id))
+                return <option key={status} value={status}>{allSelected ? '取消' : '全选'} {status}（{count}）</option>
+              })}
+            </select>
             {selectableFilteredKols.length > 0 && (
-              <div className="ml-auto flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedKolIds(current => {
@@ -223,7 +252,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                 )}
               </div>
             )}
-            <span className="ml-auto text-xs font-bold text-[#86868B]">共 {filteredRows.length} 位 KOL</span>
+            <span className="text-xs font-bold text-[#86868B]">共 {filteredRows.length} 位 KOL</span>
           </div>
         </div>
       )}

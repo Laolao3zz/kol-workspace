@@ -231,7 +231,7 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
       </div>
 
       <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2 2xl:grid-cols-4">
-        <Card>
+        <Card className="h-[244px]">
           <SectionHeader dot="bg-amber-400" title="待回复邀约" count={pendingReplies.length} actionLabel="全部" onClick={() => onNavigate('table', { invitationStatus: 'pending' })} />
           <div className="py-1">
             {pendingReplies.slice(0, 3).map(invitation => {
@@ -254,7 +254,7 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
           </div>
         </Card>
 
-        <Card>
+        <Card className="h-[244px]">
           <SectionHeader dot="bg-red-500" title="签收超7天未发布" count={overdueContent.length} actionLabel="查看" onClick={() => onNavigate('progress')} />
           <div className="py-1">
             {overdueContent.slice(0, 3).map(shipment => {
@@ -279,7 +279,7 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
           </div>
         </Card>
 
-        <Card>
+        <Card className="h-[244px]">
           <SectionHeader dot="bg-blue-400" title="待寄出样品" count={pendingShipments.length} actionLabel="查看" onClick={() => onNavigate('progress')} />
           <div className="py-1">
             {pendingShipments.slice(0, 3).map(shipment => {
@@ -302,7 +302,7 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
           </div>
         </Card>
 
-        <Card>
+        <Card className="h-[244px]">
           <SectionHeader dot="bg-violet-400" title="待补作品链接" count={waitingArchive.length} actionLabel="查看" onClick={() => onNavigate('history')} />
           <div className="py-1">
             {waitingArchive.slice(0, 3).map(shipment => {
