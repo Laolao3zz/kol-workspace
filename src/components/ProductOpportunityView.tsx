@@ -1,10 +1,11 @@
-import { Archive, Check, ChevronDown, ChevronRight, ListFilter, Package, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react'
+import { Archive, Check, ChevronDown, ChevronRight, ListFilter, Package, Pencil, Plus, Search, Tag, Trash2, UserRound, X } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
-import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
+import { TAGS, type Collaboration, type Invitation, type KOL, type Product, type Shipment } from '../types'
 import { createProduct, deleteProduct, updateProduct, type ProductInput } from '../services/productService'
 import { CONTENT_SHAPES } from '../utils/contentShape'
 import { deriveProductDraftsFromHistory } from '../utils/productExtraction'
 import { mergeOpportunityProducts } from '../utils/productMatching'
+import { canonicalizeProductTags, collectProductTagOptions } from '../utils/productTags'
 import { buildProductOpportunitySummary, filterOpportunityRowsByStatus, type OpportunityStatus, type OpportunityStatusFilter } from '../utils/workspaceViews'
 import { countProductDeletionReferences } from '../utils/productCorrection'
 
@@ -52,7 +53,7 @@ const PRODUCT_STATUSES = ['在推', '暂停', '归档']
 interface ProductFormState {
   name: string
   category: string
-  target_kol_tags: string
+  target_kol_tags: string[]
   target_content_shapes: string[]
   status: string
   priority: string
@@ -62,18 +63,18 @@ interface ProductFormState {
 const emptyProductForm: ProductFormState = {
   name: '',
   category: '',
-  target_kol_tags: '',
+  target_kol_tags: [],
   target_content_shapes: [...CONTENT_SHAPES],
   status: '在推',
   priority: '50',
   notes: '',
 }
 
-function formFromProduct(product: Product): ProductFormState {
+function formFromProduct(product: Product, tagOptions: string[] = TAGS): ProductFormState {
   return {
     name: product.name,
     category: product.category || '',
-    target_kol_tags: (product.target_kol_tags || []).join(', '),
+    target_kol_tags: canonicalizeProductTags(product.target_kol_tags || [], tagOptions),
     target_content_shapes: product.target_content_shapes?.length ? product.target_content_shapes : [...CONTENT_SHAPES],
     status: product.status || '在推',
     priority: String(product.priority ?? 0),
@@ -85,7 +86,7 @@ function productPayloadFromForm(form: ProductFormState): ProductInput {
   return {
     name: form.name.trim(),
     category: form.category.trim(),
-    target_kol_tags: form.target_kol_tags.split(',').map(tag => tag.trim()).filter(Boolean),
+    target_kol_tags: canonicalizeProductTags(form.target_kol_tags),
     target_content_shapes: form.target_content_shapes,
     status: form.status,
     priority: Number.isFinite(Number(form.priority)) ? Number(form.priority) : 0,
@@ -327,8 +328,14 @@ function ProductLibraryPanel({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [customTag, setCustomTag] = useState('')
   const operationalProducts = products.filter(product => product.status !== '归档')
   const archivedProducts = products.filter(product => product.status === '归档')
+  const tagOptions = useMemo(() => collectProductTagOptions(
+    TAGS,
+    kols.flatMap(kol => kol.tags || []),
+    products.flatMap(product => product.target_kol_tags || []),
+  ), [kols, products])
   const importCandidates = useMemo(() => deriveProductDraftsFromHistory({
     existingProducts: products,
     kols,
@@ -339,13 +346,36 @@ function ProductLibraryPanel({
   const resetForm = () => {
     setEditingProduct(null)
     setForm(emptyProductForm)
+    setCustomTag('')
     setMessage('')
   }
 
   const startEdit = (product: Product) => {
     setEditingProduct(product)
-    setForm(formFromProduct(product))
+    setForm(formFromProduct(product, tagOptions))
+    setCustomTag('')
     setMessage('')
+  }
+
+  const toggleTargetTag = (tag: string) => {
+    setForm(current => ({
+      ...current,
+      target_kol_tags: current.target_kol_tags.includes(tag)
+        ? current.target_kol_tags.filter(item => item !== tag)
+        : [...current.target_kol_tags, tag],
+    }))
+  }
+
+  const addCustomTag = () => {
+    const normalized = customTag.trim()
+    if (!normalized) return
+    const existing = tagOptions.find(tag => tag.toLocaleLowerCase() === normalized.toLocaleLowerCase())
+    const nextTag = existing || normalized
+
+    setForm(current => current.target_kol_tags.includes(nextTag)
+      ? current
+      : { ...current, target_kol_tags: [...current.target_kol_tags, nextTag] })
+    setCustomTag('')
   }
 
   const toggleShape = (shape: string) => {
@@ -382,6 +412,7 @@ function ProductLibraryPanel({
       onSelectProduct(saved.name)
       setEditingProduct(null)
       setForm(emptyProductForm)
+      setCustomTag('')
       setMessage(editingProduct ? '产品已更新' : '产品已新增')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '保存失败')
@@ -522,15 +553,51 @@ function ProductLibraryPanel({
               className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40 focus:bg-white"
             />
           </label>
-          <label className="col-span-2">
+          <div className="col-span-2">
             <span className="mb-1 block text-[11px] font-bold text-[#86868B]">目标 KOL 标签</span>
-            <input
-              value={form.target_kol_tags}
-              onChange={event => setForm(current => ({ ...current, target_kol_tags: event.target.value }))}
-              placeholder="SBC, AI, 户外装备"
-              className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40 focus:bg-white"
-            />
-          </label>
+            <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] p-2">
+              {tagOptions.map(tag => {
+                const selected = form.target_kol_tags.includes(tag)
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => toggleTargetTag(tag)}
+                    className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-bold transition ${selected ? 'bg-[#0066FF] text-white shadow-sm' : 'bg-white text-[#6E6E73] hover:bg-blue-50 hover:text-[#0066FF]'}`}
+                  >
+                    {selected && <Check className="h-3 w-3" />}
+                    {tag}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="mt-1.5 flex gap-1.5">
+              <div className="relative min-w-0 flex-1">
+                <Tag className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#AEAEB2]" />
+                <input
+                  value={customTag}
+                  onChange={event => setCustomTag(event.target.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      addCustomTag()
+                    }
+                  }}
+                  placeholder="没有合适标签时新增"
+                  className="h-8 w-full rounded-[9px] border border-black/[0.08] bg-white pl-8 pr-2 text-[11px] font-semibold outline-none transition focus:border-[#0066FF]/40"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addCustomTag}
+                disabled={!customTag.trim()}
+                className="inline-flex h-8 items-center justify-center gap-1 rounded-[9px] bg-[#1D1D1F] px-3 text-[11px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <Plus className="h-3.5 w-3.5" /> 新增
+              </button>
+            </div>
+          </div>
           <div className="col-span-2">
             <span className="mb-1 block text-[11px] font-bold text-[#86868B]">内容形态</span>
             <div className="flex gap-2">
