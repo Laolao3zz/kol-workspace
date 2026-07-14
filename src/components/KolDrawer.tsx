@@ -29,6 +29,7 @@ import { applyProductCorrection } from '../services/productCorrectionService'
 import type { ProductCorrectionPlan } from '../utils/productCorrection'
 import { toExternalProfileUrl, toSafeExternalUrl } from '../utils/profileUrl'
 import { runPostPersistWorkflow } from '../utils/persistedWrite'
+import { getAvatarTone } from '../utils/visualTone'
 
 interface Props {
   kol: KOL
@@ -671,7 +672,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
       <div className="relative ml-auto flex w-[92%] max-w-[1320px] flex-col overflow-hidden bg-[#F5F5F7] shadow-2xl">
         <div className="shrink-0 border-b border-black/[0.06] bg-white px-8 py-5">
           <div className="flex items-center gap-5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#1D1D1F] text-sm font-extrabold text-white">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] text-sm font-extrabold ${getAvatarTone(kol.name)}`}>
             {kol.name.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">

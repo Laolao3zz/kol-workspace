@@ -7,6 +7,7 @@ import { sameProduct } from '../utils/productMatching'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
 import { stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
 import { toSafeExternalUrl } from '../utils/profileUrl'
+import { getAvatarTone } from '../utils/visualTone'
 
 interface Props {
   kols: KOL[]
@@ -123,7 +124,7 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, pr
                 <tr key={row.collaboration.id} className="transition hover:bg-[#F5F5F7]">
                   <td className="px-4 py-3">
                     <button onClick={() => onSelectKol(row.kol)} className="flex min-w-0 items-center gap-3 text-left">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-[11px] font-extrabold text-white">{row.kol.name.slice(0, 2).toUpperCase()}</div>
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${getAvatarTone(row.kol.name)}`}>{row.kol.name.slice(0, 2).toUpperCase()}</div>
                       <div className="min-w-0">
                         <div className="truncate text-[13px] font-extrabold text-[#1D1D1F]">{row.kol.name}</div>
                         <div className="truncate text-[11px] font-semibold text-[#86868B]">{row.kol.platform} · {getKolContentShape(row.kol)} · {row.kol.country || '-'}</div>

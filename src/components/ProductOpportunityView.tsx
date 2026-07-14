@@ -8,6 +8,7 @@ import { mergeOpportunityProducts } from '../utils/productMatching'
 import { canonicalizeProductTags, collectProductTagOptions } from '../utils/productTags'
 import { buildProductOpportunitySummary, filterOpportunityRowsByStatus, type OpportunityStatus, type OpportunityStatusFilter } from '../utils/workspaceViews'
 import { countProductDeletionReferences } from '../utils/productCorrection'
+import { getAvatarTone, getTagTone } from '../utils/visualTone'
 
 interface Props {
   products: Product[]
@@ -258,7 +259,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                         className={`rounded-[14px] border border-black/[0.06] bg-white p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition hover:border-[#0066FF]/30 hover:shadow-md ${status === '未回复' || status === '已拒绝' || status === '不推进' ? 'opacity-65' : ''}`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-xs font-extrabold text-white">
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${getAvatarTone(row.kol.name)}`}>
                             {row.kol.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0">
@@ -268,7 +269,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                         </div>
                         <div className="mt-3 flex flex-wrap gap-1">
                           {(row.kol.tags || []).slice(0, 3).map(tag => (
-                            <span key={tag} className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px] font-bold text-[#6E6E73]">{tag}</span>
+                            <span key={tag} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${getTagTone(tag)}`}>{tag}</span>
                           ))}
                           {(row.kol.tags || []).length === 0 && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px] font-bold text-[#AEAEB2]">
@@ -689,7 +690,7 @@ function ProductLibraryPanel({
 
                   <div className="mt-2 flex flex-wrap gap-1">
                     {(product.target_kol_tags || []).slice(0, 4).map(tag => (
-                      <span key={tag} className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[10px] font-bold text-[#6E6E73]">{tag}</span>
+                      <span key={tag} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getTagTone(tag)}`}>{tag}</span>
                     ))}
                     {(product.target_content_shapes || []).map(shape => (
                       <span key={shape} className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">{shape}</span>

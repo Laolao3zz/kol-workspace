@@ -14,6 +14,7 @@ import type { ReactNode } from 'react'
 import type { Collaboration, Invitation, KOL, Shipment } from '../types'
 import { buildDashboardMetrics, getActionablePendingInvitations } from '../utils/workspaceViews'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
+import { getAvatarTone } from '../utils/visualTone'
 
 type NavigateTarget = 'table' | 'progress' | 'products' | 'history'
 export type DashboardNavigateOptions = {
@@ -35,16 +36,6 @@ interface ActivityItem {
   text: string
   time: string
 }
-
-const avatarTones = [
-  'bg-blue-500',
-  'bg-violet-500',
-  'bg-emerald-500',
-  'bg-rose-500',
-  'bg-amber-500',
-  'bg-sky-500',
-  'bg-indigo-500',
-]
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
@@ -80,10 +71,6 @@ function relativeTime(date?: string | null) {
   return `${days}天前`
 }
 
-function avatarClass(name: string) {
-  return avatarTones[name.charCodeAt(0) % avatarTones.length]
-}
-
 function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div
@@ -98,7 +85,7 @@ function Card({ children, className = '' }: { children: ReactNode; className?: s
 function Avatar({ name, size = 'sm' }: { name: string; size?: 'sm' | 'md' }) {
   const sizeClass = size === 'md' ? 'h-8 w-8 text-xs' : 'h-7 w-7 text-[11px]'
   return (
-    <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full font-bold text-white ${avatarClass(name)}`}>
+    <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full font-bold ${getAvatarTone(name)}`}>
       {name.slice(0, 2)}
     </div>
   )

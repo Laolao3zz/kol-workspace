@@ -14,6 +14,7 @@ import {
 import { sameProduct } from '../utils/productMatching'
 import { resolveProductSelection } from '../utils/productCorrection'
 import { buildBatchOutreachSelection } from '../utils/batchOutreach'
+import { getAvatarTone, getTagTone } from '../utils/visualTone'
 
 interface Props {
   kols: KOL[]
@@ -462,7 +463,7 @@ export default function KolTable({
                       </td>
                       <td onClick={() => onSelect(kol)} className="px-3 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-[11px] font-extrabold text-white">
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${getAvatarTone(kol.name)}`}>
                             {kol.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0">
@@ -497,7 +498,7 @@ export default function KolTable({
                       <td onClick={() => onSelect(kol)} className="px-3 py-3 text-xs font-medium text-[#6E6E73]">{kol.country || '-'}</td>
                       <td onClick={() => onSelect(kol)} className="px-3 py-3">
                         <div className="flex max-w-[180px] flex-wrap gap-1">
-                          {(kol.tags || []).slice(0, 2).map(tag => <span key={tag} className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px] font-bold text-[#6E6E73]">{tag}</span>)}
+                          {(kol.tags || []).slice(0, 2).map(tag => <span key={tag} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${getTagTone(tag)}`}>{tag}</span>)}
                           {(kol.tags || []).length > 2 && <span className="text-[11px] font-bold text-[#AEAEB2]">+{kol.tags.length - 2}</span>}
                         </div>
                       </td>
