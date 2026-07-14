@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, MailPlus, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Copy, MailPlus, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Collaboration, Invitation, KOL, PLATFORMS, Shipment } from '../types'
 import { createInvitation } from '../services/invitationService'
@@ -13,6 +13,7 @@ import {
 } from '../utils/workspaceViews'
 import { sameProduct } from '../utils/productMatching'
 import { resolveProductSelection } from '../utils/productCorrection'
+import { buildBatchOutreachSelection } from '../utils/batchOutreach'
 
 interface Props {
   kols: KOL[]
@@ -106,8 +107,8 @@ export default function KolTable({
   const [showBatchInvite, setShowBatchInvite] = useState(false)
   const [batchProduct, setBatchProduct] = useState('')
   const [batchSending, setBatchSending] = useState(false)
-  const [batchDone, setBatchDone] = useState(false)
-  const [batchCopySucceeded, setBatchCopySucceeded] = useState(false)
+  const [batchCopyState, setBatchCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [batchResult, setBatchResult] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
@@ -185,6 +186,7 @@ export default function KolTable({
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
   const allPageSelected = paged.length > 0 && paged.every(kol => selectedIds.has(kol.id))
   const selectedKols = useMemo(() => kols.filter(kol => selectedIds.has(kol.id)), [kols, selectedIds])
+  const batchOutreach = useMemo(() => buildBatchOutreachSelection(selectedKols), [selectedKols])
 
   const stats = useMemo(() => ({
     total: kols.length,
@@ -216,56 +218,77 @@ export default function KolTable({
     })
   }
 
-  const handleBatchInvite = async () => {
-    if (selectedKols.length === 0) return
-    setBatchSending(true)
+  const copyBatchRecipients = async () => {
+    if (!batchOutreach.recipientText) return
     try {
-      const emails = selectedKols.map(k => k.email).filter(Boolean).join(', ')
-      let clipboardCopied = false
-      if (emails && navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(emails)
-          clipboardCopied = true
-        } catch {
-          clipboardCopied = false
-        }
-      }
-      setBatchCopySucceeded(clipboardCopied)
-
-      await Promise.all(selectedKols.map(async kol => {
-        const inv = await createInvitation({
-          kol_id: kol.id,
-          product: batchProduct.trim(),
-          invited_at: new Date().toISOString().slice(0, 10),
-          email_subject: '',
-          replied: false,
-          reply_result: '',
-          notes: '',
-          quoted_fee: '',
-          decision: '待评估',
-          decision_reason: '',
-        })
-        const nextInvitations = [inv, ...(invitations[kol.id] || [])]
-        const nextStatus = deriveKolStatus(
-          kol,
-          nextInvitations,
-          shipments.filter(shipment => shipment.kol_id === kol.id),
-          collaborationsByKol[kol.id] || []
-        )
-        if (nextStatus !== kol.status) {
-          await updateKOL(kol.id, { status: nextStatus })
-        }
-      }))
-
-      setBatchDone(true)
-      setTimeout(() => {
-        setShowBatchInvite(false)
-        setBatchDone(false)
-        setSelectedIds(new Set())
-        onRefresh()
-      }, 1400)
+      await navigator.clipboard.writeText(batchOutreach.recipientText)
+      setBatchCopyState('copied')
     } catch {
-      alert('批量邀约失败，请重试')
+      setBatchCopyState('failed')
+    }
+  }
+
+  const closeBatchInvite = () => {
+    setShowBatchInvite(false)
+    if (batchResult && !batchResult.includes('写入失败') && !batchResult.startsWith('批量记录失败')) {
+      setSelectedIds(new Set())
+    }
+  }
+
+  const handleBatchInvite = async () => {
+    if (batchOutreach.validKols.length === 0 || !batchProduct.trim()) return
+    setBatchSending(true)
+    setBatchResult('')
+    try {
+      const settled = await Promise.allSettled(batchOutreach.validKols.map(async kol => {
+          const inv = await createInvitation({
+            kol_id: kol.id,
+            product: batchProduct.trim(),
+            invited_at: new Date().toISOString().slice(0, 10),
+            email_subject: '',
+            replied: false,
+            reply_result: '',
+            notes: '',
+            quoted_fee: '',
+            decision: '待评估',
+            decision_reason: '',
+          })
+          const nextInvitations = [inv, ...(invitations[kol.id] || [])]
+          const nextStatus = deriveKolStatus(
+            kol,
+            nextInvitations,
+            shipments.filter(shipment => shipment.kol_id === kol.id),
+            collaborationsByKol[kol.id] || []
+          )
+          let statusWarning = false
+          if (nextStatus !== kol.status) {
+            try {
+              await updateKOL(kol.id, { status: nextStatus })
+            } catch {
+              statusWarning = true
+            }
+          }
+          return { kolId: kol.id, statusWarning }
+        }))
+
+      const succeeded = settled.filter(result => result.status === 'fulfilled').length
+      const failures = settled.length - succeeded
+      const statusWarnings = settled.filter(result =>
+        result.status === 'fulfilled' && result.value.statusWarning
+      ).length
+      const failedIds = settled.flatMap((result, index) =>
+        result.status === 'rejected' ? [batchOutreach.validKols[index].id] : []
+      )
+
+      setBatchResult(failures > 0
+        ? `已记录 ${succeeded} 位，${failures} 位写入失败。失败项已保留，可关闭后重试。`
+        : statusWarnings > 0
+          ? `已记录 ${succeeded} 位；其中 ${statusWarnings} 位状态刷新失败，重新加载后会按邀约记录显示。`
+          : `已为 ${succeeded} 位 KOL 记录邀约。`)
+      if (failures > 0) setSelectedIds(new Set(failedIds))
+      onRefresh()
+    } catch {
+      setBatchResult('批量记录失败，请刷新后核对。')
     } finally {
       setBatchSending(false)
     }
@@ -334,7 +357,12 @@ export default function KolTable({
             </select>
             {selectedIds.size > 0 && (
               <button
-                onClick={() => { setBatchProduct(''); setShowBatchInvite(true) }}
+                onClick={() => {
+                  setBatchProduct('')
+                  setBatchCopyState('idle')
+                  setBatchResult('')
+                  setShowBatchInvite(true)
+                }}
                 className="inline-flex h-9 items-center gap-2 rounded-[10px] bg-[#1D1D1F] px-4 text-xs font-bold text-white transition active:scale-95"
               >
                 <MailPlus className="h-3.5 w-3.5" /> 批量邀约 {selectedIds.size}
@@ -497,12 +525,12 @@ export default function KolTable({
 
       {showBatchInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setShowBatchInvite(false)} />
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={batchSending ? undefined : closeBatchInvite} />
           <div className="relative w-[520px] max-w-[calc(100vw-32px)] rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-extrabold text-[#1D1D1F]">批量邀约</h3>
-                <p className="mt-1 text-xs font-medium text-[#86868B]">将复制邮箱，并为选中的 KOL 创建本次产品邀约记录。</p>
+                <p className="mt-1 text-xs font-medium text-[#86868B]">先复制收件人；邮件实际发出后，再记录本次邀约。</p>
               </div>
               <span className="rounded-full bg-[#F5F5F7] px-3 py-1 text-xs font-extrabold text-[#1D1D1F]">{selectedKols.length} 位</span>
             </div>
@@ -514,6 +542,38 @@ export default function KolTable({
                 ))}
                 {selectedKols.length > 10 && <span className="px-2 py-1 text-[11px] font-bold text-[#86868B]">+{selectedKols.length - 10}</span>}
               </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <label className="text-xs font-bold text-[#6E6E73]">邮箱收件人</label>
+                <span className="text-[11px] font-bold text-[#86868B]">{batchOutreach.recipients.length} 个邮箱</span>
+              </div>
+              <div className="flex items-stretch gap-2">
+                <textarea
+                  readOnly
+                  value={batchOutreach.recipientText}
+                  rows={3}
+                  className="min-w-0 flex-1 resize-none rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 py-2 text-xs font-semibold leading-5 text-[#1D1D1F] outline-none"
+                  placeholder="所选 KOL 暂无有效邮箱"
+                />
+                <button
+                  type="button"
+                  onClick={copyBatchRecipients}
+                  disabled={!batchOutreach.recipientText}
+                  className="inline-flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-[10px] bg-[#1D1D1F] text-[11px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  {batchCopyState === 'copied' ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {batchCopyState === 'copied' ? '已复制' : '复制收件人'}
+                </button>
+              </div>
+              {batchCopyState === 'failed' && <p className="mt-1.5 text-[11px] font-semibold text-red-600">自动复制失败，请在上方文本框中手动全选复制。</p>}
+              {batchOutreach.missingEmailKols.length > 0 && (
+                <div className="mt-2 flex items-start gap-2 rounded-[10px] border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{batchOutreach.missingEmailKols.length} 位缺少有效邮箱，将不会复制或记录邀约：{batchOutreach.missingEmailKols.map(kol => kol.name).join('、')}</span>
+                </div>
+              )}
             </div>
 
             <div className="mt-5">
@@ -529,22 +589,21 @@ export default function KolTable({
               </select>
             </div>
 
-            {batchDone ? (
-              <div className="mt-5 rounded-[14px] bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-                {batchCopySucceeded ? '邮箱已复制，邀约记录已创建' : '邀约记录已创建，邮箱复制需手动处理'}
+            {batchResult ? (
+              <div className={`mt-5 rounded-[14px] px-4 py-3 text-sm font-bold ${batchResult.includes('失败') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                {batchResult}
               </div>
-            ) : (
-              <div className="mt-6 flex justify-end gap-2">
-                <button onClick={() => setShowBatchInvite(false)} className="h-10 rounded-[10px] px-4 text-sm font-bold text-[#6E6E73] transition hover:bg-[#F5F5F7]">取消</button>
-                <button
-                  onClick={handleBatchInvite}
-                  disabled={batchSending || !batchProduct.trim()}
-                  className="h-10 rounded-[10px] bg-[#0066FF] px-5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] transition disabled:opacity-50"
-                >
-                  {batchSending ? '处理中...' : '确认邀约'}
-                </button>
-              </div>
-            )}
+            ) : null}
+            <div className="mt-6 flex justify-end gap-2">
+              <button onClick={closeBatchInvite} disabled={batchSending} className="h-10 rounded-[10px] px-4 text-sm font-bold text-[#6E6E73] transition hover:bg-[#F5F5F7] disabled:opacity-50">关闭</button>
+              <button
+                onClick={handleBatchInvite}
+                disabled={batchSending || !batchProduct.trim() || batchOutreach.validKols.length === 0 || Boolean(batchResult)}
+                className="h-10 rounded-[10px] bg-[#0066FF] px-5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] transition disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {batchSending ? '正在记录...' : '邮件已发送，记录邀约'}
+              </button>
+            </div>
           </div>
         </div>
       )}
