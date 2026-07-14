@@ -9,9 +9,11 @@ describe('K1 canonicalization migration', () => {
   })
 
   it('updates every workflow source and verifies no aliases remain', () => {
-    for (const table of ['invitations', 'shipments', 'collaborations', 'kols']) {
+    for (const table of ['invitations', 'shipments', 'collaborations']) {
       expect(migration).toContain(`UPDATE public.${table}`)
     }
+    expect(migration).not.toContain('sample_product')
+    expect(migration).not.toContain('UPDATE public.kols')
     expect(migration).toContain('Non-canonical K1 workflow references remain.')
     expect(migration.trimStart()).toMatch(/^BEGIN;/)
     expect(migration.trimEnd()).toMatch(/COMMIT;$/)

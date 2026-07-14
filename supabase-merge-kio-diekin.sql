@@ -58,10 +58,6 @@ BEGIN
       WHEN btrim(target_kol.notes) = btrim(source_kol.notes) THEN target_kol.notes
       ELSE target_kol.notes || E'\n' || source_kol.notes
     END,
-    shipping_details = coalesce(nullif(btrim(target_kol.shipping_details), ''), source_kol.shipping_details),
-    sample_product = coalesce(nullif(btrim(source_kol.sample_product), ''), target_kol.sample_product),
-    sample_date = coalesce(source_kol.sample_date, target_kol.sample_date),
-    tracking_number = coalesce(nullif(btrim(source_kol.tracking_number), ''), target_kol.tracking_number),
     blacklisted_at = coalesce(target_kol.blacklisted_at, source_kol.blacklisted_at),
     blacklist_reason = coalesce(nullif(btrim(target_kol.blacklist_reason), ''), source_kol.blacklist_reason),
     status = CASE

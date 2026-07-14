@@ -27,11 +27,6 @@ BEGIN
   WHERE lower(btrim(coalesce(product, ''))) IN ('k1', 'k1/nas', 'nas/k1')
     AND product IS DISTINCT FROM 'K1';
 
-  UPDATE public.kols
-  SET sample_product = 'K1', updated_at = now()
-  WHERE lower(btrim(coalesce(sample_product, ''))) IN ('k1', 'k1/nas', 'nas/k1')
-    AND sample_product IS DISTINCT FROM 'K1';
-
   IF EXISTS (
     SELECT 1 FROM public.invitations
     WHERE lower(btrim(coalesce(product, ''))) IN ('k1', 'k1/nas', 'nas/k1')

@@ -19,4 +19,11 @@ describe('Kio Diekin duplicate merge migration', () => {
       migration.indexOf('DELETE FROM public.kols')
     )
   })
+
+  it('does not depend on removed legacy shipment summary columns on kols', () => {
+    for (const field of ['sample_product', 'sample_date', 'tracking_number', 'shipping_details']) {
+      expect(migration).not.toContain(`source_kol.${field}`)
+      expect(migration).not.toContain(`target_kol.${field}`)
+    }
+  })
 })
