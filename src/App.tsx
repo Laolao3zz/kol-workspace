@@ -232,7 +232,6 @@ function App() {
               <CollaborationHistoryView
                 kols={kols}
                 collaborationsByKol={collaborationsByKol}
-                productOptions={productOptions}
                 onSelectKol={setSelectedKol}
               />
             )}

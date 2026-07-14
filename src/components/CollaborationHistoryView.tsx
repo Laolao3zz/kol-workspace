@@ -1,6 +1,6 @@
 import { DollarSign, ExternalLink, Eye, MessageSquare, Search, ThumbsUp } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Collaboration, KOL } from '../types'
 import { hasPublishReadyCollaborationSignal } from '../utils/kolStatus'
 import { sameProduct } from '../utils/productMatching'
@@ -8,11 +8,11 @@ import { getContentShapeMetricLabels, getKolContentShape } from '../utils/conten
 import { stripShipmentHistoryMarkers } from '../utils/collaborationArchive'
 import { toSafeExternalUrl } from '../utils/profileUrl'
 import { getAvatarTone } from '../utils/visualTone'
+import { collectCollaborationHistoryProducts } from '../utils/collaborationHistory'
 
 interface Props {
   kols: KOL[]
   collaborationsByKol: Record<string, Collaboration[]>
-  productOptions: string[]
   onSelectKol: (kol: KOL) => void
 }
 
@@ -33,7 +33,7 @@ const parseFee = (value: string) => {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-export default function CollaborationHistoryView({ kols, collaborationsByKol, productOptions, onSelectKol }: Props) {
+export default function CollaborationHistoryView({ kols, collaborationsByKol, onSelectKol }: Props) {
   const [query, setQuery] = useState('')
   const [product, setProduct] = useState('')
 
@@ -47,6 +47,14 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, pr
         .map(collaboration => ({ kol, collaboration }))
     }).sort((a, b) => (b.collaboration.publish_date || '').localeCompare(a.collaboration.publish_date || ''))
   }, [kols, collaborationsByKol])
+  const productOptions = useMemo(
+    () => collectCollaborationHistoryProducts(rows.map(row => row.collaboration)),
+    [rows]
+  )
+
+  useEffect(() => {
+    if (product && !productOptions.includes(product)) setProduct('')
+  }, [product, productOptions])
 
   const q = query.trim().toLowerCase()
   const filtered = rows.filter(row => {
@@ -132,7 +140,13 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, pr
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-[#F5F5F7] px-2.5 py-1 text-[11px] font-bold text-[#6E6E73]">{row.collaboration.product}</span>
+                    {row.collaboration.product?.trim() ? (
+                      <span className="rounded-full bg-[#F5F5F7] px-2.5 py-1 text-[11px] font-bold text-[#6E6E73]">{row.collaboration.product.trim()}</span>
+                    ) : (
+                      <button type="button" onClick={() => onSelectKol(row.kol)} className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 transition hover:bg-red-100">
+                        未标注产品 · 修正
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs font-semibold text-[#6E6E73]">{row.collaboration.publish_date || '-'}</td>
                   <td className="px-4 py-3">
