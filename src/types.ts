@@ -21,6 +21,7 @@ export interface KOL {
 
 export interface Invitation {
   id: string
+  created_at?: string
   kol_id: string
   product: string
   invited_at: string
@@ -98,7 +99,6 @@ export const CONTENT_SHAPES = ['视频', '网站']
 export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '内容跟进', '合作完成', '拒绝合作', '我方拒绝', '异常']
 export const SHIPMENT_STATUSES = ['待寄出', '运输中', '已签收']
 export const PROGRESS_STATUSES = ['待制作', '制作中', '待发布', '已完成', '暂停/异常']
-export const TAGS = ['SBC', '科技', 'NAS', '户外装备', '无线电', 'Mini PC', 'AI', 'Robotics', 'Smart Home', 'Networking', 'Storage']
 export const REPLY_RESULTS = ['同意合作', '拒绝合作', '未回复']
 export const INVITATION_DECISIONS = ['待评估', '继续推进', '我方拒绝']
 export const DECISION_REASONS = ['报价过高', '产品不匹配', '档期不合适', '暂缓推进']

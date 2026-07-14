@@ -1,8 +1,10 @@
-import { Plus, Sparkles, UserPlus, X } from 'lucide-react'
+import { Sparkles, UserPlus, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { PLATFORMS, TAGS } from '../types'
+import { PLATFORMS } from '../types'
 import type { KOL } from '../types'
 import { inferKolProfileFromUrl, normalizeProfileUrl } from '../utils/profileUrl'
+import { collectTagOptions } from '../utils/tags'
+import TagSelector from './TagSelector'
 
 interface Props {
   onClose: () => void
@@ -47,8 +49,11 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
   })
   const [profileUrlInput, setProfileUrlInput] = useState('')
   const [profileHint, setProfileHint] = useState('')
-  const [tagInput, setTagInput] = useState('')
   const [customCountry, setCustomCountry] = useState(false)
+  const tagOptions = useMemo(
+    () => collectTagOptions(existingKols.flatMap(kol => kol.tags || [])),
+    [existingKols]
+  )
 
   const duplicateMatches = useMemo<DuplicateMatch[]>(() => {
     const name = normalizeText(form.name)
@@ -91,18 +96,6 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
     e.preventDefault()
     if (!form.name.trim() || hasDuplicate) return
     onSubmit(form)
-  }
-
-  const addTag = (tag: string) => {
-    const t = tag.trim()
-    if (t && !form.tags.includes(t)) {
-      setForm(prev => ({ ...prev, tags: [...prev.tags, t] }))
-    }
-    setTagInput('')
-  }
-
-  const removeTag = (tag: string) => {
-    setForm(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }))
   }
 
   return (
@@ -272,40 +265,12 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">领域标签</label>
-            <div className="flex flex-wrap gap-1 mb-2">
-              {form.tags.map(tag => (
-                <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-[#0066FF]">
-                  {tag}
-                  <button type="button" onClick={() => removeTag(tag)} className="hover:text-blue-800">&times;</button>
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={tagInput}
-                onChange={e => setTagInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput) } }}
-                className="h-10 flex-1 rounded-[10px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
-                placeholder="输入标签后按回车"
-              />
-              <button type="button" onClick={() => addTag(tagInput)} className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-blue-200 px-3 text-xs font-bold text-[#0066FF] hover:bg-blue-50">
-                <Plus className="h-3.5 w-3.5" />
-                添加
-              </button>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {TAGS.filter(t => !form.tags.includes(t)).map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => addTag(t)}
-                  className="rounded-full bg-[#F5F5F7] px-2 py-0.5 text-xs font-bold text-[#6E6E73] hover:bg-blue-50 hover:text-[#0066FF]"
-                >
-                  + {t}
-                </button>
-              ))}
-            </div>
+            <TagSelector
+              value={form.tags}
+              options={tagOptions}
+              onChange={tags => setForm(prev => ({ ...prev, tags }))}
+              placeholder="搜索现有标签，或输入新标签"
+            />
           </div>
 
           <div>

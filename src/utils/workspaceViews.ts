@@ -140,16 +140,20 @@ export function countActiveShipments(shipments: Shipment[]): number {
 }
 
 export function buildDashboardMetrics(sources: DashboardMetricSources): DashboardMetrics {
-  const activeShipments = sources.shipments.filter(hasActiveShipment)
+  const availableKolIds = new Set(sources.kols.filter(kol => !kol.blacklisted_at).map(kol => kol.id))
+  const activeShipments = sources.shipments.filter(shipment =>
+    hasActiveShipment(shipment) && availableKolIds.has(shipment.kol_id)
+  )
   const collaborations = flatCollaborations(sources.collaborationsByKol)
+  const pendingReplies = getActionablePendingInvitations(
+    sources.invitations,
+    sources.shipments,
+    sources.collaborationsByKol
+  ).filter(invitation => availableKolIds.has(invitation.kol_id))
 
   return {
     totalKols: sources.kols.length,
-    pendingReplies: getActionablePendingInvitations(
-      sources.invitations,
-      sources.shipments,
-      sources.collaborationsByKol
-    ).length,
+    pendingReplies: pendingReplies.length,
     pendingShipments: activeShipments.filter(shipment =>
       shipment.status === '待寄出' && !shipment.tracking_number?.trim()
     ).length,
@@ -169,7 +173,10 @@ export function buildDashboardMetrics(sources: DashboardMetricSources): Dashboar
 function latestInvitationForProduct(invitations: Invitation[], product: string): Invitation | null {
   const matches = invitations.filter(invitation => sameProduct(invitation.product, product))
   if (matches.length === 0) return null
-  return matches.reduce((latest, invitation) => invitation.invited_at > latest.invited_at ? invitation : latest)
+  const timelineKey = (invitation: Invitation) => `${invitation.invited_at || ''}|${invitation.created_at || ''}`
+  return matches.reduce((latest, invitation) =>
+    timelineKey(invitation) > timelineKey(latest) ? invitation : latest
+  )
 }
 
 function shipmentForProduct(shipments: Shipment[], product: string): Shipment | null {

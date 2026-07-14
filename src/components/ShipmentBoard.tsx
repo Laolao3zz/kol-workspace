@@ -93,7 +93,9 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
   const kolMap = useMemo(() => new Map(kols.map(kol => [kol.id, kol])), [kols])
 
   const columns = useMemo<BoardColumn[]>(() => {
-    const visibleShipments = shipments.filter(isShipmentVisible)
+    const visibleShipments = shipments.filter(shipment =>
+      isShipmentVisible(shipment) && !kolMap.get(shipment.kol_id)?.blacklisted_at
+    )
     const pending = visibleShipments.filter(shipment => shipment.status === '待寄出' && !shipment.tracking_number?.trim())
     const transit = visibleShipments.filter(shipment => shipment.status === '运输中' || (shipment.tracking_number?.trim() && shipment.status !== '已签收' && !isShipmentCompleted(shipment)))
     const inProgress = visibleShipments
@@ -109,7 +111,7 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
       { key: 'progress', label: '内容跟进', subtitle: '样品已签收', icon: Clock3, dot: 'bg-[#FF3B30]', tint: 'bg-rose-50/60', shipments: inProgress },
       { key: 'completed', label: '待归档', subtitle: '补作品数据', icon: Archive, dot: 'bg-[#34C759]', tint: 'bg-emerald-50/60', shipments: completed },
     ]
-  }, [shipments])
+  }, [kolMap, shipments])
 
   const overdueCount = columns.find(column => column.key === 'progress')?.shipments.filter(shipment => daysSince(shipment.delivered_at) >= 60).length || 0
 

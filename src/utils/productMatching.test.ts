@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Product } from '../types'
-import { getProductName, mergeOpportunityProducts, normalizeProductName } from './productMatching'
+import { getProductName, mergeOpportunityProducts, normalizeProductName, shouldShowProductForKol } from './productMatching'
 
 const product = (name: string, overrides: Partial<Product> = {}): Product => ({
   id: `product_${name}`,
@@ -33,5 +33,12 @@ describe('product matching helpers', () => {
 
     expect(merged.map(getProductName)).toEqual(['Atlas NAS 4-bay', 'Paused Product'])
     expect(typeof merged[0]).toBe('object')
+  })
+
+  it('matches products by KOL tags without using legacy content-shape fields', () => {
+    expect(shouldShowProductForKol(
+      { tags: ['NAS'], platform: 'Blog', blacklisted_at: null },
+      product('K1', { target_kol_tags: ['NAS'], target_content_shapes: ['视频'] })
+    )).toBe(true)
   })
 })

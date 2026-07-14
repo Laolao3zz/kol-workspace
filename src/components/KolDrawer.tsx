@@ -30,6 +30,8 @@ import type { ProductCorrectionPlan } from '../utils/productCorrection'
 import { toExternalProfileUrl, toSafeExternalUrl } from '../utils/profileUrl'
 import { runPostPersistWorkflow } from '../utils/persistedWrite'
 import { getAvatarTone } from '../utils/visualTone'
+import { canonicalizeTags } from '../utils/tags'
+import TagSelector from './TagSelector'
 
 interface Props {
   kol: KOL
@@ -37,6 +39,7 @@ interface Props {
   collaborationCount: number
   products: Product[]
   productOptions: string[]
+  tagOptions: string[]
   onClose: () => void
   onUpdate: (id: string, updates: Partial<KOL>) => Promise<KOL> | KOL
   onInvitationsChange: () => Promise<void> | void
@@ -73,7 +76,7 @@ const opportunityHint = (status: OpportunityStatus) => {
   return map[status]
 }
 
-export default function KolDrawer({ kol, shipments, products, productOptions, onClose, onUpdate, onInvitationsChange, onCollaborationsChange, onShipmentsChange }: Props) {
+export default function KolDrawer({ kol, shipments, products, productOptions, tagOptions, onClose, onUpdate, onInvitationsChange, onCollaborationsChange, onShipmentsChange }: Props) {
   const [toast, setToast] = useState('')
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [collaborations, setCollaborations] = useState<Collaboration[]>([])
@@ -198,9 +201,8 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
     }
   }
 
-  const saveTags = async (raw: string) => {
-    const tags = raw.split(',').map(s => s.trim()).filter(Boolean)
-    await save('tags', tags)
+  const saveTags = async (tags: string[]) => {
+    await save('tags', canonicalizeTags(tags, tagOptions))
   }
 
   const openBlacklistModal = () => {
@@ -737,7 +739,15 @@ export default function KolDrawer({ kol, shipments, products, productOptions, on
                   <InlineEdit label="主页链接" value={kol.homepage_url} onSave={v => save('homepage_url', v)} />
                   <InlineEdit label="粉丝量级" value={kol.followers} onSave={v => save('followers', v)} />
                   <InlineEdit label="国家/地区" value={kol.country} onSave={v => save('country', v)} />
-                  <InlineEdit label="领域标签" value={kol.tags.join(', ')} onSave={saveTags} />
+                  <div className="md:col-span-2">
+                    <div className="mb-1 text-[11px] font-bold text-[#86868B]">领域标签</div>
+                    <TagSelector
+                      value={kol.tags || []}
+                      options={tagOptions}
+                      onChange={tags => void saveTags(tags)}
+                      placeholder="搜索现有标签，或输入新标签"
+                    />
+                  </div>
                   <InlineEdit label="KOL 备注" value={kol.notes || ''} onSave={v => save('notes', v)} type="textarea" />
                 </FieldGrid>
               </SectionCard>

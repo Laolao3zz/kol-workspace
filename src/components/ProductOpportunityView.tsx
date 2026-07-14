@@ -1,14 +1,15 @@
-import { Archive, Check, ChevronDown, ChevronRight, ListFilter, Package, Pencil, Plus, Search, Tag, Trash2, UserRound, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, ListFilter, MailPlus, Package, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
-import { TAGS, type Collaboration, type Invitation, type KOL, type Product, type Shipment } from '../types'
+import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
 import { createProduct, deleteProduct, updateProduct, type ProductInput } from '../services/productService'
-import { CONTENT_SHAPES } from '../utils/contentShape'
 import { deriveProductDraftsFromHistory } from '../utils/productExtraction'
-import { mergeOpportunityProducts } from '../utils/productMatching'
-import { canonicalizeProductTags, collectProductTagOptions } from '../utils/productTags'
+import { mergeOpportunityProducts, sameProduct } from '../utils/productMatching'
 import { buildProductOpportunitySummary, filterOpportunityRowsByStatus, type OpportunityStatus, type OpportunityStatusFilter } from '../utils/workspaceViews'
 import { countProductDeletionReferences } from '../utils/productCorrection'
 import { getAvatarTone, getTagTone } from '../utils/visualTone'
+import { canonicalizeTags, collectTagOptions } from '../utils/tags'
+import TagSelector from './TagSelector'
+import ProductBatchInviteModal from './ProductBatchInviteModal'
 
 interface Props {
   products: Product[]
@@ -18,6 +19,7 @@ interface Props {
   collaborationsByKol: Record<string, Collaboration[]>
   productOptions: string[]
   onProductsChange: () => Promise<void> | void
+  onDataChange: () => Promise<void> | void
   onSelectKol: (kol: KOL) => void
 }
 
@@ -49,36 +51,22 @@ const statusOrder: OpportunityStatus[] = ['未触达', '待回复', '已同意',
 
 const fmtFollowers = (value: string) => value?.trim() || '-'
 
-const PRODUCT_STATUSES = ['在推', '暂停', '归档']
-
 interface ProductFormState {
   name: string
-  category: string
   target_kol_tags: string[]
-  target_content_shapes: string[]
-  status: string
-  priority: string
   notes: string
 }
 
 const emptyProductForm: ProductFormState = {
   name: '',
-  category: '',
   target_kol_tags: [],
-  target_content_shapes: [...CONTENT_SHAPES],
-  status: '在推',
-  priority: '50',
   notes: '',
 }
 
-function formFromProduct(product: Product, tagOptions: string[] = TAGS): ProductFormState {
+function formFromProduct(product: Product, tagOptions: string[]): ProductFormState {
   return {
     name: product.name,
-    category: product.category || '',
-    target_kol_tags: canonicalizeProductTags(product.target_kol_tags || [], tagOptions),
-    target_content_shapes: product.target_content_shapes?.length ? product.target_content_shapes : [...CONTENT_SHAPES],
-    status: product.status || '在推',
-    priority: String(product.priority ?? 0),
+    target_kol_tags: canonicalizeTags(product.target_kol_tags || [], tagOptions),
     notes: product.notes || '',
   }
 }
@@ -86,20 +74,22 @@ function formFromProduct(product: Product, tagOptions: string[] = TAGS): Product
 function productPayloadFromForm(form: ProductFormState): ProductInput {
   return {
     name: form.name.trim(),
-    category: form.category.trim(),
-    target_kol_tags: canonicalizeProductTags(form.target_kol_tags),
-    target_content_shapes: form.target_content_shapes,
-    status: form.status,
-    priority: Number.isFinite(Number(form.priority)) ? Number(form.priority) : 0,
+    category: '',
+    target_kol_tags: canonicalizeTags(form.target_kol_tags),
+    target_content_shapes: [],
+    status: '在推',
+    priority: 0,
     notes: form.notes.trim(),
   }
 }
 
-export default function ProductOpportunityView({ products, kols, invitations, shipments, collaborationsByKol, productOptions, onProductsChange, onSelectKol }: Props) {
+export default function ProductOpportunityView({ products, kols, invitations, shipments, collaborationsByKol, productOptions, onProductsChange, onDataChange, onSelectKol }: Props) {
   const [selectedProduct, setSelectedProduct] = useState('')
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<OpportunityStatusFilter>('全部')
   const [showUntouched, setShowUntouched] = useState(false)
+  const [selectedKolIds, setSelectedKolIds] = useState<Set<string>>(new Set())
+  const [showBatchInvite, setShowBatchInvite] = useState(false)
   const opportunityProducts = useMemo(
     () => mergeOpportunityProducts(products, productOptions),
     [products, productOptions]
@@ -121,6 +111,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
 
   useEffect(() => {
     setShowUntouched(false)
+    setSelectedKolIds(new Set())
   }, [selectedProduct])
 
   const selected = summary.find(item => item.product === selectedProduct) || summary[0]
@@ -140,6 +131,18 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
     return counts
   }, {} as Record<OpportunityStatus, number>)
   const filteredRows = filterOpportunityRowsByStatus(queryFilteredRows, statusFilter)
+  const selectedKols = kols.filter(kol => selectedKolIds.has(kol.id) && !kol.blacklisted_at)
+  const selectableFilteredKols = filteredRows.map(row => row.kol).filter(kol => !kol.blacklisted_at)
+  const allFilteredSelected = selectableFilteredKols.length > 0 && selectableFilteredKols.every(kol => selectedKolIds.has(kol.id))
+  const toggleSelectedKol = (kol: KOL) => {
+    if (kol.blacklisted_at) return
+    setSelectedKolIds(current => {
+      const next = new Set(current)
+      if (next.has(kol.id)) next.delete(kol.id)
+      else next.add(kol.id)
+      return next
+    })
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -196,6 +199,30 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                 </button>
               )
             })}
+            {selectableFilteredKols.length > 0 && (
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedKolIds(current => {
+                    const next = new Set(current)
+                    if (allFilteredSelected) selectableFilteredKols.forEach(kol => next.delete(kol.id))
+                    else selectableFilteredKols.forEach(kol => next.add(kol.id))
+                    return next
+                  })}
+                  className="h-8 rounded-[9px] bg-[#F5F5F7] px-3 text-[11px] font-bold text-[#6E6E73] hover:bg-gray-200"
+                >
+                  {allFilteredSelected ? '取消全选' : `全选当前 ${selectableFilteredKols.length}`}
+                </button>
+                {selectedKols.length > 0 && (
+                  <>
+                <button type="button" onClick={() => setSelectedKolIds(new Set())} className="h-8 rounded-[9px] px-3 text-[11px] font-bold text-[#86868B] hover:bg-[#F5F5F7]">清除 {selectedKols.length}</button>
+                <button type="button" onClick={() => setShowBatchInvite(true)} className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#0066FF] px-3 text-[11px] font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.25)]">
+                  <MailPlus className="h-3.5 w-3.5" /> 批量邀约
+                </button>
+                  </>
+                )}
+              </div>
+            )}
             <span className="ml-auto text-xs font-bold text-[#86868B]">共 {filteredRows.length} 位 KOL</span>
           </div>
         </div>
@@ -252,12 +279,18 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    {rows.map(row => (
-                      <button
+                    {rows.map(row => {
+                      const invitationCount = (invitations[row.kol.id] || []).filter(invitation => sameProduct(invitation.product, selected.product)).length
+                      const checked = selectedKolIds.has(row.kol.id)
+                      return (
+                      <article
                         key={`${selected.product}-${row.kol.id}-${status}`}
-                        onClick={() => onSelectKol(row.kol)}
-                        className={`rounded-[14px] border border-black/[0.06] bg-white p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition hover:border-[#0066FF]/30 hover:shadow-md ${status === '未回复' || status === '已拒绝' || status === '不推进' ? 'opacity-65' : ''}`}
+                        className={`relative rounded-[14px] border bg-white p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition hover:shadow-md ${checked ? 'border-[#0066FF]/50 ring-2 ring-blue-50' : 'border-black/[0.06] hover:border-[#0066FF]/30'} ${status === '未回复' || status === '已拒绝' || status === '不推进' ? 'opacity-65' : ''}`}
                       >
+                        <button type="button" onClick={() => toggleSelectedKol(row.kol)} disabled={Boolean(row.kol.blacklisted_at)} className="absolute right-3 top-3 z-10" title={row.kol.blacklisted_at ? '已拉黑，不能邀约' : '选择邀约'}>
+                          <span className={`flex h-5 w-5 items-center justify-center rounded border text-[11px] font-bold ${checked ? 'border-[#0066FF] bg-[#0066FF] text-white' : 'border-black/15 bg-white text-transparent'} ${row.kol.blacklisted_at ? 'cursor-not-allowed opacity-30' : ''}`}>✓</span>
+                        </button>
+                        <button type="button" onClick={() => onSelectKol(row.kol)} className="block w-full pr-7 text-left">
                         <div className="flex items-center gap-3">
                           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${getAvatarTone(row.kol.name)}`}>
                             {row.kol.name.slice(0, 2).toUpperCase()}
@@ -265,6 +298,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                           <div className="min-w-0">
                             <div className="truncate text-sm font-extrabold text-[#1D1D1F]">{row.kol.name}</div>
                             <div className="mt-0.5 truncate text-[11px] font-semibold text-[#86868B]">{row.kol.platform} · {fmtFollowers(row.kol.followers)} · {row.kol.country || '-'}</div>
+                            {invitationCount > 1 && <div className="mt-1 text-[10px] font-extrabold text-[#0066FF]">第 {invitationCount} 次邀约</div>}
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-1">
@@ -277,8 +311,10 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
                             </span>
                           )}
                         </div>
-                      </button>
-                    ))}
+                        </button>
+                      </article>
+                      )
+                    })}
                   </div>
                 </section>
               )
@@ -304,6 +340,18 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
           />
         </div>
       </div>
+      {showBatchInvite && selected && (
+        <ProductBatchInviteModal
+          kols={selectedKols}
+          product={selected.product}
+          invitations={invitations}
+          shipments={shipments}
+          collaborationsByKol={collaborationsByKol}
+          onClose={() => setShowBatchInvite(false)}
+          onComplete={failedKolIds => setSelectedKolIds(new Set(failedKolIds))}
+          onDataChange={onDataChange}
+        />
+      )}
     </div>
   )
 }
@@ -329,14 +377,11 @@ function ProductLibraryPanel({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-  const [customTag, setCustomTag] = useState('')
   const operationalProducts = products.filter(product => product.status !== '归档')
-  const archivedProducts = products.filter(product => product.status === '归档')
-  const tagOptions = useMemo(() => collectProductTagOptions(
-    TAGS,
-    kols.flatMap(kol => kol.tags || []),
-    products.flatMap(product => product.target_kol_tags || []),
-  ), [kols, products])
+  const tagOptions = useMemo(
+    () => collectTagOptions(kols.flatMap(kol => kol.tags || [])),
+    [kols]
+  )
   const importCandidates = useMemo(() => deriveProductDraftsFromHistory({
     existingProducts: products,
     kols,
@@ -347,50 +392,13 @@ function ProductLibraryPanel({
   const resetForm = () => {
     setEditingProduct(null)
     setForm(emptyProductForm)
-    setCustomTag('')
     setMessage('')
   }
 
   const startEdit = (product: Product) => {
     setEditingProduct(product)
     setForm(formFromProduct(product, tagOptions))
-    setCustomTag('')
     setMessage('')
-  }
-
-  const toggleTargetTag = (tag: string) => {
-    setForm(current => ({
-      ...current,
-      target_kol_tags: current.target_kol_tags.includes(tag)
-        ? current.target_kol_tags.filter(item => item !== tag)
-        : [...current.target_kol_tags, tag],
-    }))
-  }
-
-  const addCustomTag = () => {
-    const normalized = customTag.trim()
-    if (!normalized) return
-    const existing = tagOptions.find(tag => tag.toLocaleLowerCase() === normalized.toLocaleLowerCase())
-    const nextTag = existing || normalized
-
-    setForm(current => current.target_kol_tags.includes(nextTag)
-      ? current
-      : { ...current, target_kol_tags: [...current.target_kol_tags, nextTag] })
-    setCustomTag('')
-  }
-
-  const toggleShape = (shape: string) => {
-    setForm(current => {
-      const exists = current.target_content_shapes.includes(shape)
-      const nextShapes = exists
-        ? current.target_content_shapes.filter(item => item !== shape)
-        : [...current.target_content_shapes, shape]
-
-      return {
-        ...current,
-        target_content_shapes: nextShapes.length > 0 ? nextShapes : [shape],
-      }
-    })
   }
 
   const handleSubmit = async (event: FormEvent) => {
@@ -413,28 +421,9 @@ function ProductLibraryPanel({
       onSelectProduct(saved.name)
       setEditingProduct(null)
       setForm(emptyProductForm)
-      setCustomTag('')
       setMessage(editingProduct ? '产品已更新' : '产品已新增')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '保存失败')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const archiveProduct = async (product: Product) => {
-    if (product.status === '归档') return
-    if (!confirm(`归档产品「${product.name}」？`)) return
-
-    setSaving(true)
-    setMessage('')
-    try {
-      await updateProduct(product.id, { status: '归档' })
-      await onProductsChange()
-      if (editingProduct?.id === product.id) resetForm()
-      setMessage('产品已归档')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : '归档失败')
     } finally {
       setSaving(false)
     }
@@ -501,7 +490,7 @@ function ProductLibraryPanel({
       <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3">
         <div>
           <div className="text-sm font-extrabold text-[#1D1D1F]">产品库</div>
-          <div className="mt-0.5 text-[11px] font-semibold text-[#86868B]">{operationalProducts.length} 个在用{archivedProducts.length > 0 ? ` · ${archivedProducts.length} 个已归档` : ''}</div>
+          <div className="mt-0.5 text-[11px] font-semibold text-[#86868B]">{operationalProducts.length} 个产品</div>
         </div>
         <div className="flex items-center gap-2">
           {importCandidates.length > 0 && (
@@ -526,10 +515,10 @@ function ProductLibraryPanel({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)]">
       <form onSubmit={handleSubmit} className="space-y-3 border-b border-black/[0.06] px-5 py-4 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r">
-        <div className="grid grid-cols-2 gap-2">
-          <label className="col-span-2">
+        <div className="space-y-3">
+          <label className="block">
             <span className="mb-1 block text-[11px] font-bold text-[#86868B]">产品名称</span>
             <input
               value={form.name}
@@ -537,98 +526,18 @@ function ProductLibraryPanel({
               className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40 focus:bg-white"
             />
           </label>
-          <label>
-            <span className="mb-1 block text-[11px] font-bold text-[#86868B]">分类</span>
-            <input
-              value={form.category}
-              onChange={event => setForm(current => ({ ...current, category: event.target.value }))}
-              className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40 focus:bg-white"
-            />
-          </label>
-          <label>
-            <span className="mb-1 block text-[11px] font-bold text-[#86868B]">优先级</span>
-            <input
-              type="number"
-              value={form.priority}
-              onChange={event => setForm(current => ({ ...current, priority: event.target.value }))}
-              className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40 focus:bg-white"
-            />
-          </label>
-          <div className="col-span-2">
+          <div>
             <span className="mb-1 block text-[11px] font-bold text-[#86868B]">目标 KOL 标签</span>
-            <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] p-2">
-              {tagOptions.map(tag => {
-                const selected = form.target_kol_tags.includes(tag)
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => toggleTargetTag(tag)}
-                    className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-bold transition ${selected ? 'bg-[#0066FF] text-white shadow-sm' : 'bg-white text-[#6E6E73] hover:bg-blue-50 hover:text-[#0066FF]'}`}
-                  >
-                    {selected && <Check className="h-3 w-3" />}
-                    {tag}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-1.5 flex gap-1.5">
-              <div className="relative min-w-0 flex-1">
-                <Tag className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#AEAEB2]" />
-                <input
-                  value={customTag}
-                  onChange={event => setCustomTag(event.target.value)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addCustomTag()
-                    }
-                  }}
-                  placeholder="没有合适标签时新增"
-                  className="h-8 w-full rounded-[9px] border border-black/[0.08] bg-white pl-8 pr-2 text-[11px] font-semibold outline-none transition focus:border-[#0066FF]/40"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={addCustomTag}
-                disabled={!customTag.trim()}
-                className="inline-flex h-8 items-center justify-center gap-1 rounded-[9px] bg-[#1D1D1F] px-3 text-[11px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-35"
-              >
-                <Plus className="h-3.5 w-3.5" /> 新增
-              </button>
-            </div>
+            <TagSelector
+              value={form.target_kol_tags}
+              options={tagOptions}
+              onChange={target_kol_tags => setForm(current => ({ ...current, target_kol_tags }))}
+              allowCreate={false}
+              placeholder="搜索现有 KOL 标签"
+              selectedAreaClassName="min-h-[76px]"
+            />
           </div>
-          <div className="col-span-2">
-            <span className="mb-1 block text-[11px] font-bold text-[#86868B]">内容形态</span>
-            <div className="flex gap-2">
-              {CONTENT_SHAPES.map(shape => {
-                const selected = form.target_content_shapes.includes(shape)
-                return (
-                  <button
-                    key={shape}
-                    type="button"
-                    onClick={() => toggleShape(shape)}
-                    className={`inline-flex h-8 flex-1 items-center justify-center rounded-[9px] text-[11px] font-extrabold transition ${selected ? 'bg-[#1D1D1F] text-white' : 'bg-[#F5F5F7] text-[#6E6E73] hover:bg-gray-200'}`}
-                  >
-                    {selected && <Check className="mr-1 h-3.5 w-3.5" />}
-                    {shape}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-          <label>
-            <span className="mb-1 block text-[11px] font-bold text-[#86868B]">状态</span>
-            <select
-              value={form.status}
-              onChange={event => setForm(current => ({ ...current, status: event.target.value }))}
-              className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40 focus:bg-white"
-            >
-              {PRODUCT_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-            </select>
-          </label>
-          <label className="col-span-2">
+          <label className="block">
             <span className="mb-1 block text-[11px] font-bold text-[#86868B]">备注</span>
             <textarea
               value={form.notes}
@@ -653,7 +562,7 @@ function ProductLibraryPanel({
       </form>
 
       <div className="min-h-0 overflow-y-auto px-5 py-4">
-        {products.length === 0 ? (
+        {operationalProducts.length === 0 ? (
           <div className="rounded-[14px] border border-dashed border-black/[0.08] bg-[#F5F5F7] px-4 py-6 text-center">
             <Package className="mx-auto mb-2 h-5 w-5 text-[#AEAEB2]" />
             <div className="text-xs font-extrabold text-[#1D1D1F]">暂无产品</div>
@@ -670,31 +579,20 @@ function ProductLibraryPanel({
           </div>
         ) : (
           <div className="space-y-2">
-            {products.map(product => {
-              const paused = product.status === '暂停'
-              const tone = product.status === '归档'
-                ? 'bg-slate-100 text-slate-600'
-                : paused
-                  ? 'bg-amber-50 text-amber-700'
-                  : 'bg-emerald-50 text-emerald-700'
-
+            {operationalProducts.map(product => {
               return (
                 <div key={product.id} className="rounded-[12px] border border-black/[0.06] bg-white p-3">
                   <div className="flex items-start justify-between gap-3">
                     <button type="button" onClick={() => onSelectProduct(product.name)} className="min-w-0 flex-1 text-left">
                       <div className="truncate text-xs font-extrabold text-[#1D1D1F]" title={product.name}>{product.name}</div>
-                      <div className="mt-1 truncate text-[11px] font-semibold text-[#86868B]">{product.category || '-'} · P{product.priority || 0}</div>
                     </button>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${tone}`}>{product.status}</span>
                   </div>
 
                   <div className="mt-2 flex flex-wrap gap-1">
                     {(product.target_kol_tags || []).slice(0, 4).map(tag => (
                       <span key={tag} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getTagTone(tag)}`}>{tag}</span>
                     ))}
-                    {(product.target_content_shapes || []).map(shape => (
-                      <span key={shape} className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">{shape}</span>
-                    ))}
+                    {(product.target_kol_tags || []).length === 0 && <span className="text-[10px] font-semibold text-[#AEAEB2]">适用于全部标签</span>}
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -705,15 +603,6 @@ function ProductLibraryPanel({
                     >
                       <Pencil className="h-3.5 w-3.5" /> 编辑
                     </button>
-                    {product.status !== '归档' && (
-                      <button
-                        type="button"
-                        onClick={() => archiveProduct(product)}
-                        className="inline-flex h-7 min-w-[72px] flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-slate-100 text-[11px] font-bold text-slate-600 transition hover:bg-slate-200"
-                      >
-                        <Archive className="h-3.5 w-3.5" /> 归档
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => removeProduct(product)}

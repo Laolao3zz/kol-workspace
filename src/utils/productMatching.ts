@@ -1,5 +1,4 @@
 import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types'
-import { getKolContentShape } from './contentShape'
 
 export type ProductLike = string | Product
 
@@ -60,11 +59,6 @@ export function shouldShowProductForKol(
   if (kol.blacklisted_at) return false
   if (typeof product === 'string') return true
   if (product.status === '归档') return false
-
-  const targetShapes = product.target_content_shapes || []
-  if (targetShapes.length > 0 && !targetShapes.includes(getKolContentShape(kol))) {
-    return false
-  }
 
   const targetTags = product.target_kol_tags || []
   if (targetTags.length === 0) return true

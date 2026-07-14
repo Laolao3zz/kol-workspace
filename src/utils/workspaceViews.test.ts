@@ -368,6 +368,52 @@ describe('workspace view helpers', () => {
     expect(summary[0].rows.map(row => row.kol.id)).toEqual(['blocked-history'])
   })
 
+  it('uses the newest same-day invitation to reset a second outreach to pending', () => {
+    const summary = buildProductOpportunitySummary({
+      products: [product('K1')],
+      kols: [kol('creator')],
+      invitations: {
+        creator: [
+          invitation({
+            id: 'second',
+            kol_id: 'creator',
+            product: 'K1',
+            invited_at: '2026-07-14',
+            created_at: '2026-07-14T09:00:00.000Z',
+          }),
+          invitation({
+            id: 'first',
+            kol_id: 'creator',
+            product: 'K1',
+            invited_at: '2026-07-14',
+            created_at: '2026-07-14T08:00:00.000Z',
+            replied: true,
+            reply_result: '拒绝合作',
+          }),
+        ],
+      },
+      shipments: [],
+      collaborationsByKol: {},
+      currentDate: '2026-07-14',
+    })
+
+    expect(summary[0].rows[0].status).toBe('待回复')
+  })
+
+  it('excludes blacklisted KOL workflow items from dashboard metrics', () => {
+    const metrics = buildDashboardMetrics({
+      kols: [kol('available'), kol('blocked', { blacklisted_at: '2026-07-14T00:00:00.000Z' })],
+      invitations: {},
+      shipments: [
+        shipment({ kol_id: 'available', product: 'K1', status: '已签收' }),
+        shipment({ kol_id: 'blocked', product: 'K1', status: '已签收' }),
+      ],
+      collaborationsByKol: {},
+    })
+
+    expect(metrics.contentFollowUp).toBe(1)
+  })
+
   it('filters product opportunity rows by selected status', () => {
     const rows = [
       { kol: kol('untouched'), status: '未触达' as const },

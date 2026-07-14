@@ -203,14 +203,16 @@ function buildRecentActivities(kols: KOL[], pendingReplies: Invitation[], pendin
 
 export default function WorkspaceDashboard({ kols, invitations, shipments, collaborationsByKol, onSelectKol, onNavigate }: Props) {
   const metrics = buildDashboardMetrics({ kols, invitations, shipments, collaborationsByKol })
+  const availableKolIds = new Set(kols.filter(kol => !kol.blacklisted_at).map(kol => kol.id))
   const pendingReplies = getActionablePendingInvitations(invitations, shipments, collaborationsByKol)
-  const pendingShipments = shipments.filter(shipment => !shipment.archived_at && shipment.status === '待寄出' && !shipment.tracking_number?.trim())
-  const inTransitSoon = shipments.filter(shipment => !shipment.archived_at && shipment.status === '运输中').length
+    .filter(invitation => availableKolIds.has(invitation.kol_id))
+  const pendingShipments = shipments.filter(shipment => availableKolIds.has(shipment.kol_id) && !shipment.archived_at && shipment.status === '待寄出' && !shipment.tracking_number?.trim())
+  const inTransitSoon = shipments.filter(shipment => availableKolIds.has(shipment.kol_id) && !shipment.archived_at && shipment.status === '运输中').length
   const contentFollowUps = shipments
-    .filter(shipment => !shipment.archived_at && shipment.status === '已签收' && !isCompletedShipment(shipment))
+    .filter(shipment => availableKolIds.has(shipment.kol_id) && !shipment.archived_at && shipment.status === '已签收' && !isCompletedShipment(shipment))
     .sort((a, b) => daysSince(b.delivered_at) - daysSince(a.delivered_at))
   const overdueContent = contentFollowUps.filter(shipment => daysSince(shipment.delivered_at) >= 7)
-  const waitingArchive = shipments.filter(shipment => !shipment.archived_at && isCompletedShipment(shipment))
+  const waitingArchive = shipments.filter(shipment => availableKolIds.has(shipment.kol_id) && !shipment.archived_at && isCompletedShipment(shipment))
   const recentActivities = buildRecentActivities(kols, pendingReplies, pendingShipments, overdueContent, collaborationsByKol)
 
   const stats = [

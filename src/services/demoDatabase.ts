@@ -592,6 +592,7 @@ export const demoDatabase = {
     const current = loadState()
     const record: Invitation = {
       id: nextId('invitation'),
+      created_at: new Date().toISOString(),
       kol_id: invitation.kol_id,
       product: invitation.product?.trim() || '',
       invited_at: invitation.invited_at || new Date().toISOString().slice(0, 10),

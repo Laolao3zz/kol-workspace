@@ -13,6 +13,7 @@ import WorkspaceDashboard, { type DashboardNavigateOptions } from './components/
 import ProductOpportunityView from './components/ProductOpportunityView'
 import CollaborationHistoryView from './components/CollaborationHistoryView'
 import { collectProductOptions } from './utils/productOptions'
+import { collectTagOptions } from './utils/tags'
 import { countActiveShipments } from './utils/workspaceViews'
 
 type ViewMode = 'dashboard' | 'table' | 'progress' | 'products' | 'history'
@@ -42,8 +43,9 @@ function formatTodayLabel() {
   return `${year}年${month}月${day}日 · ${weekday}`
 }
 
-function countProgressBadge(shipments: Shipment[]) {
-  return countActiveShipments(shipments)
+function countProgressBadge(shipments: Shipment[], kols: KOL[]) {
+  const availableKolIds = new Set(kols.filter(kol => !kol.blacklisted_at).map(kol => kol.id))
+  return countActiveShipments(shipments.filter(shipment => availableKolIds.has(shipment.kol_id)))
 }
 
 function App() {
@@ -79,7 +81,11 @@ function App() {
     () => products.filter(product => product.status !== '归档').map(product => product.name),
     [products]
   )
-  const progressCount = useMemo(() => countProgressBadge(shipments), [shipments])
+  const tagOptions = useMemo(
+    () => collectTagOptions(kols.flatMap(kol => kol.tags || [])),
+    [kols]
+  )
+  const progressCount = useMemo(() => countProgressBadge(shipments, kols), [shipments, kols])
 
   useEffect(() => {
     if (dataError) {
@@ -217,6 +223,7 @@ function App() {
                 collaborationsByKol={collaborationsByKol}
                 productOptions={productOptions}
                 onProductsChange={refreshProducts}
+                onDataChange={refreshAll}
                 onSelectKol={setSelectedKol}
               />
             )}
@@ -239,6 +246,7 @@ function App() {
             collaborationCount={countCompletedCollaborations(collaborationsByKol[selectedKol.id] || [])}
             products={products}
             productOptions={productOptions}
+            tagOptions={tagOptions}
             onClose={() => setSelectedKol(null)}
             onUpdate={handleUpdateKol}
             onInvitationsChange={() => refreshInvitations(selectedKol.id)}
