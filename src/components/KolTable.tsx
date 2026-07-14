@@ -1,9 +1,9 @@
-import { AlertTriangle, Ban, CheckCircle2, ChevronLeft, ChevronRight, Copy, MailPlus, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react'
+import { AlertTriangle, ArrowUpDown, Ban, CheckCircle2, ChevronLeft, ChevronRight, Copy, MailPlus, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Collaboration, Invitation, KOL, PLATFORMS, Shipment } from '../types'
 import { createInvitation } from '../services/invitationService'
 import { updateKOL } from '../services/kolService'
-import { countCompletedCollaborations, deriveKolStatus } from '../utils/kolStatus'
+import { countCompletedCollaborations, deriveKolStatus, getLatestInvitation } from '../utils/kolStatus'
 import { collectProductOptions } from '../utils/productOptions'
 import { CONTENT_SHAPES, getKolContentShape } from '../utils/contentShape'
 import {
@@ -15,6 +15,7 @@ import { sameProduct } from '../utils/productMatching'
 import { resolveProductSelection } from '../utils/productCorrection'
 import { buildBatchOutreachSelection } from '../utils/batchOutreach'
 import { getAvatarTone, getTagTone } from '../utils/visualTone'
+import { type KolSortOption, sortKols } from '../utils/kolSorting'
 
 interface Props {
   kols: KOL[]
@@ -105,6 +106,7 @@ export default function KolTable({
   const [filterInvProduct, setFilterInvProduct] = useState('')
   const [filterInvStatus, setFilterInvStatus] = useState('')
   const [filterBlacklist, setFilterBlacklist] = useState('')
+  const [sortBy, setSortBy] = useState<KolSortOption>('created_desc')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showBatchInvite, setShowBatchInvite] = useState(false)
   const [batchProduct, setBatchProduct] = useState('')
@@ -115,9 +117,7 @@ export default function KolTable({
   const [pageSize, setPageSize] = useState(25)
 
   const getLatestInv = (kolId: string): Invitation | null => {
-    const invs = invitations[kolId] || []
-    if (invs.length === 0) return null
-    return invs.reduce((latest, inv) => !latest || inv.invited_at > latest.invited_at ? inv : latest)
+    return getLatestInvitation(invitations[kolId] || [])
   }
 
   const allTags = useMemo(() => {
@@ -140,7 +140,7 @@ export default function KolTable({
   }, [productOptions])
 
   const filtered = useMemo(() => {
-    return kols.filter(kol => {
+    const matches = kols.filter(kol => {
       const q = search.trim().toLowerCase()
       const matchSearch = !q ||
         text(kol.name).includes(q) ||
@@ -179,12 +179,30 @@ export default function KolTable({
 
       return matchSearch && matchContentShape && matchPlatform && matchTag && matchInvProduct && matchInvStatus && matchBlacklist
     })
-  }, [kols, search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, filterBlacklist, invitations, shipments, allCollaborations])
+    return sortKols(matches, sortBy, invitations, collaborationsByKol)
+  }, [kols, search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, filterBlacklist, invitations, shipments, allCollaborations, sortBy, collaborationsByKol])
+
+  const activeFilterCount = [search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, filterBlacklist]
+    .filter(Boolean).length
+
+  const clearFilters = () => {
+    setSearch('')
+    setFilterContentShape('')
+    setFilterPlatform('')
+    setFilterTag('')
+    setFilterInvProduct('')
+    setFilterInvStatus('')
+    setFilterBlacklist('')
+  }
 
   useEffect(() => {
     setPage(1)
     setSelectedIds(new Set())
   }, [search, filterContentShape, filterPlatform, filterTag, filterInvProduct, filterInvStatus, filterBlacklist, pageSize])
+
+  useEffect(() => {
+    setPage(1)
+  }, [sortBy])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -336,7 +354,8 @@ export default function KolTable({
             </button>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-4 rounded-[10px] border border-black/[0.06] bg-[#F7F8FA] p-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[260px] flex-1">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#AEAEB2]" />
               <input
@@ -344,12 +363,15 @@ export default function KolTable({
                 placeholder="搜索名称 / 邮箱 / 主页 / 国家 / 标签"
                 value={search}
                 onChange={event => setSearch(event.target.value)}
-                className="h-9 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] pl-9 pr-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40 focus:bg-white"
+                className="h-9 w-full rounded-[8px] border border-black/[0.08] bg-white pl-9 pr-3 text-xs font-semibold outline-none transition focus:border-[#0066FF]/40"
               />
             </div>
+            <span className="inline-flex h-9 items-center gap-1.5 px-1 text-[11px] font-bold text-[#86868B]">
+              <SlidersHorizontal className="h-3.5 w-3.5" /> 筛选
+            </span>
             <FilterSelect value={filterContentShape} onChange={setFilterContentShape} options={CONTENT_SHAPES} placeholder="全部形态" />
             <FilterSelect value={filterPlatform} onChange={setFilterPlatform} options={PLATFORMS} placeholder="全部平台" />
-            <FilterSelect value={filterTag} onChange={setFilterTag} options={allTags} placeholder="全部分类" />
+            <FilterSelect value={filterTag} onChange={setFilterTag} options={allTags} placeholder="全部标签" />
             <FilterSelect value={filterInvProduct} onChange={setFilterInvProduct} options={allInvProducts} placeholder="邀约产品" />
             <select
               value={filterInvStatus}
@@ -372,6 +394,31 @@ export default function KolTable({
               <option value="available">可联系</option>
               <option value="blacklisted">已拉黑</option>
             </select>
+            <span className="h-6 w-px bg-black/[0.08]" />
+            <div className="relative">
+              <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#86868B]" />
+              <select
+                value={sortBy}
+                onChange={event => setSortBy(event.target.value as KolSortOption)}
+                className="h-9 rounded-[8px] border border-black/[0.08] bg-white pl-8 pr-3 text-xs font-bold text-[#525257] outline-none focus:border-[#0066FF]/40"
+                aria-label="排序方式"
+              >
+                <option value="created_desc">最近添加</option>
+                <option value="updated_desc">最近更新</option>
+                <option value="name_asc">名称 A-Z</option>
+                <option value="followers_desc">粉丝数从高到低</option>
+                <option value="invitation_desc">最近邀约优先</option>
+                <option value="collaborations_desc">合作次数从多到少</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={clearFilters}
+              disabled={activeFilterCount === 0}
+              className="inline-flex h-9 items-center gap-1.5 rounded-[8px] px-3 text-xs font-bold text-[#6E6E73] transition hover:bg-white hover:text-[#1D1D1F] disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              <X className="h-3.5 w-3.5" /> 清除筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ''}
+            </button>
             {selectedIds.size > 0 && (
               <button
                 onClick={() => {
@@ -385,6 +432,7 @@ export default function KolTable({
                 <MailPlus className="h-3.5 w-3.5" /> 批量邀约 {selectedIds.size}
               </button>
             )}
+          </div>
           </div>
         </div>
 
@@ -657,7 +705,7 @@ function FilterSelect({
     <select
       value={value}
       onChange={event => onChange(event.target.value)}
-      className="h-9 rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] outline-none focus:border-[#0066FF]/40"
+      className="h-9 rounded-[8px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] outline-none focus:border-[#0066FF]/40"
     >
       <option value="">{placeholder}</option>
       {options.map(option => <option key={option} value={option}>{option}</option>)}

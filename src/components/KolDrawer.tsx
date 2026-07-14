@@ -1008,7 +1008,7 @@ function SectionCard({ icon: Icon, title, action, children }: {
   icon: LucideIcon; title: string; action?: React.ReactNode; children: React.ReactNode
 }) {
   return (
-    <div className="overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+    <div className="relative overflow-visible rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       <div className="flex items-center justify-between border-b border-black/[0.06] px-4 py-3">
         <h3 className="flex items-center gap-2 text-sm font-extrabold text-[#1D1D1F]">
           <span className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-[#F4F5F7] text-[#1D1D1F]"><Icon className="h-4 w-4" /></span>
