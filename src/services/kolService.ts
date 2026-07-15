@@ -3,6 +3,8 @@ import type { KOL } from '../types'
 import { demoDatabase } from './demoDatabase'
 import { retryOperation } from '../utils/retry'
 import { logError, logWarning } from '../utils/logger'
+import { findKolDuplicateMatches, hasBlockingKolDuplicate } from '../utils/kolDuplicate'
+import { analyzeKolProfileUrl, isUnresolvedContentUrl } from '../utils/profileUrl'
 
 export async function getKOLs(): Promise<KOL[]> {
   try {
@@ -39,15 +41,33 @@ export async function createKOL(
       throw new Error('KOL 名称不能为空')
     }
 
+    if (isUnresolvedContentUrl(kol.homepage_url)) {
+      throw new Error('主页链接是无法识别作者的内容页面，请改为 KOL 主页或频道链接')
+    }
+
+    const profileAnalysis = kol.homepage_url ? analyzeKolProfileUrl(kol.homepage_url) : null
+    const payload = {
+      ...kol,
+      name: kol.name.trim(),
+      email: kol.email?.trim() || '',
+      homepage_url: profileAnalysis?.canonical_profile_url || kol.homepage_url?.trim() || '',
+    }
+    const duplicateMatches = findKolDuplicateMatches(payload, await getKOLs())
+    const blockingMatches = duplicateMatches.filter(match => match.level === 'blocking')
+    if (hasBlockingKolDuplicate(blockingMatches)) {
+      const names = blockingMatches.slice(0, 3).map(match => match.kol.name).join('、')
+      throw new Error(`检测到重复 KOL：${names}`)
+    }
+
     if (isDemoMode()) {
-      return demoDatabase.createKOL(kol)
+      return demoDatabase.createKOL(payload)
     }
 
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
           .from('kols')
-          .insert([kol])
+          .insert([payload])
           .select()
           .single()
 

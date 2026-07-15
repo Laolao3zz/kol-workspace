@@ -26,6 +26,27 @@ describe('kolService', () => {
     expect((created as KOLWithNotes).notes).toBe('Prefers WhatsApp follow-up.')
   })
 
+  it('blocks duplicate emails even when the display name differs', async () => {
+    await expect(createKOL({
+      name: `Duplicate Email ${Date.now()}`,
+      email: ' ALEX@TECHLAB.EXAMPLE ',
+    })).rejects.toThrow('检测到重复 KOL')
+  })
+
+  it('blocks a profile subpage that belongs to an existing social account', async () => {
+    await expect(createKOL({
+      name: `Duplicate Channel ${Date.now()}`,
+      homepage_url: 'https://youtube.com/@alextechlab/videos',
+    })).rejects.toThrow('检测到重复 KOL')
+  })
+
+  it('rejects content URLs that cannot reveal their author', async () => {
+    await expect(createKOL({
+      name: `Content Link ${Date.now()}`,
+      homepage_url: 'https://youtube.com/watch?v=video-id',
+    })).rejects.toThrow('内容页面')
+  })
+
   it('allows updating only KOL-level notes', async () => {
     const created = await createKOL({
       name: `Editable Notes Creator ${Date.now()}`,

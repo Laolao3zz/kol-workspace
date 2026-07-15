@@ -2,7 +2,8 @@ import { Sparkles, UserPlus, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { PLATFORMS } from '../types'
 import type { KOL } from '../types'
-import { inferKolProfileFromUrl, normalizeProfileUrl } from '../utils/profileUrl'
+import { analyzeKolProfileUrl, isUnresolvedContentUrl } from '../utils/profileUrl'
+import { findKolDuplicateMatches, hasBlockingKolDuplicate } from '../utils/kolDuplicate'
 import { collectTagOptions } from '../utils/tags'
 import TagSelector from './TagSelector'
 
@@ -24,18 +25,6 @@ export interface KolFormData {
   notes: string
 }
 
-type DuplicateMatch = {
-  kol: KOL
-  fields: string[]
-}
-
-const normalizeText = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ')
-const normalizeEmail = (value: string) => value.trim().toLowerCase()
-
-const normalizeChannelUrl = (value: string) => {
-  return normalizeProfileUrl(value)
-}
-
 export default function AddKolModal({ onClose, onSubmit, existingKols, countryOptions }: Props) {
   const [form, setForm] = useState<KolFormData>({
     name: '',
@@ -49,52 +38,54 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
   })
   const [profileUrlInput, setProfileUrlInput] = useState('')
   const [profileHint, setProfileHint] = useState('')
+  const [profileHintError, setProfileHintError] = useState(false)
   const [customCountry, setCustomCountry] = useState(false)
   const tagOptions = useMemo(
     () => collectTagOptions(existingKols.flatMap(kol => kol.tags || [])),
     [existingKols]
   )
 
-  const duplicateMatches = useMemo<DuplicateMatch[]>(() => {
-    const name = normalizeText(form.name)
-    const email = normalizeEmail(form.email)
-    const homepage = normalizeChannelUrl(form.homepage_url)
-
-    if (!name && !email && !homepage) return []
-
-    return existingKols.reduce<DuplicateMatch[]>((matches, kol) => {
-      const fields: string[] = []
-      if (name && normalizeText(kol.name || '') === name) fields.push('名称')
-      if (email && normalizeEmail(kol.email || '') === email) fields.push('邮箱')
-      if (homepage && normalizeChannelUrl(kol.homepage_url || '') === homepage) fields.push('主页/频道链接')
-
-      if (fields.length > 0) matches.push({ kol, fields })
-      return matches
-    }, [])
-  }, [existingKols, form.name, form.email, form.homepage_url])
-
-  const hasDuplicate = duplicateMatches.length > 0
+  const duplicateMatches = useMemo(
+    () => findKolDuplicateMatches(form, existingKols),
+    [existingKols, form]
+  )
+  const hasBlockingDuplicate = hasBlockingKolDuplicate(duplicateMatches)
+  const hasInvalidHomepage = isUnresolvedContentUrl(form.homepage_url)
 
   const applyProfileUrl = () => {
-    const inferred = inferKolProfileFromUrl(profileUrlInput || form.homepage_url)
-    if (!inferred) {
+    const rawUrl = profileUrlInput || form.homepage_url
+    const analysis = analyzeKolProfileUrl(rawUrl)
+    if (!analysis) {
+      setProfileHintError(true)
       setProfileHint('暂时无法识别该链接，请手动填写平台和主页。')
       return
     }
+    if (analysis.kind === 'content' && !analysis.canonical_profile_url) {
+      setProfileHintError(true)
+      setProfileHint(`这是 ${analysis.platform} 内容链接，链接中没有作者身份。请打开作者主页后复制主页链接。`)
+      return
+    }
+
+    const homepageUrl = analysis.canonical_profile_url || analysis.original_url
 
     setForm(prev => ({
       ...prev,
-      platform: inferred.platform,
-      homepage_url: inferred.homepage_url,
-      name: prev.name.trim() ? prev.name : inferred.name || prev.name,
+      platform: analysis.platform,
+      homepage_url: homepageUrl,
+      name: prev.name.trim() ? prev.name : analysis.name || prev.name,
     }))
-    setProfileUrlInput(inferred.homepage_url)
-    setProfileHint(inferred.name ? `已识别 ${inferred.platform} · ${inferred.name}` : `已识别 ${inferred.platform} 链接`)
+    setProfileUrlInput(homepageUrl)
+    setProfileHintError(false)
+    setProfileHint(analysis.kind === 'content'
+      ? `已从内容链接提取 ${analysis.platform} 主页${analysis.name ? ` · ${analysis.name}` : ''}`
+      : analysis.name
+        ? `已识别 ${analysis.platform} · ${analysis.name}`
+        : `已识别 ${analysis.platform} 链接`)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name.trim() || hasDuplicate) return
+    if (!form.name.trim() || hasBlockingDuplicate || hasInvalidHomepage) return
     onSubmit(form)
   }
 
@@ -128,6 +119,7 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
                 onChange={e => {
                   setProfileUrlInput(e.target.value)
                   setProfileHint('')
+                  setProfileHintError(false)
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
@@ -136,14 +128,14 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
                   }
                 }}
                 className="h-10 min-w-0 flex-1 rounded-[10px] border border-blue-100 bg-white px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40"
-                placeholder="粘贴 YouTube / TikTok / Instagram / X 主页或视频链接"
+                placeholder="粘贴 YouTube / TikTok / Instagram / X 主页或内容链接"
               />
               <button type="button" onClick={applyProfileUrl} className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#0066FF] px-4 text-xs font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.25)]">
                 <Sparkles className="h-3.5 w-3.5" />
                 识别
               </button>
             </div>
-            <p className="mt-2 text-[11px] font-semibold text-blue-700/80">
+            <p className={`mt-2 text-[11px] font-semibold ${profileHintError ? 'text-red-700' : 'text-blue-700/80'}`}>
               {profileHint || '轻量识别会填入平台、主页链接和可识别的 handle；粉丝数/邮箱仍需人工确认。'}
             </p>
           </div>
@@ -156,7 +148,7 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
               type="text"
               value={form.name}
               onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-              className={`h-10 w-full rounded-[10px] border px-3 text-sm font-semibold outline-none ${hasDuplicate ? 'border-red-300 bg-red-50/40 focus:border-red-400' : 'border-black/[0.08] focus:border-[#0066FF]/40'}`}
+              className={`h-10 w-full rounded-[10px] border px-3 text-sm font-semibold outline-none ${hasBlockingDuplicate ? 'border-red-300 bg-red-50/40 focus:border-red-400' : 'border-black/[0.08] focus:border-[#0066FF]/40'}`}
               placeholder="必填"
               autoFocus
             />
@@ -169,7 +161,7 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
                 type="email"
                 value={form.email}
                 onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
-                className={`h-10 w-full rounded-[10px] border px-3 text-sm font-semibold outline-none ${hasDuplicate ? 'border-red-300 bg-red-50/40 focus:border-red-400' : 'border-black/[0.08] focus:border-[#0066FF]/40'}`}
+                className={`h-10 w-full rounded-[10px] border px-3 text-sm font-semibold outline-none ${hasBlockingDuplicate ? 'border-red-300 bg-red-50/40 focus:border-red-400' : 'border-black/[0.08] focus:border-[#0066FF]/40'}`}
               />
             </div>
             <div>
@@ -190,9 +182,12 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
               type="text"
               value={form.homepage_url}
               onChange={e => setForm(prev => ({ ...prev, homepage_url: e.target.value }))}
-              className={`h-10 w-full rounded-[10px] border px-3 text-sm font-semibold outline-none ${hasDuplicate ? 'border-red-300 bg-red-50/40 focus:border-red-400' : 'border-black/[0.08] focus:border-[#0066FF]/40'}`}
+              className={`h-10 w-full rounded-[10px] border px-3 text-sm font-semibold outline-none ${hasBlockingDuplicate || hasInvalidHomepage ? 'border-red-300 bg-red-50/40 focus:border-red-400' : 'border-black/[0.08] focus:border-[#0066FF]/40'}`}
               placeholder="可填网站、频道名、主页链接或备注"
             />
+            {hasInvalidHomepage && (
+              <p className="mt-1.5 text-[11px] font-semibold text-red-600">这是内容链接，无法确认作者身份。请粘贴该 KOL 的主页或频道链接。</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -240,24 +235,24 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
             </div>
           </div>
 
-          {hasDuplicate && (
-            <div className="rounded-[14px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 shadow-sm">
-              <div className="font-semibold mb-1">检测到可能重复的 KOL，已阻止新增</div>
+          {duplicateMatches.length > 0 && (
+            <div className={`rounded-[14px] border px-3 py-2.5 text-sm shadow-sm ${hasBlockingDuplicate ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+              <div className="mb-1 font-semibold">{hasBlockingDuplicate ? '检测到重复 KOL，已阻止新增' : '发现可能重复记录，请确认后再新增'}</div>
               <div className="space-y-1">
                 {duplicateMatches.slice(0, 3).map(match => (
-                  <div key={match.kol.id} className="flex items-start justify-between gap-3 rounded-[10px] border border-red-100 bg-white/70 px-2 py-1.5">
+                  <div key={match.kol.id} className={`flex items-start justify-between gap-3 rounded-[10px] border bg-white/70 px-2 py-1.5 ${match.level === 'blocking' ? 'border-red-100' : 'border-amber-100'}`}>
                     <div>
-                      <div className="font-medium text-red-800">{match.kol.name}</div>
-                      <div className="text-xs text-red-600">匹配字段：{match.fields.join('、')}</div>
+                      <div className="font-medium">{match.kol.name}</div>
+                      <div className="text-xs opacity-80">匹配字段：{match.fields.join('、')} · {match.level === 'blocking' ? '确定重复' : '仅提醒'}</div>
                     </div>
-                    <div className="text-right text-xs text-red-500 shrink-0">
+                    <div className="shrink-0 text-right text-xs opacity-70">
                       <div>{match.kol.platform || '-'}</div>
                       <div>{match.kol.email || match.kol.homepage_url || '-'}</div>
                     </div>
                   </div>
                 ))}
                 {duplicateMatches.length > 3 && (
-                  <div className="text-xs text-red-500">还有 {duplicateMatches.length - 3} 条可能重复记录，请先搜索确认。</div>
+                  <div className="text-xs opacity-75">还有 {duplicateMatches.length - 3} 条匹配记录，请先搜索确认。</div>
                 )}
               </div>
             </div>
@@ -290,7 +285,7 @@ export default function AddKolModal({ onClose, onSubmit, existingKols, countryOp
             </button>
             <button
               type="submit"
-              disabled={!form.name.trim() || hasDuplicate}
+              disabled={!form.name.trim() || hasBlockingDuplicate || hasInvalidHomepage}
               className="h-10 rounded-[10px] bg-[#0066FF] px-5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(0,102,255,0.35)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               确认新增
