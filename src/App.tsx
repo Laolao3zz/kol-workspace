@@ -102,15 +102,28 @@ function App() {
     }
   }, [kols, selectedKol])
 
-  const handleCreateKol = async (data: KolFormData) => {
+  const handleCreateKol = async (data: KolFormData): Promise<KOL> => {
     try {
-      await createKOL(data)
-      await refreshAll()
-      setShowAddKolModal(false)
+      const created = await createKOL(data)
       setError(null)
+      return created
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建失败')
+      const message = err instanceof Error ? err.message : '创建失败'
+      setError(message)
+      throw err instanceof Error ? err : new Error(message)
     }
+  }
+
+  const refreshAfterAddKol = () => {
+    setShowAddKolModal(false)
+    void refreshAll().catch(err => {
+      setError(err instanceof Error ? err.message : '刷新 KOL 数据失败')
+    })
+  }
+
+  const handleOpenExistingKol = (kol: KOL) => {
+    setSelectedKol(kol)
+    refreshAfterAddKol()
   }
 
   const handleUpdateKol = async (id: string, updates: Partial<KOL>) => {
@@ -258,8 +271,9 @@ function App() {
           <AddKolModal
             existingKols={kols}
             countryOptions={[...new Set(kols.map(kol => String(kol.country || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))}
-            onClose={() => setShowAddKolModal(false)}
+            onClose={refreshAfterAddKol}
             onSubmit={handleCreateKol}
+            onOpenExisting={handleOpenExistingKol}
           />
         )}
       </div>
