@@ -82,6 +82,7 @@ export function deriveKolStatus(
   if (latestInvitation && invitationIsCurrent) {
     if (!latestInvitation.replied || latestInvitation.reply_result === '未回复') return '已邀约'
     if (isInvitationApproved(latestInvitation)) return '待寄出'
+    if (latestInvitation.reply_result === '沟通中') return '沟通中'
     return '已邀约'
   }
 

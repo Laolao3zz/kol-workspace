@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS kols (
 CREATE TABLE IF NOT EXISTS invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   kol_id UUID REFERENCES kols(id) ON DELETE CASCADE,
+  conversation_id UUID NOT NULL DEFAULT gen_random_uuid(),
+  direction TEXT NOT NULL DEFAULT 'outbound' CHECK (direction IN ('outbound', 'inbound')),
   product TEXT,
   invited_at DATE,
   email_subject TEXT,
@@ -112,6 +114,20 @@ ALTER TABLE public.invitations
   ADD COLUMN IF NOT EXISTS decision TEXT DEFAULT '待评估';
 ALTER TABLE public.invitations
   ADD COLUMN IF NOT EXISTS decision_reason TEXT;
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS conversation_id UUID DEFAULT gen_random_uuid();
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS direction TEXT DEFAULT 'outbound';
+UPDATE public.invitations
+SET conversation_id = gen_random_uuid()
+WHERE conversation_id IS NULL;
+UPDATE public.invitations
+SET direction = 'outbound'
+WHERE direction IS NULL OR direction NOT IN ('outbound', 'inbound');
+ALTER TABLE public.invitations
+  ALTER COLUMN conversation_id SET NOT NULL;
+ALTER TABLE public.invitations
+  ALTER COLUMN direction SET NOT NULL;
 ALTER TABLE public.collaborations
   ADD COLUMN IF NOT EXISTS shipment_id UUID;
 ALTER TABLE public.kols
@@ -163,6 +179,7 @@ CREATE INDEX IF NOT EXISTS idx_kols_name ON kols (name);
 CREATE INDEX IF NOT EXISTS idx_kols_status ON kols (status);
 CREATE INDEX IF NOT EXISTS idx_kols_blacklisted_at ON kols (blacklisted_at) WHERE blacklisted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_invitations_kol_id ON invitations (kol_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_conversation_id ON invitations (conversation_id);
 CREATE INDEX IF NOT EXISTS idx_collaborations_kol_id ON collaborations (kol_id);
 CREATE INDEX IF NOT EXISTS idx_emails_kol_id ON emails (kol_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_kol_id ON shipments (kol_id);

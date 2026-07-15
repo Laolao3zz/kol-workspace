@@ -13,6 +13,7 @@ import {
 import type { ReactNode } from 'react'
 import type { Collaboration, Invitation, KOL, Shipment } from '../types'
 import { buildDashboardMetrics, getActionablePendingInvitations } from '../utils/workspaceViews'
+import { getConversationProductLabel } from '../utils/opportunityConversation'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
 import { getAvatarTone } from '../utils/visualTone'
 
@@ -130,7 +131,7 @@ function EmptyState({ icon, text }: { icon: ReactNode; text: string }) {
   )
 }
 
-function buildRecentActivities(kols: KOL[], pendingReplies: Invitation[], pendingShipments: Shipment[], overdueContent: Shipment[], collaborationsByKol: Record<string, Collaboration[]>): ActivityItem[] {
+function buildRecentActivities(kols: KOL[], invitationsByKol: Record<string, Invitation[]>, pendingReplies: Invitation[], pendingShipments: Shipment[], overdueContent: Shipment[], collaborationsByKol: Record<string, Collaboration[]>): ActivityItem[] {
   const kolMap = new Map(kols.map(kol => [kol.id, kol]))
   const published = Object.entries(collaborationsByKol).flatMap(([kolId, collaborations]) => {
     const kol = kolMap.get(kolId)
@@ -168,13 +169,14 @@ function buildRecentActivities(kols: KOL[], pendingReplies: Invitation[], pendin
 
   const replies = pendingReplies.map(invitation => {
     const kol = kolMap.get(invitation.kol_id)
+    const products = getConversationProductLabel(invitation, invitationsByKol[invitation.kol_id] || [])
     return {
       id: `reply-${invitation.id}`,
       date: invitation.invited_at,
       activity: {
         id: `reply-${invitation.id}`,
         icon: <Mail className="h-3.5 w-3.5 text-blue-500" />,
-        text: `${kol?.name || 'KOL'} 收到邀约邮件（${invitation.product}），等待回复中`,
+        text: `${kol?.name || 'KOL'} 已发送邀约（${products}），等待回复中`,
         time: relativeTime(invitation.invited_at),
       },
     }
@@ -212,7 +214,7 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
     .sort((a, b) => daysSince(b.delivered_at) - daysSince(a.delivered_at))
   const overdueContent = contentFollowUps.filter(shipment => daysSince(shipment.delivered_at) >= 7)
   const waitingArchive = shipments.filter(shipment => availableKolIds.has(shipment.kol_id) && !shipment.archived_at && isCompletedShipment(shipment))
-  const recentActivities = buildRecentActivities(kols, pendingReplies, pendingShipments, overdueContent, collaborationsByKol)
+  const recentActivities = buildRecentActivities(kols, invitations, pendingReplies, pendingShipments, overdueContent, collaborationsByKol)
 
   const stats = [
     { label: 'KOL 总量', value: metrics.totalKols, sub: '查看资源池', color: '#1D1D1F', accent: '#F8F8FA', onClick: () => onNavigate('table') },
@@ -237,13 +239,14 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
             {pendingReplies.slice(0, 3).map(invitation => {
               const kol = kolById(kols, invitation.kol_id)
               if (!kol) return null
+              const products = getConversationProductLabel(invitation, invitations[invitation.kol_id] || [])
               return (
                 <button key={invitation.id} onClick={() => onSelectKol(kol)} className="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-xl px-5 py-3 text-left transition-colors hover:bg-[#F5F5F7]">
                   <div className="flex min-w-0 items-center gap-3">
                     <Avatar name={kol.name} />
                     <div className="min-w-0">
                       <div className="truncate text-[13px] font-semibold text-[#1D1D1F]">{kol.name}</div>
-                      <div className="truncate text-[11px] text-[#6E6E73]">{invitation.product} · {invitation.invited_at}</div>
+                      <div className="truncate text-[11px] text-[#6E6E73]">{products} · {invitation.invited_at}</div>
                     </div>
                   </div>
                   <span className="rounded-full bg-[#E8F0FF] px-3 py-1.5 text-[11px] font-semibold text-[#0066FF]">催回复</span>

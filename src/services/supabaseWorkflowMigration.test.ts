@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import canonicalSchema from '../../supabase-schema.sql?raw'
 import workflowMigration from '../../supabase-workflow-links.sql?raw'
+import opportunityMigration from '../../supabase-opportunity-groups.sql?raw'
 
 describe('workflow migration safety contract', () => {
   it('backfills the shipment fields required by the workflow RPC', () => {
@@ -24,6 +25,13 @@ describe('workflow migration safety contract', () => {
   it('backfills relation columns before canonical workflow functions are created', () => {
     expect(canonicalSchema).toMatch(/ALTER TABLE public\.shipments[\s\S]*ADD COLUMN IF NOT EXISTS source_invitation_id UUID/i)
     expect(canonicalSchema).toMatch(/ALTER TABLE public\.collaborations[\s\S]*ADD COLUMN IF NOT EXISTS shipment_id UUID/i)
+  })
+
+  it('adds opportunity source and conversation grouping without rewriting products', () => {
+    expect(opportunityMigration).toMatch(/ADD COLUMN IF NOT EXISTS conversation_id UUID/i)
+    expect(opportunityMigration).toMatch(/ADD COLUMN IF NOT EXISTS direction TEXT/i)
+    expect(opportunityMigration).toContain("direction IN ('outbound', 'inbound')")
+    expect(opportunityMigration).not.toMatch(/UPDATE public\.invitations[\s\S]*SET product/i)
   })
 
   it('uses one lock order and preserves edited shipments during invitation deletion', () => {

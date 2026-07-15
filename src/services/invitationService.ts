@@ -16,6 +16,8 @@ function normalizeInvitationPayload(invitation: Partial<Invitation>): Partial<In
   const payload: Partial<Invitation> = {}
 
   if ('kol_id' in invitation) payload.kol_id = invitation.kol_id
+  if ('conversation_id' in invitation) payload.conversation_id = invitation.conversation_id?.trim() || null
+  if ('direction' in invitation) payload.direction = invitation.direction === 'inbound' ? 'inbound' : 'outbound'
   if ('product' in invitation) payload.product = invitation.product?.trim() || ''
   if ('invited_at' in invitation) payload.invited_at = nullableDate(invitation.invited_at) || ''
   if ('email_subject' in invitation) payload.email_subject = invitation.email_subject?.trim() || ''
@@ -88,33 +90,42 @@ export async function getInvitationsByKOL(kolId: string): Promise<Invitation[]> 
   }
 }
 
-export async function createInvitation(inv: Omit<Invitation, 'id'>): Promise<Invitation> {
+export async function createInvitations(invitations: Array<Omit<Invitation, 'id'>>): Promise<Invitation[]> {
+  if (invitations.length === 0) return []
+
   try {
-    const payload = normalizeInvitationPayload(inv)
+    const payloads = invitations.map(normalizeInvitationPayload)
 
     if (isDemoMode()) {
-      return demoDatabase.createInvitation(payload as Partial<Invitation> & Pick<Invitation, 'kol_id' | 'product'>)
+      return payloads.map(payload =>
+        demoDatabase.createInvitation(payload as Partial<Invitation> & Pick<Invitation, 'kol_id' | 'product'>)
+      )
     }
 
     const result = await retryOperation(
       async () => {
         const { data, error } = await getSupabase()
           .from('invitations')
-          .insert([payload])
+          .insert(payloads)
           .select()
-          .single()
 
         if (error) throw error
-        return data
+        return data || []
       },
       { maxRetries: 2 }
     )
 
-    return result as Invitation
+    return result as Invitation[]
   } catch (error) {
-    logError('createInvitation', error, { inv })
+    logError('createInvitations', error, { invitations })
     throw error
   }
+}
+
+export async function createInvitation(invitation: Omit<Invitation, 'id'>): Promise<Invitation> {
+  const [created] = await createInvitations([invitation])
+  if (!created) throw new Error('合作机会创建失败')
+  return created
 }
 
 export async function deleteInvitation(id: string): Promise<void> {

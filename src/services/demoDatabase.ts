@@ -594,6 +594,8 @@ export const demoDatabase = {
       id: nextId('invitation'),
       created_at: new Date().toISOString(),
       kol_id: invitation.kol_id,
+      conversation_id: invitation.conversation_id?.trim() || `demo-conversation-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      direction: invitation.direction === 'inbound' ? 'inbound' : 'outbound',
       product: invitation.product?.trim() || '',
       invited_at: invitation.invited_at || new Date().toISOString().slice(0, 10),
       email_subject: invitation.email_subject?.trim() || '',

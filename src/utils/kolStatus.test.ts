@@ -102,6 +102,14 @@ describe('deriveKolStatus', () => {
     expect(status).toBe('待寄出')
   })
 
+  it('shows creator-initiated opportunities as discussing before approval', () => {
+    const status = deriveKolStatus(baseKol, [
+      invitation({ direction: 'inbound', replied: true, reply_result: '沟通中', decision: '待评估' }),
+    ])
+
+    expect(status).toBe('沟通中')
+  })
+
   it('lets a newer invitation become the current state after an archived completed cooperation', () => {
     const status = deriveKolStatus(
       baseKol,

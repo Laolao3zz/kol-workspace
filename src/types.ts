@@ -23,6 +23,8 @@ export interface Invitation {
   id: string
   created_at?: string
   kol_id: string
+  conversation_id?: string | null
+  direction?: InvitationDirection
   product: string
   invited_at: string
   email_subject: string
@@ -47,6 +49,8 @@ export interface Collaboration {
   fee: string
   notes: string
 }
+
+export type InvitationDirection = 'outbound' | 'inbound'
 
 export interface Product {
   id: string
@@ -96,7 +100,7 @@ export interface Email {
 
 export const PLATFORMS = ['YouTube', 'TikTok', 'X', 'Blog', 'Forum', 'Instagram', '网站', 'Discord']
 export const CONTENT_SHAPES = ['视频', '网站']
-export const STATUSES = ['未首触', '已邀约', '待寄出', '运输中', '内容跟进', '合作完成', '拒绝合作', '我方拒绝', '异常']
+export const STATUSES = ['未首触', '已邀约', '沟通中', '待寄出', '运输中', '内容跟进', '合作完成', '拒绝合作', '我方拒绝', '异常']
 export const SHIPMENT_STATUSES = ['待寄出', '运输中', '已签收']
 export const PROGRESS_STATUSES = ['待制作', '制作中', '待发布', '已完成', '暂停/异常']
 export const REPLY_RESULTS = ['同意合作', '拒绝合作', '未回复']

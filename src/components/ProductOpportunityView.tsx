@@ -27,6 +27,7 @@ const statusTone: Record<OpportunityStatus, string> = {
   未触达: 'bg-gray-100 text-gray-600',
   待回复: 'bg-amber-50 text-amber-700',
   未回复: 'bg-violet-50 text-violet-700',
+  沟通中: 'bg-cyan-50 text-cyan-700',
   已同意: 'bg-blue-50 text-blue-700',
   已拒绝: 'bg-red-50 text-red-700',
   不推进: 'bg-slate-100 text-slate-600',
@@ -39,6 +40,7 @@ const statusDot: Record<OpportunityStatus, string> = {
   未触达: 'bg-gray-300',
   待回复: 'bg-[#FFB000]',
   未回复: 'bg-violet-500',
+  沟通中: 'bg-cyan-500',
   已同意: 'bg-[#0066FF]',
   已拒绝: 'bg-[#FF3B30]',
   不推进: 'bg-slate-400',
@@ -47,7 +49,7 @@ const statusDot: Record<OpportunityStatus, string> = {
   已完成: 'bg-[#34C759]',
 }
 
-const statusOrder: OpportunityStatus[] = ['未触达', '待回复', '已同意', '寄样中', '内容中', '已完成', '未回复', '已拒绝', '不推进']
+const statusOrder: OpportunityStatus[] = ['未触达', '待回复', '沟通中', '已同意', '寄样中', '内容中', '已完成', '未回复', '已拒绝', '不推进']
 
 const fmtFollowers = (value: string) => value?.trim() || '-'
 

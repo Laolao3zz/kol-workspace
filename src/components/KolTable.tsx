@@ -36,6 +36,7 @@ const statusTone = (status: string) => {
   const map: Record<string, string> = {
     未首触: 'bg-gray-100 text-gray-600',
     已邀约: 'bg-purple-50 text-purple-700',
+    沟通中: 'bg-cyan-50 text-cyan-700',
     待寄出: 'bg-amber-50 text-amber-700',
     运输中: 'bg-blue-50 text-blue-700',
     已签收: 'bg-cyan-50 text-cyan-700',
@@ -59,16 +60,18 @@ const replyTone = (invitation: Invitation | null) => {
   if (unansweredStatus === '待回复') return 'bg-amber-50 text-amber-700'
   if (unansweredStatus === '未回复') return 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-100'
   if (invitation.decision === '我方拒绝') return 'bg-slate-100 text-slate-600'
+  if (invitation.reply_result === '沟通中') return 'bg-cyan-50 text-cyan-700'
   if (invitation.reply_result.includes('同意')) return 'bg-emerald-50 text-emerald-700'
   if (invitation.reply_result.includes('拒绝')) return 'bg-red-50 text-red-700'
   return 'bg-gray-100 text-gray-600'
 }
 
 const replyLabel = (invitation: Invitation | null) => {
-  if (!invitation) return '无邀约'
+  if (!invitation) return '无机会'
   const unansweredStatus = getUnansweredInvitationStatus(invitation)
   if (unansweredStatus) return unansweredStatus
   if (invitation.decision === '我方拒绝') return '不推进'
+  if (invitation.reply_result === '沟通中') return '沟通中'
   if (invitation.reply_result.includes('同意')) return '已同意'
   if (invitation.reply_result.includes('拒绝')) return '已拒绝'
   return invitation.reply_result
@@ -167,6 +170,11 @@ export default function KolTable({
       if (filterInvStatus === 'unreplied') {
         matchInvStatus = invs.some(invitation =>
           isOverduePendingInvitation(invitation, shipments, allCollaborations)
+        )
+      }
+      if (filterInvStatus === 'discussing') {
+        matchInvStatus = invs.some(invitation =>
+          invitation.reply_result === '沟通中'
         )
       }
       if (filterInvStatus === 'agreed') matchInvStatus = Boolean(latest?.replied && latest.reply_result.includes('同意') && latest.decision !== '我方拒绝')
@@ -378,12 +386,13 @@ export default function KolTable({
               onChange={event => setFilterInvStatus(event.target.value)}
               className="h-9 rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] outline-none focus:border-[#0066FF]/40"
             >
-              <option value="">邀约结果</option>
+              <option value="">合作机会</option>
               <option value="pending">待回复（14天内）</option>
               <option value="unreplied">未回复（超14天）</option>
+              <option value="discussing">沟通中 / 主动联系</option>
               <option value="agreed">已同意</option>
               <option value="rejected">已拒绝/不推进</option>
-              <option value="none">无邀约</option>
+              <option value="none">无合作机会</option>
             </select>
             <select
               value={filterBlacklist}

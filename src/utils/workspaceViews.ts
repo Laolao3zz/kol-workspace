@@ -2,7 +2,7 @@ import type { Collaboration, Invitation, KOL, Product, Shipment } from '../types
 import { countCompletedCollaborations, hasRealCollaborationSignal, invitationTimelineKey } from './kolStatus'
 import { getProductName, hasProductRecordForKol, sameProduct, shouldShowProductForKol } from './productMatching'
 
-export type OpportunityStatus = '未触达' | '待回复' | '未回复' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
+export type OpportunityStatus = '未触达' | '待回复' | '未回复' | '沟通中' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
 export type OpportunityStatusFilter = OpportunityStatus | '全部'
 export type UnansweredInvitationStatus = '待回复' | '未回复'
 
@@ -31,7 +31,7 @@ export interface ProductOpportunitySummary {
 
 export type ProductOpportunityRow = ProductOpportunitySummary['rows'][number]
 
-const opportunityStatuses: OpportunityStatus[] = ['未触达', '待回复', '未回复', '已同意', '已拒绝', '不推进', '寄样中', '内容中', '已完成']
+const opportunityStatuses: OpportunityStatus[] = ['未触达', '待回复', '未回复', '沟通中', '已同意', '已拒绝', '不推进', '寄样中', '内容中', '已完成']
 const PENDING_REPLY_WINDOW_DAYS = 14
 
 export function filterOpportunityRowsByStatus(
@@ -82,6 +82,7 @@ export function getUnansweredInvitationStatus(
   invitation: Invitation,
   currentDate = todayISO()
 ): UnansweredInvitationStatus | null {
+  if (invitation.direction === 'inbound') return null
   if (!isPendingInvitation(invitation)) return null
   return isWithinPendingReplyWindow(invitation, currentDate) ? '待回复' : '未回复'
 }
@@ -128,9 +129,16 @@ export function getActionablePendingInvitations(
   collaborationsByKol: Record<string, Collaboration[]>
 ): Invitation[] {
   const collaborations = flatCollaborations(collaborationsByKol)
-  return flatInvitations(invitations).filter(invitation =>
+  const actionable = flatInvitations(invitations).filter(invitation =>
     isActionablePendingInvitation(invitation, shipments, collaborations)
   )
+  const seenConversations = new Set<string>()
+  return actionable.filter(invitation => {
+    const conversationKey = `${invitation.kol_id}:${invitation.conversation_id?.trim() || invitation.id}`
+    if (seenConversations.has(conversationKey)) return false
+    seenConversations.add(conversationKey)
+    return true
+  })
 }
 
 export function countActiveShipments(shipments: Shipment[]): number {
@@ -213,6 +221,7 @@ function opportunityStatusForKol(
   if (latestInvitation.decision === '我方拒绝') return '不推进'
   if (latestInvitation.reply_result?.includes('拒绝')) return '已拒绝'
   if (latestInvitation.reply_result?.includes('同意')) return '已同意'
+  if (latestInvitation.direction === 'inbound' || latestInvitation.reply_result === '沟通中') return '沟通中'
 
   return '待回复'
 }

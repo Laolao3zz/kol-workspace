@@ -136,6 +136,23 @@ describe('workspace view helpers', () => {
     expect(metrics.pendingReplies).toBe(1)
   })
 
+  it('counts one pending task for a multi-product conversation', () => {
+    const conversationId = 'conversation-1'
+    const metrics = buildDashboardMetrics({
+      kols: [kol('multi')],
+      invitations: {
+        multi: [
+          invitation({ id: 'k1', kol_id: 'multi', product: 'K1', conversation_id: conversationId }),
+          invitation({ id: 'x1', kol_id: 'multi', product: 'X1', conversation_id: conversationId }),
+        ],
+      },
+      shipments: [],
+      collaborationsByKol: {},
+    })
+
+    expect(metrics.pendingReplies).toBe(1)
+  })
+
   it('keeps unanswered invitations actionable through day 14 and expires them on day 15', () => {
     const pending = invitation({ invited_at: '2026-06-26' })
     const overdue = invitation({ invited_at: '2026-06-25' })
@@ -156,6 +173,19 @@ describe('workspace view helpers', () => {
       [],
       '2026-07-10'
     )).toBe(true)
+  })
+
+  it('never applies the unanswered timer to creator-initiated opportunities', () => {
+    const inbound = invitation({
+      direction: 'inbound',
+      replied: true,
+      reply_result: '沟通中',
+      invited_at: '2026-01-01',
+    })
+
+    expect(getUnansweredInvitationStatus(inbound, '2026-07-10')).toBeNull()
+    expect(isActionablePendingInvitation(inbound, [], [], '2026-07-10')).toBe(false)
+    expect(isOverduePendingInvitation(inbound, [], [], '2026-07-10')).toBe(false)
   })
 
   it('does not classify an old unanswered invitation as overdue after its workflow advanced', () => {
@@ -269,8 +299,30 @@ describe('workspace view helpers', () => {
     })
 
     const newLaunch = summary.find(item => item.product === 'New Launch')
-    expect(newLaunch?.rows[0].status).toBe('待回复')
-    expect(newLaunch?.counts['待回复']).toBe(1)
+    expect(newLaunch?.rows[0].status).toBe('沟通中')
+    expect(newLaunch?.counts['沟通中']).toBe(1)
+  })
+
+  it('shows creator-initiated product opportunities as discussing', () => {
+    const summary = buildProductOpportunitySummary({
+      products: ['K1'],
+      kols: [kol('inbound')],
+      invitations: {
+        inbound: [invitation({
+          kol_id: 'inbound',
+          product: 'K1',
+          direction: 'inbound',
+          replied: true,
+          reply_result: '沟通中',
+        })],
+      },
+      shipments: [],
+      collaborationsByKol: {},
+      currentDate: '2026-12-31',
+    })
+
+    expect(summary[0].rows[0].status).toBe('沟通中')
+    expect(summary[0].counts['未回复']).toBe(0)
   })
 
   it('marks unanswered product invitations as overdue after 14 days', () => {

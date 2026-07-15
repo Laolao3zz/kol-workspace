@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AUTO_CREATED_SHIPMENT_NOTE } from '../utils/invitationWorkflow'
-import { createInvitation, deleteInvitation, getInvitations, getInvitationsByKOL } from './invitationService'
+import { createInvitation, createInvitations, deleteInvitation, getInvitations, getInvitationsByKOL } from './invitationService'
 import { createShipment, deleteShipment, getShipmentsByKOL, updateShipment } from './shipmentService'
 
 const createApprovedInvitation = () => createInvitation({
@@ -34,6 +34,35 @@ const createLinkedShipment = (sourceInvitationId: string) => createShipment({
 })
 
 describe('invitationService workflow deletion', () => {
+  it('creates multiple product opportunities in one conversation', async () => {
+    const conversationId = 'e1aa4f3d-7bca-46ec-839f-bd0e212a23aa'
+    const base = {
+      kol_id: 'demo-kol-001',
+      conversation_id: conversationId,
+      direction: 'inbound' as const,
+      invited_at: '2026-07-15',
+      email_subject: '',
+      replied: true,
+      reply_result: '沟通中',
+      quoted_fee: '',
+      decision: '待评估',
+      decision_reason: '',
+      notes: '',
+    }
+    const created = await createInvitations([
+      { ...base, product: 'K1' },
+      { ...base, product: 'X1' },
+    ])
+
+    try {
+      expect(created).toHaveLength(2)
+      expect(new Set(created.map(item => item.conversation_id))).toEqual(new Set([conversationId]))
+      expect(created.every(item => item.direction === 'inbound')).toBe(true)
+    } finally {
+      await Promise.all(created.map(item => deleteInvitation(item.id)))
+    }
+  })
+
   it('loads invitations across all KOLs', async () => {
     const invitations = await getInvitations()
 

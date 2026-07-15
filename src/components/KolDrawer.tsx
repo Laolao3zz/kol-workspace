@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { ArrowRightLeft, Ban, BarChart3, ChevronDown, ChevronRight, CheckCircle2, ExternalLink, Mail, Package, Pencil, Plus, ShieldCheck, Trash2, Truck, UserRound, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { KOL, Invitation, Collaboration, Shipment, Product, PLATFORMS } from '../types'
-import { getInvitationsByKOL, createInvitation, deleteInvitation, updateInvitation } from '../services/invitationService'
+import { getInvitationsByKOL, createInvitations, deleteInvitation, updateInvitation } from '../services/invitationService'
 import { getCollaborationsByKOL, createCollaboration, deleteCollaboration, ensureCompletionCollaboration, updateCollaboration } from '../services/collaborationService'
 import { createShipment, updateShipment, deleteShipment, deleteAutoCreatedPendingShipment, getShipmentsByKOL } from '../services/shipmentService'
 import { countCompletedCollaborations, deriveKolStatus, hasPublishReadyCollaborationSignal, hasRealCollaborationSignal } from '../utils/kolStatus'
@@ -32,6 +32,7 @@ import { runPostPersistWorkflow } from '../utils/persistedWrite'
 import { getAvatarTone } from '../utils/visualTone'
 import { canonicalizeTags } from '../utils/tags'
 import TagSelector from './TagSelector'
+import { getInvitationDirection, groupOpportunityConversations } from '../utils/opportunityConversation'
 
 interface Props {
   kol: KOL
@@ -47,12 +48,13 @@ interface Props {
   onShipmentsChange: () => Promise<void> | void
 }
 
-const opportunityOrder: OpportunityStatus[] = ['未触达', '待回复', '已同意', '寄样中', '内容中', '已完成', '未回复', '已拒绝', '不推进']
+const opportunityOrder: OpportunityStatus[] = ['未触达', '待回复', '沟通中', '已同意', '寄样中', '内容中', '已完成', '未回复', '已拒绝', '不推进']
 
 const opportunityTone: Record<OpportunityStatus, string> = {
   未触达: 'bg-gray-100 text-gray-600',
   待回复: 'bg-amber-50 text-amber-700',
   未回复: 'bg-violet-50 text-violet-700',
+  沟通中: 'bg-cyan-50 text-cyan-700',
   已同意: 'bg-blue-50 text-blue-700',
   已拒绝: 'bg-red-50 text-red-700',
   不推进: 'bg-slate-100 text-slate-600',
@@ -66,6 +68,7 @@ const opportunityHint = (status: OpportunityStatus) => {
     未触达: '尚未触达该产品，可发起新邀约',
     待回复: '已触达，等待回复或需要跟进',
     未回复: '邀约已超过 14 天，仍未收到回复',
+    沟通中: '博主已主动联系，正在评估或沟通',
     已同意: '已同意合作，下一步安排寄样',
     寄样中: '样品流转中，等待签收',
     内容中: '样品已签收，进入内容跟进',
@@ -135,6 +138,10 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
       }))
       .sort((a, b) => opportunityOrder.indexOf(a.status) - opportunityOrder.indexOf(b.status))
   }, [allKolShipments, collaborations, drawerOpportunityProducts, invitations, kol])
+  const opportunityConversations = useMemo(
+    () => groupOpportunityConversations(invitations),
+    [invitations]
+  )
 
   useEffect(() => { loadSubData() }, [kol.id])
 
@@ -162,8 +169,6 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
   }
 
   const shipmentStatus = (trackingNumber: string) => trackingNumber.trim() ? '运输中' : '待寄出'
-  const INVITATION_ENTRY_STATUSES = ['未首触', '未回复', '拒绝合作', '我方拒绝', '沟通中', '']
-
   const nextKolStatus = (shipment: ShipmentFormData | Shipment) => {
     if ('completed_at' in shipment && shipment.completed_at) return '合作完成'
     if ('progress_status' in shipment && shipment.progress_status === '已完成') return '合作完成'
@@ -183,10 +188,6 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
   ) => {
     const nextStatus = deriveKolStatus(kol, nextInvitations, nextShipments, nextCollaborations)
     await onUpdate(kol.id, { status: nextStatus })
-  }
-
-  const pushStatus = async (newStatus: string) => {
-    await onUpdate(kol.id, { status: newStatus })
   }
 
   const save = async (field: keyof KOL, value: string | string[]) => {
@@ -474,7 +475,11 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
       const previousInvitation = editingInvitation
       let saved: Invitation
       try {
-        saved = await updateInvitation(editingInvitation.id, data)
+        const { products, ...sharedData } = data
+        saved = await updateInvitation(editingInvitation.id, {
+          ...sharedData,
+          product: products[0] || editingInvitation.product,
+        })
       } catch (error) {
         showToast(error instanceof Error ? error.message : '邀约更新失败')
         return
@@ -499,38 +504,41 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
       return
     }
 
-    let invitation: Invitation
+    let createdInvitations: Invitation[]
     try {
-      invitation = await createInvitation(data)
+      const { products, ...sharedData } = data
+      createdInvitations = await createInvitations(products.map(product => ({
+        ...sharedData,
+        product,
+      })))
     } catch (error) {
-      showToast(error instanceof Error ? error.message : '邀约添加失败')
+      showToast(error instanceof Error ? error.message : '合作机会添加失败')
       return
     }
 
-    const updated = [invitation, ...invitations]
+    const updated = [...createdInvitations, ...invitations]
     setInvitations(updated)
     setShowInvModal(false)
 
     const outcome = await runPostPersistWorkflow([
-      () => syncInvitationWorkflow(invitation, updated, null),
       async () => {
-        if (INVITATION_ENTRY_STATUSES.includes(kol.status) && (!invitation.replied || invitation.reply_result === '未回复')) {
-          await pushStatus('已邀约')
+        for (const invitation of createdInvitations) {
+          await syncInvitationWorkflow(invitation, updated, null)
         }
       },
       () => Promise.resolve().then(() => onInvitationsChange()),
     ], recoveryRefreshes)
     if (!outcome.completed) {
       const detail = outcome.error instanceof Error ? outcome.error.message : '关联数据同步失败'
-      showToast(`邀约已添加，但关联数据同步失败：${detail}`)
+      showToast(`合作机会已添加，但关联数据同步失败：${detail}`)
       return
     }
 
-    showToast('邀约已添加')
+    showToast(createdInvitations.length > 1 ? `已添加 ${createdInvitations.length} 个产品机会` : '合作机会已添加')
   }
 
   const handleDeleteInvitation = async (id: string) => {
-    if (!confirm('删除该邀约记录？')) return
+    if (!confirm('删除当前产品机会？')) return
     try {
       await deleteInvitation(id)
     } catch (error) {
@@ -602,6 +610,8 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
 
   const invReplyBadge = (inv: Invitation) => {
     if (!inv.replied) return <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-medium">未回复</span>
+    if (inv.decision === '我方拒绝') return <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-[10px] font-medium">不推进</span>
+    if (inv.reply_result === '沟通中') return <span className="px-2 py-0.5 bg-cyan-50 text-cyan-700 rounded-full text-[10px] font-medium">沟通中</span>
     if (inv.reply_result.includes('同意')) return <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-medium">已同意</span>
     if (inv.reply_result.includes('拒绝')) return <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-medium">已拒绝</span>
     if (inv.reply_result === '未回复') return <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-medium">未回复</span>
@@ -610,7 +620,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
 
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
-      '未首触': 'bg-gray-100 text-gray-600', '已邀约': 'bg-purple-100 text-purple-700',
+      '未首触': 'bg-gray-100 text-gray-600', '已邀约': 'bg-purple-100 text-purple-700', '沟通中': 'bg-cyan-50 text-cyan-700',
       '待寄出': 'bg-orange-100 text-orange-700', '运输中': 'bg-blue-100 text-blue-700',
       '已签收': 'bg-teal-100 text-teal-700', '内容跟进': 'bg-rose-100 text-rose-700',
       '待制作': 'bg-amber-100 text-amber-700', '制作中': 'bg-sky-100 text-sky-700',
@@ -765,7 +775,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                     </div>
                     {latestInvitation && (
                       <div className="rounded-[14px] border border-black/[0.06] bg-white p-3 text-xs font-semibold text-[#6E6E73]">
-                        最近邀约：{latestInvitation.product} · {latestInvitation.replied ? latestInvitation.reply_result : '未回复'} · {latestInvitation.invited_at}
+                        最近机会：{getInvitationDirection(latestInvitation) === 'inbound' ? '博主主动联系' : '我方邀约'} · {latestInvitation.product} · {latestInvitation.replied ? latestInvitation.reply_result : '未回复'} · {latestInvitation.invited_at}
                       </div>
                     )}
                   </div>
@@ -863,32 +873,45 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                 )}
               </SectionCard>
 
-              <SectionCard icon={Mail} title="邀约记录"
-                action={<HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus} disabled={Boolean(kol.blacklisted_at)}>发起邀约</HeaderButton>}
+              <SectionCard icon={Mail} title="合作机会"
+                action={<HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus} disabled={Boolean(kol.blacklisted_at)}>新增机会</HeaderButton>}
               >
                 {loadingSub ? (
                   <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-12 rounded-[12px] bg-[#F5F5F7] animate-pulse" />) }</div>
-                ) : invitations.length === 0 ? (
-                  <p className="py-4 text-center text-xs font-semibold text-[#86868B]">暂无邀约</p>
+                ) : opportunityConversations.length === 0 ? (
+                  <p className="py-4 text-center text-xs font-semibold text-[#86868B]">暂无合作机会</p>
                 ) : (
                   <div className="space-y-2">
-                    {invitations.map(inv => (
-                      <div key={inv.id} className="group flex items-center gap-3 rounded-[12px] border border-black/[0.06] bg-white p-3 transition hover:bg-[#F5F5F7]">
-                        <div className="h-2 w-2 shrink-0 rounded-full bg-[#0066FF]" />
-                        <span className="w-20 shrink-0 text-xs font-semibold text-[#86868B]">{inv.invited_at}</span>
-                        <span className="w-16 shrink-0 text-xs font-extrabold text-[#1D1D1F]">{inv.product}</span>
-                        <span className="flex-1 truncate text-xs font-semibold text-[#6E6E73]">
-                          {inv.quoted_fee ? `报价 ${inv.quoted_fee}` : inv.notes || '-'}
-                          {inv.decision === '我方拒绝' ? ' · 我方不同意' : ''}
-                          {inv.reply_result?.includes('拒绝') ? ' · 博主不同意' : ''}
-                        </span>
-                        {invReplyBadge(inv)}
-                        <button onClick={() => { setEditingInvitation(inv); setShowInvModal(true) }} className="shrink-0 text-[#AEAEB2] opacity-0 transition hover:text-[#0066FF] group-hover:opacity-100" title="编辑">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => handleDeleteInvitation(inv.id)} className="shrink-0 text-[#AEAEB2] opacity-0 transition hover:text-red-600 group-hover:opacity-100" title="删除">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                    {opportunityConversations.map(conversation => (
+                      <div key={conversation.id} className="overflow-hidden rounded-[10px] bg-[#F7F8FA]">
+                        <div className="flex items-center gap-2 px-3 py-2.5">
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${conversation.direction === 'inbound' ? 'bg-cyan-500' : 'bg-[#0066FF]'}`} />
+                          <span className="text-xs font-bold text-[#3A3A3C]">{conversation.latest.invited_at}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${conversation.direction === 'inbound' ? 'bg-cyan-50 text-cyan-700' : 'bg-blue-50 text-blue-700'}`}>
+                            {conversation.direction === 'inbound' ? '博主主动联系' : '我方主动邀约'}
+                          </span>
+                          {conversation.invitations.length > 1 && <span className="text-[10px] font-semibold text-[#86868B]">{conversation.invitations.length} 个产品</span>}
+                          <span className="ml-auto max-w-[45%] truncate text-[10px] font-semibold text-[#86868B]" title={conversation.latest.email_subject || conversation.latest.notes || ''}>
+                            {conversation.latest.email_subject || conversation.latest.notes || ''}
+                          </span>
+                        </div>
+                        <div className="divide-y divide-black/[0.05] border-t border-black/[0.05] bg-white/75">
+                          {conversation.invitations.map(inv => (
+                            <div key={inv.id} className="group flex min-h-11 items-center gap-3 px-3 py-2 transition hover:bg-white">
+                              <span className="w-24 shrink-0 truncate text-xs font-extrabold text-[#1D1D1F]" title={inv.product}>{inv.product}</span>
+                              <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[#6E6E73]">
+                                {inv.quoted_fee ? `报价 ${inv.quoted_fee}` : inv.notes || '-'}
+                              </span>
+                              {invReplyBadge(inv)}
+                              <button onClick={() => { setEditingInvitation(inv); setShowInvModal(true) }} className="shrink-0 text-[#AEAEB2] opacity-0 transition hover:text-[#0066FF] group-hover:opacity-100" title="编辑当前产品">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button onClick={() => handleDeleteInvitation(inv.id)} className="shrink-0 text-[#AEAEB2] opacity-0 transition hover:text-red-600 group-hover:opacity-100" title="删除当前产品机会">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
