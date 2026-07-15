@@ -5,6 +5,12 @@ import { getProductName, hasProductRecordForKol, sameProduct, shouldShowProductF
 export type OpportunityStatus = '未触达' | '待回复' | '未回复' | '沟通中' | '已同意' | '已拒绝' | '不推进' | '寄样中' | '内容中' | '已完成'
 export type OpportunityStatusFilter = OpportunityStatus | '全部'
 export type UnansweredInvitationStatus = '待回复' | '未回复'
+export type CommunicationFollowUpKind = 'awaiting_reply' | 'discussion'
+
+export interface CommunicationFollowUp {
+  invitation: Invitation
+  kind: CommunicationFollowUpKind
+}
 
 export interface DashboardMetricSources {
   kols: KOL[]
@@ -16,6 +22,7 @@ export interface DashboardMetricSources {
 export interface DashboardMetrics {
   totalKols: number
   pendingReplies: number
+  communicationFollowUps: number
   pendingShipments: number
   inTransit: number
   contentFollowUp: number
@@ -123,6 +130,15 @@ export function isOverduePendingInvitation(
   return !hasLaterWorkflowForInvitation(invitation, shipments, collaborations)
 }
 
+export function isActionableDiscussion(
+  invitation: Invitation,
+  shipments: Shipment[],
+  collaborations: Collaboration[]
+): boolean {
+  if (invitation.reply_result !== '沟通中' || invitation.decision === '我方拒绝') return false
+  return !hasLaterWorkflowForInvitation(invitation, shipments, collaborations)
+}
+
 export function getActionablePendingInvitations(
   invitations: Record<string, Invitation[]>,
   shipments: Shipment[],
@@ -139,6 +155,34 @@ export function getActionablePendingInvitations(
     seenConversations.add(conversationKey)
     return true
   })
+}
+
+export function getActionableCommunicationFollowUps(
+  invitations: Record<string, Invitation[]>,
+  shipments: Shipment[],
+  collaborationsByKol: Record<string, Collaboration[]>
+): CommunicationFollowUp[] {
+  const collaborations = flatCollaborations(collaborationsByKol)
+  const byConversation = new Map<string, CommunicationFollowUp>()
+
+  flatInvitations(invitations).forEach(invitation => {
+    const kind = isActionablePendingInvitation(invitation, shipments, collaborations)
+      ? 'awaiting_reply'
+      : isActionableDiscussion(invitation, shipments, collaborations)
+        ? 'discussion'
+        : null
+    if (!kind) return
+
+    const conversationKey = `${invitation.kol_id}:${invitation.conversation_id?.trim() || invitation.id}`
+    const current = byConversation.get(conversationKey)
+    if (!current || (current.kind === 'awaiting_reply' && kind === 'discussion')) {
+      byConversation.set(conversationKey, { invitation, kind })
+    }
+  })
+
+  return [...byConversation.values()].sort((left, right) =>
+    invitationTimelineKey(right.invitation).localeCompare(invitationTimelineKey(left.invitation))
+  )
 }
 
 export function countActiveShipments(shipments: Shipment[]): number {
@@ -158,10 +202,16 @@ export function buildDashboardMetrics(sources: DashboardMetricSources): Dashboar
     sources.shipments,
     sources.collaborationsByKol
   ).filter(invitation => availableKolIds.has(invitation.kol_id))
+  const communicationFollowUps = getActionableCommunicationFollowUps(
+    sources.invitations,
+    sources.shipments,
+    sources.collaborationsByKol
+  ).filter(item => availableKolIds.has(item.invitation.kol_id))
 
   return {
     totalKols: sources.kols.length,
     pendingReplies: pendingReplies.length,
+    communicationFollowUps: communicationFollowUps.length,
     pendingShipments: activeShipments.filter(shipment =>
       shipment.status === '待寄出' && !shipment.tracking_number?.trim()
     ).length,

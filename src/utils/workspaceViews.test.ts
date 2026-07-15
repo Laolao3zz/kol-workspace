@@ -5,7 +5,9 @@ import {
   buildProductOpportunitySummary,
   countActiveShipments,
   filterOpportunityRowsByStatus,
+  getActionableCommunicationFollowUps,
   getUnansweredInvitationStatus,
+  isActionableDiscussion,
   isActionablePendingInvitation,
   isOverduePendingInvitation,
 } from './workspaceViews'
@@ -112,6 +114,7 @@ describe('workspace view helpers', () => {
 
     expect(metrics.totalKols).toBe(3)
     expect(metrics.pendingReplies).toBe(1)
+    expect(metrics.communicationFollowUps).toBe(1)
     expect(metrics.pendingShipments).toBe(1)
     expect(metrics.inTransit).toBe(1)
     expect(metrics.contentFollowUp).toBe(1)
@@ -186,6 +189,73 @@ describe('workspace view helpers', () => {
     expect(getUnansweredInvitationStatus(inbound, '2026-07-10')).toBeNull()
     expect(isActionablePendingInvitation(inbound, [], [], '2026-07-10')).toBe(false)
     expect(isOverduePendingInvitation(inbound, [], [], '2026-07-10')).toBe(false)
+  })
+
+  it('keeps active discussions visible as communication follow-ups', () => {
+    const inbound = invitation({
+      id: 'inbound-k1',
+      kol_id: 'inbound',
+      product: 'K1',
+      conversation_id: 'conversation-inbound',
+      direction: 'inbound',
+      replied: true,
+      reply_result: '沟通中',
+    })
+
+    expect(isActionableDiscussion(inbound, [], [])).toBe(true)
+    const followUps = getActionableCommunicationFollowUps(
+      { inbound: [inbound] },
+      [],
+      {}
+    )
+    expect(followUps).toEqual([{ invitation: inbound, kind: 'discussion' }])
+  })
+
+  it('combines pending replies and active discussions in dashboard follow-up metrics', () => {
+    const metrics = buildDashboardMetrics({
+      kols: [kol('outbound'), kol('inbound')],
+      invitations: {
+        outbound: [invitation({ kol_id: 'outbound', product: 'K1' })],
+        inbound: [invitation({
+          kol_id: 'inbound',
+          product: 'X1',
+          direction: 'inbound',
+          replied: true,
+          reply_result: '沟通中',
+        })],
+      },
+      shipments: [],
+      collaborationsByKol: {},
+    })
+
+    expect(metrics.pendingReplies).toBe(1)
+    expect(metrics.communicationFollowUps).toBe(2)
+  })
+
+  it('counts one follow-up for multiple discussing products in one conversation', () => {
+    const conversationId = 'conversation-inbound'
+    const followUps = getActionableCommunicationFollowUps({
+      inbound: [
+        invitation({ id: 'k1', kol_id: 'inbound', product: 'K1', conversation_id: conversationId, direction: 'inbound', replied: true, reply_result: '沟通中' }),
+        invitation({ id: 'x1', kol_id: 'inbound', product: 'X1', conversation_id: conversationId, direction: 'inbound', replied: true, reply_result: '沟通中' }),
+      ],
+    }, [], {})
+
+    expect(followUps).toHaveLength(1)
+    expect(followUps[0].kind).toBe('discussion')
+  })
+
+  it('removes a discussion reminder after its product workflow advances', () => {
+    const inbound = invitation({
+      id: 'inbound-k1',
+      kol_id: 'inbound',
+      product: 'K1',
+      direction: 'inbound',
+      replied: true,
+      reply_result: '沟通中',
+    })
+
+    expect(isActionableDiscussion(inbound, [shipment({ kol_id: 'inbound', product: 'K1' })], [])).toBe(false)
   })
 
   it('does not classify an old unanswered invitation as overdue after its workflow advanced', () => {

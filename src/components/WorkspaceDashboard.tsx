@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Collaboration, Invitation, KOL, Shipment } from '../types'
-import { buildDashboardMetrics, getActionablePendingInvitations } from '../utils/workspaceViews'
+import { buildDashboardMetrics, getActionableCommunicationFollowUps, type CommunicationFollowUp } from '../utils/workspaceViews'
 import { getConversationProductLabel } from '../utils/opportunityConversation'
 import { getContentShapeMetricLabels, getKolContentShape } from '../utils/contentShape'
 import { getAvatarTone } from '../utils/visualTone'
@@ -131,7 +131,7 @@ function EmptyState({ icon, text }: { icon: ReactNode; text: string }) {
   )
 }
 
-function buildRecentActivities(kols: KOL[], invitationsByKol: Record<string, Invitation[]>, pendingReplies: Invitation[], pendingShipments: Shipment[], overdueContent: Shipment[], collaborationsByKol: Record<string, Collaboration[]>): ActivityItem[] {
+function buildRecentActivities(kols: KOL[], invitationsByKol: Record<string, Invitation[]>, communicationFollowUps: CommunicationFollowUp[], pendingShipments: Shipment[], overdueContent: Shipment[], collaborationsByKol: Record<string, Collaboration[]>): ActivityItem[] {
   const kolMap = new Map(kols.map(kol => [kol.id, kol]))
   const published = Object.entries(collaborationsByKol).flatMap(([kolId, collaborations]) => {
     const kol = kolMap.get(kolId)
@@ -167,7 +167,8 @@ function buildRecentActivities(kols: KOL[], invitationsByKol: Record<string, Inv
     }
   })
 
-  const replies = pendingReplies.map(invitation => {
+  const replies = communicationFollowUps.map(followUp => {
+    const invitation = followUp.invitation
     const kol = kolMap.get(invitation.kol_id)
     const products = getConversationProductLabel(invitation, invitationsByKol[invitation.kol_id] || [])
     return {
@@ -175,8 +176,10 @@ function buildRecentActivities(kols: KOL[], invitationsByKol: Record<string, Inv
       date: invitation.invited_at,
       activity: {
         id: `reply-${invitation.id}`,
-        icon: <Mail className="h-3.5 w-3.5 text-blue-500" />,
-        text: `${kol?.name || 'KOL'} 已发送邀约（${products}），等待回复中`,
+        icon: <Mail className={`h-3.5 w-3.5 ${followUp.kind === 'discussion' ? 'text-cyan-500' : 'text-blue-500'}`} />,
+        text: followUp.kind === 'discussion'
+          ? `${kol?.name || 'KOL'} 正在沟通（${products}），待继续跟进`
+          : `${kol?.name || 'KOL'} 已发送邀约（${products}），等待回复中`,
         time: relativeTime(invitation.invited_at),
       },
     }
@@ -205,8 +208,10 @@ function buildRecentActivities(kols: KOL[], invitationsByKol: Record<string, Inv
 export default function WorkspaceDashboard({ kols, invitations, shipments, collaborationsByKol, onSelectKol, onNavigate }: Props) {
   const metrics = buildDashboardMetrics({ kols, invitations, shipments, collaborationsByKol })
   const availableKolIds = new Set(kols.filter(kol => !kol.blacklisted_at).map(kol => kol.id))
-  const pendingReplies = getActionablePendingInvitations(invitations, shipments, collaborationsByKol)
-    .filter(invitation => availableKolIds.has(invitation.kol_id))
+  const communicationFollowUps = getActionableCommunicationFollowUps(invitations, shipments, collaborationsByKol)
+    .filter(item => availableKolIds.has(item.invitation.kol_id))
+  const pendingReplyCount = communicationFollowUps.filter(item => item.kind === 'awaiting_reply').length
+  const discussionCount = communicationFollowUps.filter(item => item.kind === 'discussion').length
   const pendingShipments = shipments.filter(shipment => availableKolIds.has(shipment.kol_id) && !shipment.archived_at && shipment.status === '待寄出' && !shipment.tracking_number?.trim())
   const inTransitSoon = shipments.filter(shipment => availableKolIds.has(shipment.kol_id) && !shipment.archived_at && shipment.status === '运输中').length
   const contentFollowUps = shipments
@@ -214,11 +219,11 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
     .sort((a, b) => daysSince(b.delivered_at) - daysSince(a.delivered_at))
   const overdueContent = contentFollowUps.filter(shipment => daysSince(shipment.delivered_at) >= 7)
   const waitingArchive = shipments.filter(shipment => availableKolIds.has(shipment.kol_id) && !shipment.archived_at && isCompletedShipment(shipment))
-  const recentActivities = buildRecentActivities(kols, invitations, pendingReplies, pendingShipments, overdueContent, collaborationsByKol)
+  const recentActivities = buildRecentActivities(kols, invitations, communicationFollowUps, pendingShipments, overdueContent, collaborationsByKol)
 
   const stats = [
     { label: 'KOL 总量', value: metrics.totalKols, sub: '查看资源池', color: '#1D1D1F', accent: '#F8F8FA', onClick: () => onNavigate('table') },
-    { label: '待回复', value: pendingReplies.length, sub: '邀约跟进', color: '#0066FF', accent: '#EEF4FF', onClick: () => onNavigate('table', { invitationStatus: 'pending' }) },
+    { label: '待跟进', value: communicationFollowUps.length, sub: `${pendingReplyCount} 待回复 · ${discussionCount} 沟通中`, color: '#087F8C', accent: '#ECFAFB', onClick: () => onNavigate('table', { invitationStatus: 'followup' }) },
     { label: '待寄出', value: pendingShipments.length, sub: '补充物流信息', color: '#C76B00', accent: '#FFF7E8', onClick: () => onNavigate('progress') },
     { label: '运输中', value: metrics.inTransit, sub: `${inTransitSoon} 件在途`, color: '#0066FF', accent: '#EEF4FF', onClick: () => onNavigate('progress') },
     { label: '内容跟进', value: metrics.contentFollowUp, sub: `${overdueContent.length} 件逾期`, color: '#D92D20', accent: '#FFF1F0', onClick: () => onNavigate('progress') },
@@ -234,9 +239,10 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
 
       <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2 2xl:grid-cols-4">
         <Card className="h-[244px]">
-          <SectionHeader dot="bg-amber-400" title="待回复邀约" count={pendingReplies.length} actionLabel="全部" onClick={() => onNavigate('table', { invitationStatus: 'pending' })} />
+          <SectionHeader dot="bg-cyan-500" title="待跟进沟通" count={communicationFollowUps.length} actionLabel="全部" onClick={() => onNavigate('table', { invitationStatus: 'followup' })} />
           <div className="py-1">
-            {pendingReplies.slice(0, 3).map(invitation => {
+            {communicationFollowUps.slice(0, 3).map(followUp => {
+              const invitation = followUp.invitation
               const kol = kolById(kols, invitation.kol_id)
               if (!kol) return null
               const products = getConversationProductLabel(invitation, invitations[invitation.kol_id] || [])
@@ -249,11 +255,13 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
                       <div className="truncate text-[11px] text-[#6E6E73]">{products} · {invitation.invited_at}</div>
                     </div>
                   </div>
-                  <span className="rounded-full bg-[#E8F0FF] px-3 py-1.5 text-[11px] font-semibold text-[#0066FF]">催回复</span>
+                  <span className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold ${followUp.kind === 'discussion' ? 'bg-cyan-50 text-cyan-700' : 'bg-[#E8F0FF] text-[#0066FF]'}`}>
+                    {followUp.kind === 'discussion' ? '继续沟通' : '催回复'}
+                  </span>
                 </button>
               )
             })}
-            {pendingReplies.length === 0 && <EmptyState icon={<Send className="h-5 w-5" />} text="暂无待回复邀约" />}
+            {communicationFollowUps.length === 0 && <EmptyState icon={<Send className="h-5 w-5" />} text="暂无待跟进沟通" />}
           </div>
         </Card>
 

@@ -8,6 +8,7 @@ import { collectProductOptions } from '../utils/productOptions'
 import { CONTENT_SHAPES, getKolContentShape } from '../utils/contentShape'
 import {
   getUnansweredInvitationStatus,
+  isActionableDiscussion,
   isActionablePendingInvitation,
   isOverduePendingInvitation,
 } from '../utils/workspaceViews'
@@ -165,6 +166,12 @@ export default function KolTable({
       if (filterInvStatus === 'pending') {
         matchInvStatus = invs.some(invitation =>
           isActionablePendingInvitation(invitation, shipments, allCollaborations)
+        )
+      }
+      if (filterInvStatus === 'followup') {
+        matchInvStatus = invs.some(invitation =>
+          isActionablePendingInvitation(invitation, shipments, allCollaborations) ||
+          isActionableDiscussion(invitation, shipments, allCollaborations)
         )
       }
       if (filterInvStatus === 'unreplied') {
@@ -387,6 +394,7 @@ export default function KolTable({
               className="h-9 rounded-[10px] border border-black/[0.08] bg-white px-3 text-xs font-bold text-[#6E6E73] outline-none focus:border-[#0066FF]/40"
             >
               <option value="">合作机会</option>
+              <option value="followup">待跟进（待回复/沟通中）</option>
               <option value="pending">待回复（14天内）</option>
               <option value="unreplied">未回复（超14天）</option>
               <option value="discussing">沟通中 / 主动联系</option>

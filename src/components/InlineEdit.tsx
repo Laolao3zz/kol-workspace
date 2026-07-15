@@ -41,12 +41,13 @@ export default function InlineEdit({ label, value, onSave, type = 'text', option
   }
 
   return (
-    <div className="mb-1">
+    <div className="mb-1 min-w-0 max-w-full">
       <span className="text-[11px] text-gray-400 block">{label}</span>
       {!editing ? (
         <div
           onClick={() => setEditing(true)}
-          className="text-sm py-1 border-b border-dashed border-gray-200 cursor-text min-h-[28px] text-gray-800 hover:bg-blue-50/50 transition-colors rounded-sm px-1 -mx-1"
+          className="min-h-[28px] max-w-full cursor-text break-words rounded-sm border-b border-dashed border-gray-200 px-1 py-1 text-sm text-gray-800 transition-colors [overflow-wrap:anywhere] hover:bg-blue-50/50"
+          title={value || undefined}
         >
           {value || <span className="text-gray-300 italic">点击编辑</span>}
         </div>
@@ -56,7 +57,7 @@ export default function InlineEdit({ label, value, onSave, type = 'text', option
           value={draft}
           onChange={e => { setDraft(e.target.value); }}
           onBlur={commit}
-          className="w-full text-sm py-1 px-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+          className="min-w-0 w-full text-sm py-1 px-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
         >
           <option value="">--</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -69,7 +70,7 @@ export default function InlineEdit({ label, value, onSave, type = 'text', option
           onChange={e => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={handleKeyDown}
-          className="w-full text-sm py-1 px-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="min-w-0 w-full text-sm py-1 px-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
         />
       ) : type === 'textarea' ? (
         <textarea
@@ -79,7 +80,7 @@ export default function InlineEdit({ label, value, onSave, type = 'text', option
           onBlur={commit}
           onKeyDown={handleKeyDown}
           rows={3}
-          className="w-full text-sm py-1 px-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 resize-y"
+          className="min-w-0 w-full text-sm py-1 px-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 resize-y"
         />
       ) : (
         <input
@@ -89,7 +90,7 @@ export default function InlineEdit({ label, value, onSave, type = 'text', option
           onChange={e => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={handleKeyDown}
-          className="w-full text-sm py-1 px-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="min-w-0 w-full text-sm py-1 px-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
         />
       )}
     </div>

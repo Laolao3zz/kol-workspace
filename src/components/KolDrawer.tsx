@@ -1062,7 +1062,7 @@ function SectionCard({ icon: Icon, title, action, children }: {
 }
 
 function FieldGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-2">{children}</div>
+  return <div className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">{children}</div>
 }
 
 function HeaderButton({ icon: Icon, children, onClick, tone = 'primary', disabled = false }: { icon: LucideIcon; children: string; onClick: () => void; tone?: 'primary' | 'neutral'; disabled?: boolean }) {
