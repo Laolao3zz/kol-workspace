@@ -142,6 +142,23 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
     () => groupOpportunityConversations(invitations),
     [invitations]
   )
+  const editingInvitationHasShipment = editingInvitation
+    ? allKolShipments.some(shipment => shipment.source_invitation_id === editingInvitation.id)
+    : false
+  const editingProductOptions = useMemo(() => {
+    if (!editingInvitation) return managedProductOptions
+    const usedByConversation = new Set(
+      invitations
+        .filter(invitation =>
+          invitation.id !== editingInvitation.id &&
+          invitation.conversation_id &&
+          invitation.conversation_id === editingInvitation.conversation_id
+        )
+        .map(invitation => invitation.product.trim().toLocaleLowerCase())
+    )
+    return productFormOptions(editingInvitation.product)
+      .filter(product => product === editingInvitation.product || !usedByConversation.has(product.trim().toLocaleLowerCase()))
+  }, [editingInvitation, invitations, managedProductOptions])
 
   useEffect(() => { loadSubData() }, [kol.id])
 
@@ -512,7 +529,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
         product,
       })))
     } catch (error) {
-      showToast(error instanceof Error ? error.message : '合作机会添加失败')
+      showToast(error instanceof Error ? error.message : '沟通记录添加失败')
       return
     }
 
@@ -530,11 +547,11 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
     ], recoveryRefreshes)
     if (!outcome.completed) {
       const detail = outcome.error instanceof Error ? outcome.error.message : '关联数据同步失败'
-      showToast(`合作机会已添加，但关联数据同步失败：${detail}`)
+      showToast(`沟通记录已添加，但关联数据同步失败：${detail}`)
       return
     }
 
-    showToast(createdInvitations.length > 1 ? `已添加 ${createdInvitations.length} 个产品机会` : '合作机会已添加')
+    showToast(createdInvitations.length > 1 ? `已记录 ${createdInvitations.length} 个产品` : '沟通记录已添加')
   }
 
   const handleDeleteInvitation = async (id: string) => {
@@ -775,7 +792,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                     </div>
                     {latestInvitation && (
                       <div className="rounded-[14px] border border-black/[0.06] bg-white p-3 text-xs font-semibold text-[#6E6E73]">
-                        最近机会：{getInvitationDirection(latestInvitation) === 'inbound' ? '博主主动联系' : '我方邀约'} · {latestInvitation.product} · {latestInvitation.replied ? latestInvitation.reply_result : '未回复'} · {latestInvitation.invited_at}
+                        最近沟通：{getInvitationDirection(latestInvitation) === 'inbound' ? '博主主动联系' : '我方邀约'} · {latestInvitation.product} · {latestInvitation.replied ? latestInvitation.reply_result : '未回复'} · {latestInvitation.invited_at}
                       </div>
                     )}
                   </div>
@@ -873,13 +890,13 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                 )}
               </SectionCard>
 
-              <SectionCard icon={Mail} title="合作机会"
-                action={<HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus} disabled={Boolean(kol.blacklisted_at)}>新增机会</HeaderButton>}
+              <SectionCard icon={Mail} title="沟通记录"
+                action={<HeaderButton onClick={() => { setEditingInvitation(null); setShowInvModal(true) }} icon={Plus} disabled={Boolean(kol.blacklisted_at)}>记录沟通</HeaderButton>}
               >
                 {loadingSub ? (
                   <div className="space-y-2">{ [1,2].map(i => <div key={i} className="h-12 rounded-[12px] bg-[#F5F5F7] animate-pulse" />) }</div>
                 ) : opportunityConversations.length === 0 ? (
-                  <p className="py-4 text-center text-xs font-semibold text-[#86868B]">暂无合作机会</p>
+                  <p className="py-4 text-center text-xs font-semibold text-[#86868B]">暂无沟通记录</p>
                 ) : (
                   <div className="space-y-2">
                     {opportunityConversations.map(conversation => (
@@ -903,8 +920,8 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                                 {inv.quoted_fee ? `报价 ${inv.quoted_fee}` : inv.notes || '-'}
                               </span>
                               {invReplyBadge(inv)}
-                              <button onClick={() => { setEditingInvitation(inv); setShowInvModal(true) }} className="shrink-0 text-[#AEAEB2] opacity-0 transition hover:text-[#0066FF] group-hover:opacity-100" title="编辑当前产品">
-                                <Pencil className="h-3.5 w-3.5" />
+                              <button onClick={() => { setEditingInvitation(inv); setShowInvModal(true) }} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-[7px] bg-[#F1F2F4] px-2 text-[10px] font-bold text-[#6E6E73] transition hover:bg-blue-50 hover:text-[#0066FF]" title="更新当前产品进展">
+                                <Pencil className="h-3 w-3" /> 编辑
                               </button>
                               <button onClick={() => handleDeleteInvitation(inv.id)} className="shrink-0 text-[#AEAEB2] opacity-0 transition hover:text-red-600 group-hover:opacity-100" title="删除当前产品机会">
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -977,7 +994,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
         {toast && <div className="fixed bottom-6 right-6 z-[60] rounded-[12px] bg-[#1D1D1F] px-5 py-2.5 text-sm font-bold text-white shadow-lg">{toast}</div>}
       </div>
 
-      {showInvModal && <AddInvitationModal kolId={kol.id} invitation={editingInvitation} productOptions={productFormOptions(editingInvitation?.product)} onClose={() => { setShowInvModal(false); setEditingInvitation(null) }} onSubmit={handleAddInvitation} />}
+      {showInvModal && <AddInvitationModal kolId={kol.id} invitation={editingInvitation} productOptions={editingInvitation ? editingProductOptions : managedProductOptions} canChangeProduct={Boolean(editingInvitation) && !editingInvitationHasShipment} onClose={() => { setShowInvModal(false); setEditingInvitation(null) }} onSubmit={handleAddInvitation} />}
       {showColModal && <AddCollaborationModal kolId={kol.id} collaboration={editingCollaboration} productOptions={productFormOptions(editingCollaboration?.product)} contentShape={contentShape} onClose={() => { setShowColModal(false); setEditingCollaboration(null) }} onSubmit={handleAddCollaboration} />}
       {showShipmentModal && <AddShipmentModal kolId={kol.id} shipment={editingShipment} productOptions={productFormOptions(editingShipment?.product)} onClose={() => { setShowShipmentModal(false); setEditingShipment(null) }} onSubmit={handleSaveShipment} />}
       {editingProgress && <EditProgressModal shipment={editingProgress} onClose={() => setEditingProgress(null)} onSubmit={handleSaveProgress} />}
