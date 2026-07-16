@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Bell, Clock, LayoutDashboard, LayoutGrid, Package, Plus, Star, Users } from 'lucide-react'
+import { Bell, Clock, LayoutDashboard, LayoutGrid, Package, Star, Users } from 'lucide-react'
 import { KOL, Shipment } from './types'
 import { createKOL, deleteKOL } from './services/kolService'
 import { countCompletedCollaborations } from './utils/kolStatus'
@@ -176,11 +176,7 @@ function App() {
         <Sidebar active={viewMode} onNav={handleNavigate} kolsCount={kols.length} progressCount={progressCount} />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <PageHeader
-            page={viewMode}
-            onAddKol={() => setShowAddKolModal(true)}
-            onQuickInvite={() => setViewMode('table')}
-          />
+          <PageHeader page={viewMode} />
 
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {viewMode === 'dashboard' && (
@@ -333,27 +329,15 @@ function Sidebar({ active, onNav, kolsCount, progressCount }: { active: ViewMode
   )
 }
 
-function PageHeader({ page, onAddKol, onQuickInvite }: { page: ViewMode; onAddKol: () => void; onQuickInvite: () => void }) {
+function PageHeader({ page }: { page: ViewMode }) {
   const meta = PAGE_META[page]
   const sub = page === 'dashboard' ? formatTodayLabel() : meta.sub
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.07] bg-white px-6">
+    <div className="flex h-14 shrink-0 items-center border-b border-black/[0.07] bg-white px-6">
       <div className="flex items-center gap-3">
         <h1 className="text-[18px] font-extrabold text-[#1D1D1F]">{meta.title}</h1>
         <span className="text-sm text-[#AEAEB2]">·</span>
         <span className="text-[13px] font-medium text-[#6E6E73]">{sub}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        {page === 'dashboard' && (
-          <button onClick={onQuickInvite} className="flex items-center gap-1.5 rounded-[8px] bg-[#0066FF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(0,102,255,0.25)] transition hover:bg-[#0057DB] active:scale-[0.98]">
-            <Plus className="h-3.5 w-3.5" /> 快速邀约
-          </button>
-        )}
-        {page === 'table' && (
-          <button onClick={onAddKol} className="flex items-center gap-1.5 rounded-[8px] bg-[#0066FF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_1px_2px_rgba(0,102,255,0.25)] transition hover:bg-[#0057DB] active:scale-[0.98]">
-            <Plus className="h-3.5 w-3.5" /> 添加 KOL
-          </button>
-        )}
       </div>
     </div>
   )

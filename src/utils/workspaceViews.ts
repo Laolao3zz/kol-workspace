@@ -17,6 +17,7 @@ export interface DashboardMetricSources {
   invitations: Record<string, Invitation[]>
   shipments: Shipment[]
   collaborationsByKol: Record<string, Collaboration[]>
+  currentDate?: string
 }
 
 export interface DashboardMetrics {
@@ -142,11 +143,12 @@ export function isActionableDiscussion(
 export function getActionablePendingInvitations(
   invitations: Record<string, Invitation[]>,
   shipments: Shipment[],
-  collaborationsByKol: Record<string, Collaboration[]>
+  collaborationsByKol: Record<string, Collaboration[]>,
+  currentDate = todayISO()
 ): Invitation[] {
   const collaborations = flatCollaborations(collaborationsByKol)
   const actionable = flatInvitations(invitations).filter(invitation =>
-    isActionablePendingInvitation(invitation, shipments, collaborations)
+    isActionablePendingInvitation(invitation, shipments, collaborations, currentDate)
   )
   const seenConversations = new Set<string>()
   return actionable.filter(invitation => {
@@ -160,13 +162,14 @@ export function getActionablePendingInvitations(
 export function getActionableCommunicationFollowUps(
   invitations: Record<string, Invitation[]>,
   shipments: Shipment[],
-  collaborationsByKol: Record<string, Collaboration[]>
+  collaborationsByKol: Record<string, Collaboration[]>,
+  currentDate = todayISO()
 ): CommunicationFollowUp[] {
   const collaborations = flatCollaborations(collaborationsByKol)
   const byConversation = new Map<string, CommunicationFollowUp>()
 
   flatInvitations(invitations).forEach(invitation => {
-    const kind = isActionablePendingInvitation(invitation, shipments, collaborations)
+    const kind = isActionablePendingInvitation(invitation, shipments, collaborations, currentDate)
       ? 'awaiting_reply'
       : isActionableDiscussion(invitation, shipments, collaborations)
         ? 'discussion'
@@ -200,12 +203,14 @@ export function buildDashboardMetrics(sources: DashboardMetricSources): Dashboar
   const pendingReplies = getActionablePendingInvitations(
     sources.invitations,
     sources.shipments,
-    sources.collaborationsByKol
+    sources.collaborationsByKol,
+    sources.currentDate
   ).filter(invitation => availableKolIds.has(invitation.kol_id))
   const communicationFollowUps = getActionableCommunicationFollowUps(
     sources.invitations,
     sources.shipments,
-    sources.collaborationsByKol
+    sources.collaborationsByKol,
+    sources.currentDate
   ).filter(item => availableKolIds.has(item.invitation.kol_id))
 
   return {

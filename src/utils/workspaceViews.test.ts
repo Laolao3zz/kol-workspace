@@ -94,6 +94,8 @@ const product = (name: string, overrides: Partial<Product> = {}): Product => ({
   ...overrides,
 })
 
+const TEST_CURRENT_DATE = '2026-07-10'
+
 describe('workspace view helpers', () => {
   it('builds dashboard metrics from real workflow records', () => {
     const metrics = buildDashboardMetrics({
@@ -110,6 +112,7 @@ describe('workspace view helpers', () => {
       collaborationsByKol: {
         k3: [collaboration({ kol_id: 'k3', product: 'X1' })],
       },
+      currentDate: TEST_CURRENT_DATE,
     })
 
     expect(metrics.totalKols).toBe(3)
@@ -134,6 +137,7 @@ describe('workspace view helpers', () => {
         shipment({ kol_id: 'covered', product: 'Shipped Product', status: '待寄出' }),
       ],
       collaborationsByKol: {},
+      currentDate: TEST_CURRENT_DATE,
     })
 
     expect(metrics.pendingReplies).toBe(1)
@@ -151,6 +155,7 @@ describe('workspace view helpers', () => {
       },
       shipments: [],
       collaborationsByKol: {},
+      currentDate: TEST_CURRENT_DATE,
     })
 
     expect(metrics.pendingReplies).toBe(1)
@@ -226,6 +231,7 @@ describe('workspace view helpers', () => {
       },
       shipments: [],
       collaborationsByKol: {},
+      currentDate: TEST_CURRENT_DATE,
     })
 
     expect(metrics.pendingReplies).toBe(1)
@@ -316,6 +322,7 @@ describe('workspace view helpers', () => {
       },
       shipments: [],
       collaborationsByKol: {},
+      currentDate: TEST_CURRENT_DATE,
     })
 
     expect(summary[0].rows).toHaveLength(1)
@@ -465,6 +472,7 @@ describe('workspace view helpers', () => {
       },
       shipments: [],
       collaborationsByKol: {},
+      currentDate: TEST_CURRENT_DATE,
     })
 
     const sbc = summary.find(item => item.product === 'Pocket SBC Kit')
