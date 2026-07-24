@@ -121,7 +121,7 @@ export default function AddInvitationModal({ kolId, invitation, productOptions =
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative mx-4 max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[16px] border border-black/[0.07] bg-white p-6 shadow-2xl">
+      <div className="relative mx-3 max-h-[calc(100dvh-24px)] w-full max-w-3xl overflow-y-auto rounded-[12px] border border-black/[0.07] bg-white p-4 shadow-2xl sm:mx-4 sm:max-h-[92vh] sm:rounded-[16px] sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#1D1D1F] text-white">
@@ -182,7 +182,7 @@ export default function AddInvitationModal({ kolId, invitation, productOptions =
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">联系日期</label>
               <input type="date" value={form.invited_at} onChange={event => setForm(previous => ({ ...previous, invited_at: event.target.value }))} className="h-10 w-full rounded-[8px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40" />
@@ -195,7 +195,7 @@ export default function AddInvitationModal({ kolId, invitation, productOptions =
 
           <div>
             <label className="mb-2 block text-xs font-bold text-[#525257]">当前结果</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {options.map(option => {
                 const active = outcome === option.value
                 return (

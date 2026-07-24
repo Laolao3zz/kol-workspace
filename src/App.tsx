@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Bell, Clock, LayoutDashboard, LayoutGrid, Package, Star, Users } from 'lucide-react'
+import { Clock, LayoutDashboard, LayoutGrid, LogOut, Package, Star, Users } from 'lucide-react'
 import { KOL, Shipment } from './types'
 import { createKOL, deleteKOL } from './services/kolService'
 import { countCompletedCollaborations } from './utils/kolStatus'
@@ -15,6 +15,7 @@ import CollaborationHistoryView from './components/CollaborationHistoryView'
 import { collectProductOptions } from './utils/productOptions'
 import { collectTagOptions } from './utils/tags'
 import { countActiveShipments } from './utils/workspaceViews'
+import { useAuth } from './auth/AuthProvider'
 
 type ViewMode = 'dashboard' | 'table' | 'progress' | 'products' | 'history'
 
@@ -49,6 +50,7 @@ function countProgressBadge(shipments: Shipment[], kols: KOL[]) {
 }
 
 function App() {
+  const { email, isDemo, signOut } = useAuth()
   const {
     kols,
     products,
@@ -160,25 +162,39 @@ function App() {
     }
   }
 
+  const handleSignOut = () => {
+    void signOut().catch(err => {
+      setError(err instanceof Error ? err.message : '退出登录失败')
+    })
+  }
+
   return (
     <ErrorBoundary>
       <div
-        className="flex h-screen overflow-hidden bg-[#F4F5F7] text-[#1D1D1F]"
+        className="flex h-[100dvh] overflow-hidden bg-[#F4F5F7] text-[#1D1D1F]"
         style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}
       >
         {error && (
-          <div className="fixed right-5 top-5 z-[80] rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg">
+          <div className="fixed left-3 right-3 top-3 z-[90] rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg sm:left-auto sm:right-5 sm:top-5 sm:max-w-md">
             {error}
             <button onClick={() => setError(null)} className="ml-3 font-bold hover:text-red-900">&times;</button>
           </div>
         )}
 
-        <Sidebar active={viewMode} onNav={handleNavigate} kolsCount={kols.length} progressCount={progressCount} />
+        <Sidebar
+          active={viewMode}
+          onNav={handleNavigate}
+          kolsCount={kols.length}
+          progressCount={progressCount}
+          email={email}
+          isDemo={isDemo}
+          onSignOut={handleSignOut}
+        />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <PageHeader page={viewMode} />
+          <PageHeader page={viewMode} email={email} isDemo={isDemo} onSignOut={handleSignOut} />
 
-          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
             {viewMode === 'dashboard' && (
               <WorkspaceDashboard
                 kols={kols}
@@ -191,7 +207,7 @@ function App() {
             )}
 
             {viewMode === 'table' && (
-              <div className="flex-1 overflow-auto p-5 xl:px-6">
+              <div className="flex-1 overflow-auto p-2.5 sm:p-4 xl:px-6">
                 <KolTable
                   kols={kols}
                   invitations={invitations}
@@ -210,7 +226,7 @@ function App() {
             )}
 
             {viewMode === 'progress' && (
-              <div className="flex-1 overflow-hidden p-5 xl:px-6">
+              <div className="flex-1 overflow-hidden p-2.5 sm:p-4 xl:px-6">
                 <ShipmentBoard
                   kols={kols}
                   invitations={invitations}
@@ -272,14 +288,32 @@ function App() {
             onOpenExisting={handleOpenExistingKol}
           />
         )}
+
+        <MobileNavigation active={viewMode} onNav={handleNavigate} kolsCount={kols.length} progressCount={progressCount} />
       </div>
     </ErrorBoundary>
   )
 }
 
-function Sidebar({ active, onNav, kolsCount, progressCount }: { active: ViewMode; onNav: (mode: ViewMode) => void; kolsCount: number; progressCount: number }) {
+function Sidebar({
+  active,
+  onNav,
+  kolsCount,
+  progressCount,
+  email,
+  isDemo,
+  onSignOut,
+}: {
+  active: ViewMode
+  onNav: (mode: ViewMode) => void
+  kolsCount: number
+  progressCount: number
+  email: string
+  isDemo: boolean
+  onSignOut: () => void
+}) {
   return (
-    <aside className="flex min-h-screen w-[216px] shrink-0 flex-col border-r border-black/[0.07] bg-white">
+    <aside className="hidden min-h-[100dvh] w-[216px] shrink-0 flex-col border-r border-black/[0.07] bg-white md:flex">
       <div className="px-5 pb-5 pt-6">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#0066FF] text-white shadow-[0_4px_12px_rgba(0,102,255,0.35)]">
@@ -316,30 +350,63 @@ function Sidebar({ active, onNav, kolsCount, progressCount }: { active: ViewMode
       </nav>
 
       <div className="border-t border-black/[0.06] px-3 pb-5 pt-4">
-        <div className="flex cursor-pointer items-center gap-3 rounded-[8px] px-3 py-2.5 transition-colors hover:bg-[#F4F5F7]">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5856D6] text-xs font-bold text-white">运</div>
+        <div className="flex items-center gap-2 rounded-[8px] px-3 py-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-xs font-bold text-white">{isDemo ? '演' : email.slice(0, 1).toUpperCase()}</div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-bold text-[#1D1D1F]">运营工作台</div>
-            <div className="text-[11px] text-[#6E6E73]">KOL 管理</div>
+            <div className="truncate text-[12px] font-bold text-[#1D1D1F]">{email}</div>
+            <div className="text-[10px] text-[#6E6E73]">{isDemo ? '未连接 Supabase' : '内部成员'}</div>
           </div>
-          <Bell className="h-4 w-4 shrink-0 text-[#AEAEB2]" />
+          {!isDemo && (
+            <button onClick={onSignOut} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[#86868B] hover:bg-[#F4F5F7] hover:text-[#1D1D1F]" title="退出登录">
+              <LogOut className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </aside>
   )
 }
 
-function PageHeader({ page }: { page: ViewMode }) {
+function PageHeader({ page, email, isDemo, onSignOut }: { page: ViewMode; email: string; isDemo: boolean; onSignOut: () => void }) {
   const meta = PAGE_META[page]
   const sub = page === 'dashboard' ? formatTodayLabel() : meta.sub
   return (
-    <div className="flex h-14 shrink-0 items-center border-b border-black/[0.07] bg-white px-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-[18px] font-extrabold text-[#1D1D1F]">{meta.title}</h1>
-        <span className="text-sm text-[#AEAEB2]">·</span>
-        <span className="text-[13px] font-medium text-[#6E6E73]">{sub}</span>
+    <div className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.07] bg-white px-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#0066FF] text-white md:hidden">
+          <Star className="h-3.5 w-3.5" fill="currentColor" />
+        </div>
+        <h1 className="truncate text-[17px] font-extrabold text-[#1D1D1F] sm:text-[18px]">{meta.title}</h1>
+        <span className="hidden text-sm text-[#AEAEB2] sm:inline">·</span>
+        <span className="hidden truncate text-[13px] font-medium text-[#6E6E73] sm:inline">{sub}</span>
       </div>
+      {!isDemo && (
+        <button onClick={onSignOut} className="ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] text-[#86868B] hover:bg-[#F4F5F7] md:hidden" title={`${email} · 退出登录`}>
+          <LogOut className="h-4 w-4" />
+        </button>
+      )}
     </div>
+  )
+}
+
+function MobileNavigation({ active, onNav, kolsCount, progressCount }: { active: ViewMode; onNav: (mode: ViewMode) => void; kolsCount: number; progressCount: number }) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(4rem+env(safe-area-inset-bottom))] grid-cols-5 border-t border-black/[0.08] bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:hidden">
+      {NAV_ITEMS.map(item => {
+        const Icon = item.icon
+        const selected = active === item.id
+        const count = item.id === 'table' ? kolsCount : item.id === 'progress' ? progressCount : 0
+        return (
+          <button key={item.id} onClick={() => onNav(item.id)} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 text-[10px] font-bold ${selected ? 'text-[#0066FF]' : 'text-[#86868B]'}`}>
+            <span className={`relative flex h-7 w-10 items-center justify-center rounded-[8px] ${selected ? 'bg-[#EAF2FF]' : ''}`}>
+              <Icon className="h-[18px] w-[18px]" />
+              {count > 0 && <span className="absolute -right-1 -top-1 min-w-[16px] rounded-full bg-[#1D1D1F] px-1 text-[9px] leading-4 text-white">{count > 99 ? '99+' : count}</span>}
+            </span>
+            <span className="max-w-full truncate">{item.label.replace('KOL ', '')}</span>
+          </button>
+        )
+      })}
+    </nav>
   )
 }
 

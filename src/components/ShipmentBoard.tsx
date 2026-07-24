@@ -277,19 +277,19 @@ export default function ShipmentBoard({ kols, invitations, shipments, onSelect, 
     <>
       <section className="flex h-full min-h-0 flex-col overflow-hidden">
         {boardError && (
-          <div className="fixed right-6 top-20 z-50 flex items-center gap-2 rounded-[12px] border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 shadow-lg">
+          <div className="fixed left-3 right-3 top-16 z-50 flex items-center gap-2 rounded-[8px] border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 shadow-lg sm:left-auto sm:right-6 sm:top-20 sm:max-w-md">
             <AlertTriangle className="h-4 w-4" />
             <span>{boardError}</span>
             <button onClick={() => setBoardError('')} className="ml-2 font-bold hover:text-red-900">&times;</button>
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-x-auto">
-          <div className="grid h-full min-w-[1180px] grid-cols-4 gap-4">
+        <div className="min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain">
+          <div className="grid h-full min-w-0 auto-cols-[minmax(280px,88vw)] grid-flow-col gap-3 sm:auto-cols-[360px] xl:min-w-[1180px] xl:grid-flow-row xl:grid-cols-4 xl:gap-4">
             {columns.map(column => {
               const Icon = column.icon
               return (
-                <div key={column.key} className="flex min-h-0 flex-col overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                <div key={column.key} className="flex min-h-0 snap-start flex-col overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
                   <div className={`shrink-0 border-b border-black/[0.06] px-4 py-3 ${column.tint}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">

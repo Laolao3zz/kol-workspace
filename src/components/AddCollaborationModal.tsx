@@ -61,7 +61,7 @@ export default function AddCollaborationModal({ kolId, collaboration, productOpt
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
+      <div className="relative mx-3 max-h-[calc(100dvh-24px)] w-full max-w-lg overflow-y-auto rounded-[12px] border border-black/[0.06] bg-white p-4 shadow-2xl sm:mx-4 sm:max-h-[90vh] sm:rounded-[20px] sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
@@ -77,7 +77,7 @@ export default function AddCollaborationModal({ kolId, collaboration, productOpt
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">产品名</label>
               <select
@@ -112,7 +112,7 @@ export default function AddCollaborationModal({ kolId, collaboration, productOpt
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">{metricLabels.viewsInput}</label>
               <input

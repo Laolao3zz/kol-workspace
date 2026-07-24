@@ -79,7 +79,7 @@ export default function CorrectProductModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={saving ? undefined : onClose} />
-      <div className="relative w-[560px] max-w-[calc(100vw-32px)] rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
+      <div className="relative w-[560px] max-w-[calc(100vw-24px)] rounded-[12px] border border-black/[0.06] bg-white p-4 shadow-2xl sm:max-w-[calc(100vw-32px)] sm:rounded-[20px] sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
@@ -101,7 +101,7 @@ export default function CorrectProductModal({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-[minmax(0,1fr)_32px_minmax(0,1fr)] items-end gap-3">
+            <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_32px_minmax(0,1fr)]">
               <label>
                 <span className="mb-1.5 block text-xs font-bold text-[#6E6E73]">来源产品</span>
                 <select value={sourceProduct} onChange={event => setSourceProduct(event.target.value)} className="h-10 w-full rounded-[10px] border border-black/[0.08] bg-[#F5F5F7] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40">
@@ -117,7 +117,7 @@ export default function CorrectProductModal({
               </label>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <ImpactCount label="邀约" value={plan.invitations.length} />
               <ImpactCount label="寄样" value={plan.shipments.length} />
               <ImpactCount label="合作" value={plan.collaborations.length} />

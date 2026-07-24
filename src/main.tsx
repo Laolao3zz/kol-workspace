@@ -2,13 +2,16 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
+import { AuthProvider } from './auth/AuthProvider'
 
 console.log('[main] Starting React...')
 
 try {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </React.StrictMode>,
   )
   console.log('[main] React mounted successfully')

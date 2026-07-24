@@ -80,15 +80,15 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, on
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 border-b border-black/[0.06] bg-white px-8 py-4">
+      <div className="shrink-0 border-b border-black/[0.06] bg-white px-3 py-3 sm:px-5 lg:px-8 lg:py-4">
         <div className="flex flex-wrap items-center gap-3">
           <HistoryStat icon={<Eye className="h-4 w-4" />} label="播放/访问" value={formatNumber(totals.views)} tone="text-[#0066FF]" />
           <HistoryStat icon={<ThumbsUp className="h-4 w-4" />} label="点赞/互动" value={formatNumber(totals.likes)} tone="text-[#34C759]" />
           <HistoryStat icon={<MessageSquare className="h-4 w-4" />} label="总评论" value={formatNumber(totals.comments)} tone="text-[#FF9F0A]" />
           <HistoryStat icon={<DollarSign className="h-4 w-4" />} label="费用记录" value={totals.fee ? totals.fee.toLocaleString() : '-'} tone="text-[#1D1D1F]" />
 
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div className="relative w-60">
+          <div className="flex w-full flex-wrap items-center gap-2 lg:ml-auto lg:w-auto">
+            <div className="relative min-w-0 flex-1 sm:w-60 sm:flex-none">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#AEAEB2]" />
               <input
                 value={query}
@@ -109,8 +109,38 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, on
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto px-8 py-5">
-        <div className="overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <div className="min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-5 lg:px-8 lg:py-5">
+        <div className="space-y-2 sm:hidden">
+          {filtered.map(row => {
+            const workHref = toSafeExternalUrl(row.collaboration.work_url)
+            return (
+              <article key={row.collaboration.id} className="rounded-[8px] border border-black/[0.07] bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <button onClick={() => onSelectKol(row.kol)} className="flex min-w-0 items-center gap-3 text-left">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${getAvatarTone(row.kol.name)}`}>{row.kol.name.slice(0, 2).toUpperCase()}</div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-extrabold text-[#1D1D1F]">{row.kol.name}</div>
+                      <div className="mt-0.5 truncate text-[11px] font-semibold text-[#86868B]">{row.kol.platform} · {row.kol.country || '-'}</div>
+                    </div>
+                  </button>
+                  <span className="shrink-0 text-[11px] font-bold text-[#86868B]">{row.collaboration.publish_date || '-'}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-[#F5F5F7] px-2.5 py-1 text-[11px] font-bold text-[#6E6E73]">{row.collaboration.product?.trim() || '未标注产品'}</span>
+                  {workHref && <a href={workHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-[#0066FF]"><ExternalLink className="h-3 w-3" />查看作品</a>}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-black/[0.06] pt-3 text-center">
+                  <MobileMetric label="播放/访问" value={formatNumber(row.collaboration.views)} />
+                  <MobileMetric label="点赞/互动" value={formatNumber(row.collaboration.likes)} />
+                  <MobileMetric label="评论" value={formatNumber(row.collaboration.comments)} />
+                </div>
+                {stripShipmentHistoryMarkers(row.collaboration.notes) && <p className="mt-3 line-clamp-2 text-xs font-medium leading-5 text-[#6E6E73]">{stripShipmentHistoryMarkers(row.collaboration.notes)}</p>}
+              </article>
+            )
+          })}
+          {filtered.length === 0 && <div className="py-16 text-center text-sm font-bold text-[#86868B]">暂无合作历史</div>}
+        </div>
+        <div className="hidden overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:block">
           <table className="min-w-[980px] w-full text-left text-sm">
             <thead className="bg-[#FBFBFD]">
               <tr className="border-b border-black/[0.06] text-[11px] font-bold text-[#86868B]">
@@ -187,12 +217,21 @@ export default function CollaborationHistoryView({ kols, collaborationsByKol, on
 
 function HistoryStat({ icon, label, value, tone }: { icon: ReactNode; label: string; value: string; tone: string }) {
   return (
-    <div className="flex min-w-[150px] items-center gap-3 rounded-[8px] border border-black/[0.07] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+    <div className="flex min-w-[calc(50%-6px)] flex-1 items-center gap-3 rounded-[8px] border border-black/[0.07] bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:min-w-[150px] sm:flex-none sm:px-4 sm:py-3">
       <span className="text-[#86868B]">{icon}</span>
       <div>
         <div className={`text-base font-extrabold tabular-nums ${tone}`}>{value}</div>
         <div className="text-[11px] font-bold text-[#86868B]">{label}</div>
       </div>
+    </div>
+  )
+}
+
+function MobileMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-sm font-extrabold tabular-nums text-[#1D1D1F]">{value}</div>
+      <div className="mt-0.5 text-[10px] font-bold text-[#86868B]">{label}</div>
     </div>
   )
 }

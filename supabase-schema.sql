@@ -160,19 +160,21 @@ BEGIN
   END IF;
 END $$;
 
--- RLS 策略：公开访问，允许所有读写操作
+-- RLS 策略：仅允许管理员创建的 Supabase Auth 账号访问
 ALTER TABLE kols ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE collaborations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE emails ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shipments ENABLE ROW LEVEL SECURITY;
 
--- 允许所有读写（无认证模式）
-CREATE POLICY "Allow all access" ON kols FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access" ON invitations FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access" ON collaborations FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access" ON emails FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all access" ON shipments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated internal access" ON kols FOR ALL TO authenticated USING ((SELECT auth.uid()) IS NOT NULL) WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+CREATE POLICY "Authenticated internal access" ON invitations FOR ALL TO authenticated USING ((SELECT auth.uid()) IS NOT NULL) WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+CREATE POLICY "Authenticated internal access" ON collaborations FOR ALL TO authenticated USING ((SELECT auth.uid()) IS NOT NULL) WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+CREATE POLICY "Authenticated internal access" ON emails FOR ALL TO authenticated USING ((SELECT auth.uid()) IS NOT NULL) WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+CREATE POLICY "Authenticated internal access" ON shipments FOR ALL TO authenticated USING ((SELECT auth.uid()) IS NOT NULL) WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+
+REVOKE ALL PRIVILEGES ON TABLE kols, invitations, collaborations, emails, shipments FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE kols, invitations, collaborations, emails, shipments TO authenticated;
 
 -- 索引
 CREATE INDEX IF NOT EXISTS idx_kols_name ON kols (name);
@@ -335,7 +337,9 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all access" ON products FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated internal access" ON products FOR ALL TO authenticated USING ((SELECT auth.uid()) IS NOT NULL) WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
+REVOKE ALL PRIVILEGES ON TABLE products FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE products TO authenticated;
 
 CREATE INDEX IF NOT EXISTS idx_products_name ON products (name);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products (status);
@@ -446,4 +450,10 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.delete_product_if_unreferenced(UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.delete_product_if_unreferenced(UUID) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.delete_product_if_unreferenced(UUID) FROM anon;
+GRANT EXECUTE ON FUNCTION public.delete_product_if_unreferenced(UUID) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.delete_stale_auto_shipment(UUID, TIMESTAMPTZ, TEXT, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.delete_stale_auto_shipment(UUID, TIMESTAMPTZ, TEXT, UUID) TO authenticated;
+REVOKE ALL ON FUNCTION public.delete_invitation_with_stale_shipment(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.delete_invitation_with_stale_shipment(UUID) TO authenticated;

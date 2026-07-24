@@ -61,15 +61,15 @@ ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public'
-      AND tablename = 'products'
-      AND policyname = 'Allow all access'
-  ) THEN
-    CREATE POLICY "Allow all access" ON products FOR ALL USING (true) WITH CHECK (true);
-  END IF;
+  DROP POLICY IF EXISTS "Allow all access" ON products;
+  DROP POLICY IF EXISTS "Authenticated internal access" ON products;
+  CREATE POLICY "Authenticated internal access" ON products FOR ALL TO authenticated
+    USING ((SELECT auth.uid()) IS NOT NULL)
+    WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
 END $$;
+
+REVOKE ALL PRIVILEGES ON TABLE products FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE products TO authenticated;
 
 CREATE INDEX IF NOT EXISTS idx_products_name ON products (name);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products (status);
@@ -188,7 +188,8 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.delete_product_if_unreferenced(UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.delete_product_if_unreferenced(UUID) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.delete_product_if_unreferenced(UUID) FROM anon;
+GRANT EXECUTE ON FUNCTION public.delete_product_if_unreferenced(UUID) TO authenticated;
 
 -- 强制 PostgREST 重新加载 schema 缓存
 -- 不加这一行的话，即使列已经存在，PostgREST 仍可能返回 PGRST204

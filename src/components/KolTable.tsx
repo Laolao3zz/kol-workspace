@@ -338,9 +338,9 @@ export default function KolTable({
   return (
     <>
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        <div className="shrink-0 border-b border-black/[0.06] px-5 py-4">
+        <div className="shrink-0 border-b border-black/[0.06] px-3 py-3 sm:px-5 sm:py-4">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex min-w-[220px] flex-1 items-center gap-3">
+            <div className="flex w-full min-w-0 flex-1 items-center gap-3 sm:min-w-[220px] sm:w-auto">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
                 <Users className="h-5 w-5" />
               </div>
@@ -349,7 +349,7 @@ export default function KolTable({
                 <p className="mt-0.5 text-xs font-medium text-[#86868B]">共 {stats.total} 位，{filtered.length} 位符合当前筛选</p>
               </div>
             </div>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid w-full grid-cols-4 gap-1.5 text-center sm:w-auto sm:gap-2">
               <MiniStat label="视频" value={stats.video} tone="text-[#0066FF]" />
               <MiniStat label="网站" value={stats.website} tone="text-[#FF9F0A]" />
               <MiniStat label="合作次" value={stats.completed} tone="text-[#34C759]" />
@@ -371,7 +371,7 @@ export default function KolTable({
 
           <div className="mt-4 rounded-[10px] border border-black/[0.06] bg-[#F7F8FA] p-2.5">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[260px] flex-1">
+            <div className="relative w-full min-w-0 basis-full sm:min-w-[260px] sm:basis-auto sm:flex-1">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#AEAEB2]" />
               <input
                 type="text"
@@ -411,7 +411,7 @@ export default function KolTable({
               <option value="available">可联系</option>
               <option value="blacklisted">已拉黑</option>
             </select>
-            <span className="h-6 w-px bg-black/[0.08]" />
+            <span className="hidden h-6 w-px bg-black/[0.08] sm:block" />
             <div className="relative">
               <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#86868B]" />
               <select
@@ -453,7 +453,69 @@ export default function KolTable({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:hidden">
+          {loading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-36 animate-pulse rounded-[8px] bg-[#F5F5F7]" />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex min-h-64 flex-col items-center justify-center text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-[8px] bg-[#F5F5F7] text-[#86868B]"><Users className="h-5 w-5" /></div>
+              <p className="mt-3 text-sm font-bold text-[#1D1D1F]">{kols.length === 0 ? '暂无 KOL 数据' : '没有匹配的 KOL'}</p>
+              {kols.length === 0 && <button onClick={onAddKol} className="mt-3 inline-flex items-center gap-1.5 rounded-[8px] bg-[#0066FF] px-4 py-2 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5" />添加第一位 KOL</button>}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {paged.map(kol => {
+                const latestInvitation = getLatestInv(kol.id)
+                const count = collaborationCount(kol.id)
+                const contentShape = getKolContentShape(kol)
+                return (
+                  <article key={kol.id} className={`rounded-[8px] border p-3 shadow-sm ${selectedIds.has(kol.id) ? 'border-[#0066FF]/30 bg-blue-50/40' : 'border-black/[0.07] bg-white'}`}>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(kol.id)}
+                        onChange={() => toggleSelect(kol.id)}
+                        disabled={Boolean(kol.blacklisted_at)}
+                        title={kol.blacklisted_at ? '已拉黑，不能加入批量邀约' : '选择 KOL'}
+                        className="mt-2.5 h-4 w-4 shrink-0 rounded border-gray-300 text-[#0066FF] focus:ring-[#0066FF]"
+                      />
+                      <button onClick={() => onSelect(kol)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${getAvatarTone(kol.name)}`}>{kol.name.slice(0, 2).toUpperCase()}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-extrabold text-[#1D1D1F]">{kol.name}</span>
+                            {kol.blacklisted_at && <Ban className="h-3.5 w-3.5 shrink-0 text-red-600" />}
+                          </div>
+                          <div className="mt-0.5 truncate text-[11px] font-semibold text-[#86868B]">{kol.platform || '-'} · {contentShape} · {kol.country || '-'}</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[#AEAEB2]" />
+                      </button>
+                    </div>
+
+                    <button onClick={() => onSelect(kol)} className="mt-3 block w-full text-left">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(kol.status)}`}>{kol.status || '-'}</span>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${replyTone(latestInvitation)}`}>{replyLabel(latestInvitation)}</span>
+                        {latestInvitation && <span className="max-w-[48%] truncate rounded-full bg-[#F5F5F7] px-2.5 py-1 text-[11px] font-bold text-[#6E6E73]">{latestInvitation.product}</span>}
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-black/[0.06] pt-3 text-[11px]">
+                        <MobileKolMeta label="粉丝" value={kol.followers || '-'} />
+                        <MobileKolMeta label="合作" value={count > 0 ? `${count} 次` : '-'} />
+                        <MobileKolMeta label="寄样" value={kol.sample_product || shipmentDateLabel(kol) || '-'} />
+                      </div>
+                      {kol.email && <div className="mt-3 truncate text-[11px] font-semibold text-[#6E6E73]">{kol.email}</div>}
+                      {(kol.tags || []).length > 0 && <div className="mt-2 flex flex-wrap gap-1">{kol.tags.slice(0, 3).map(tag => <span key={tag} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getTagTone(tag)}`}>{tag}</span>)}</div>}
+                    </button>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="hidden min-h-0 flex-1 overflow-auto sm:block">
           <table className="min-w-[1260px] w-full text-left text-sm">
             <thead className="sticky top-0 z-10 bg-[#FBFBFD]">
               <tr className="border-b border-black/[0.06] text-[11px] font-bold text-[#86868B]">
@@ -592,10 +654,10 @@ export default function KolTable({
           </table>
         </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t border-black/[0.06] bg-[#FBFBFD] px-5 py-3 text-xs font-semibold text-[#6E6E73]">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-black/[0.06] bg-[#FBFBFD] px-3 py-2.5 text-xs font-semibold text-[#6E6E73] sm:px-5 sm:py-3">
           <div>第 {pageStart}-{pageEnd} 条 / 共 {filtered.length} 条</div>
-          <div className="flex items-center gap-2">
-            <span>每页</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="hidden sm:inline">每页</span>
             <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))} className="h-8 rounded-[8px] border border-black/[0.08] bg-white px-2 outline-none">
               {[25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
             </select>
@@ -700,9 +762,18 @@ export default function KolTable({
 
 function MiniStat({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className="min-w-16 rounded-[10px] bg-[#F5F5F7] px-3 py-2">
+    <div className="min-w-0 rounded-[8px] bg-[#F5F5F7] px-2 py-2 sm:min-w-16 sm:rounded-[10px] sm:px-3">
       <div className={`text-[15px] font-extrabold tabular-nums ${tone}`}>{value}</div>
       <div className="mt-0.5 text-[10px] font-bold text-[#86868B]">{label}</div>
+    </div>
+  )
+}
+
+function MobileKolMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="truncate font-extrabold text-[#1D1D1F]">{value}</div>
+      <div className="mt-0.5 font-bold text-[#AEAEB2]">{label}</div>
     </div>
   )
 }

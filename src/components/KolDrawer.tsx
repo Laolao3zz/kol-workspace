@@ -698,9 +698,9 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative ml-auto flex w-[92%] max-w-[1420px] flex-col overflow-hidden bg-[#F4F5F7] shadow-2xl">
-        <div className="shrink-0 border-b border-black/[0.07] bg-white px-6 py-4">
-          <div className="flex items-center gap-5">
+      <div className="relative ml-auto flex w-full max-w-[1420px] flex-col overflow-hidden bg-[#F4F5F7] shadow-2xl md:w-[92%]">
+        <div className="shrink-0 border-b border-black/[0.07] bg-white px-3 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-center gap-3 sm:gap-5">
             <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] text-sm font-extrabold ${getAvatarTone(kol.name)}`}>
             {kol.name.slice(0, 2).toUpperCase()}
             </div>
@@ -728,6 +728,7 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                 )}
               </div>
             </div>
+            <div className="hidden sm:contents">
             {kol.blacklisted_at ? (
               <button onClick={restoreKol} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100" title="恢复为可联系 KOL">
                 <ShieldCheck className="h-3.5 w-3.5" /> 解除拉黑
@@ -737,13 +738,14 @@ export default function KolDrawer({ kol, shipments, products, productOptions, ta
                 <Ban className="h-3.5 w-3.5" /> 拉黑
               </button>
             )}
+            </div>
             <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-white text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]" title="关闭">
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 xl:p-5">
+        <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 xl:p-5">
           <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
             <div className="xl:sticky xl:top-0">
               <SectionCard icon={UserRound} title="基础身份">

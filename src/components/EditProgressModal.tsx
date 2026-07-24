@@ -30,7 +30,7 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative w-[520px] max-w-[calc(100vw-32px)] max-h-[86vh] overflow-y-auto rounded-[20px] border border-black/[0.06] bg-white p-6 shadow-2xl">
+      <div className="relative max-h-[calc(100dvh-24px)] w-[520px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-[12px] border border-black/[0.06] bg-white p-4 shadow-2xl sm:max-h-[86vh] sm:max-w-[calc(100vw-32px)] sm:rounded-[20px] sm:p-6">
         <div className="flex items-start justify-between mb-5">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#1D1D1F] text-white">
@@ -48,7 +48,7 @@ export default function EditProgressModal({ shipment, onClose, onSubmit }: Props
 
         <div className="space-y-4">
           <div className="rounded-[16px] border border-black/[0.06] bg-[#F5F5F7] p-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">进度状态</label>
                 <select

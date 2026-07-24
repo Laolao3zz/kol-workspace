@@ -163,7 +163,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 border-b border-black/[0.06] bg-white px-8 py-4">
+      <div className="shrink-0 border-b border-black/[0.06] bg-white px-3 py-3 sm:px-5 lg:px-8 lg:py-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
             {summary.map(item => (
@@ -176,7 +176,7 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
               </button>
             ))}
           </div>
-          <div className="relative w-72 max-w-full">
+          <div className="relative w-full sm:w-72 sm:max-w-full">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#AEAEB2]" />
             <input
               value={query}
@@ -189,8 +189,8 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
       </div>
 
       {selected && (
-        <div className="shrink-0 border-b border-black/[0.06] bg-white px-8 py-3">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="shrink-0 overflow-x-auto border-b border-black/[0.06] bg-white px-3 py-3 sm:px-5 lg:px-8">
+          <div className="flex min-w-max items-center gap-2 sm:min-w-0 sm:flex-wrap sm:gap-3">
             <button
               type="button"
               onClick={() => setStatusFilter('全部')}
@@ -259,9 +259,9 @@ export default function ProductOpportunityView({ products, kols, invitations, sh
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-hidden px-8 py-5">
-        <div className="grid h-full min-h-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_560px] 2xl:grid-cols-[minmax(0,1fr)_640px]">
-          <div className="min-h-0 overflow-y-auto pr-1">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 lg:px-8 lg:py-5 xl:overflow-hidden">
+        <div className="grid min-h-0 grid-cols-1 gap-4 xl:h-full xl:grid-cols-[minmax(0,1fr)_560px] xl:gap-5 2xl:grid-cols-[minmax(0,1fr)_640px]">
+          <div className="min-h-0 pr-0 xl:overflow-y-auto xl:pr-1">
         {!selected ? (
           <div className="flex h-full flex-col items-center justify-center text-[#86868B]">
             <Package className="mb-3 h-8 w-8" />
@@ -517,7 +517,7 @@ function ProductLibraryPanel({
   }
 
   return (
-    <aside className="flex min-h-0 flex-col overflow-hidden rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+    <aside className="flex min-h-0 flex-col overflow-visible rounded-[10px] border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] xl:overflow-hidden">
       <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-3">
         <div>
           <div className="text-sm font-extrabold text-[#1D1D1F]">产品库</div>

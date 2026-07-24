@@ -94,7 +94,7 @@ function MetricCard({ label, value, sub, color, accent, onClick }: { label: stri
     <button
       type="button"
       onClick={onClick}
-      className="group relative min-w-0 overflow-hidden rounded-[14px] border border-black/[0.04] px-4 py-4 text-left shadow-[0_5px_16px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,0,0,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0066FF]"
+      className="group relative min-w-0 overflow-hidden rounded-[10px] border border-black/[0.04] px-3 py-3 text-left shadow-[0_5px_16px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,0,0,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0066FF] sm:rounded-[14px] sm:px-4 sm:py-4"
       style={{ background: accent }}
     >
       <div className="flex items-center justify-between gap-2">
@@ -232,8 +232,8 @@ export default function WorkspaceDashboard({ kols, invitations, shipments, colla
   ]
 
   return (
-    <div className="flex-1 space-y-6 overflow-y-auto px-8 py-6">
-      <div className="grid grid-cols-7 gap-3">
+    <div className="flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:px-5 lg:space-y-6 lg:px-8 lg:py-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 2xl:grid-cols-7">
         {stats.map(stat => <MetricCard key={stat.label} {...stat} />)}
       </div>
 

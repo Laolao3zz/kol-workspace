@@ -308,8 +308,8 @@ export default function AddKolModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={onClose} />
-      <div className={`relative mx-4 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-[16px] border border-black/[0.08] bg-white shadow-2xl ${mode === 'batch' ? 'max-w-6xl' : 'max-w-2xl'}`}>
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-black/[0.06] px-6 py-5">
+      <div className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden border border-black/[0.08] bg-white shadow-2xl sm:mx-4 sm:max-h-[92vh] sm:rounded-[16px] ${mode === 'batch' ? 'max-w-6xl' : 'max-w-2xl'}`}>
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-black/[0.06] px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#1D1D1F] text-white">
               <UserPlus className="h-4 w-4" />
@@ -324,16 +324,16 @@ export default function AddKolModal({
           </button>
         </div>
 
-        <div className="shrink-0 border-b border-black/[0.06] px-6 py-3">
+        <div className="shrink-0 border-b border-black/[0.06] px-4 py-3 sm:px-6">
           <div className="inline-flex rounded-[9px] bg-[#F1F2F4] p-1">
             <ModeButton active={mode === 'single'} onClick={() => switchMode('single')} icon={<UserPlus className="h-3.5 w-3.5" />}>单个录入</ModeButton>
             <ModeButton active={mode === 'batch'} onClick={() => switchMode('batch')} icon={<ListPlus className="h-3.5 w-3.5" />}>批量录入</ModeButton>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           {mode === 'batch' && (
-            <aside className="flex w-[320px] shrink-0 flex-col border-r border-black/[0.07] bg-[#F8F9FA]">
+            <aside className="flex max-h-[42vh] w-full shrink-0 flex-col border-b border-black/[0.07] bg-[#F8F9FA] lg:max-h-none lg:w-[320px] lg:border-b-0 lg:border-r">
               <div className="border-b border-black/[0.06] p-4">
                 <label className="mb-2 block text-xs font-bold text-[#3A3A3C]">粘贴主页链接</label>
                 <textarea
@@ -396,12 +396,12 @@ export default function AddKolModal({
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4 p-6">
+              <form onSubmit={handleSubmit} className="space-y-4 p-4 sm:p-6">
                 <div className="rounded-[10px] border border-blue-100 bg-blue-50/70 p-4">
                   <label className="mb-2 flex items-center gap-2 text-xs font-extrabold text-[#0066FF]">
                     <Sparkles className="h-3.5 w-3.5" /> 主页链接快速识别
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <input
                       type="text"
                       value={profileUrlInput}
@@ -444,7 +444,7 @@ export default function AddKolModal({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-gray-600">联系邮箱</label>
                     <input type="email" value={form.email} onChange={event => setForm(previous => ({ ...previous, email: event.target.value }))} className={`h-10 w-full rounded-[8px] border px-3 text-sm font-semibold outline-none ${hasBlockingDuplicate ? 'border-red-300 bg-red-50/40' : 'border-black/[0.08] focus:border-[#0066FF]/40'}`} />
@@ -463,7 +463,7 @@ export default function AddKolModal({
                   {hasInvalidHomepage && <p className="mt-1.5 text-[11px] font-semibold text-red-600">该内容链接无法确认作者身份，请改为 KOL 主页或频道链接。</p>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-gray-600">粉丝量级</label>
                     <input type="text" value={form.followers} onChange={event => setForm(previous => ({ ...previous, followers: event.target.value }))} className="h-10 w-full rounded-[8px] border border-black/[0.08] px-3 text-sm font-semibold outline-none focus:border-[#0066FF]/40" placeholder="如 1.2M" />
@@ -522,7 +522,7 @@ export default function AddKolModal({
 
                 {submitError && <div className="rounded-[8px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{submitError}</div>}
 
-                <div className="flex justify-end gap-2 border-t border-black/[0.06] pt-4">
+                <div className="flex flex-wrap justify-end gap-2 border-t border-black/[0.06] pt-4">
                   {mode === 'batch' ? (
                     <>
                       <button type="button" onClick={removeActiveCandidate} disabled={submitting} className="inline-flex h-10 items-center gap-1.5 rounded-[8px] px-4 text-sm font-bold text-[#6E6E73] hover:bg-[#F5F5F7] disabled:opacity-50"><SkipForward className="h-4 w-4" /> 不添加</button>
