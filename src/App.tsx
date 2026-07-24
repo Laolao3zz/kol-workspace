@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Clock, LayoutDashboard, LayoutGrid, LogOut, Package, Star, Users } from 'lucide-react'
+import { Clock, LayoutDashboard, LayoutGrid, LogOut, Package, Settings, Users } from 'lucide-react'
+import youyeetooLogo from './assets/youyeetoo-logo.png'
 import { KOL, Shipment } from './types'
 import { createKOL, deleteKOL } from './services/kolService'
 import { countCompletedCollaborations } from './utils/kolStatus'
@@ -12,6 +13,7 @@ import AddKolModal, { KolFormData } from './components/AddKolModal'
 import WorkspaceDashboard, { type DashboardNavigateOptions } from './components/WorkspaceDashboard'
 import ProductOpportunityView from './components/ProductOpportunityView'
 import CollaborationHistoryView from './components/CollaborationHistoryView'
+import AccountSettingsModal from './components/AccountSettingsModal'
 import { collectProductOptions } from './utils/productOptions'
 import { collectTagOptions } from './utils/tags'
 import { countActiveShipments } from './utils/workspaceViews'
@@ -50,7 +52,7 @@ function countProgressBadge(shipments: Shipment[], kols: KOL[]) {
 }
 
 function App() {
-  const { email, isDemo, signOut } = useAuth()
+  const { email, username, isDemo, updateUsername, signOut } = useAuth()
   const {
     kols,
     products,
@@ -72,6 +74,8 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard')
   const [tableInvitationStatusFilter, setTableInvitationStatusFilter] = useState<string | undefined>()
   const [showAddKolModal, setShowAddKolModal] = useState(false)
+  const [showAccountSettings, setShowAccountSettings] = useState(false)
+  const displayName = username || email.split('@')[0] || '内部成员'
   const productOptions = useMemo(() => collectProductOptions({
     products,
     kols,
@@ -187,12 +191,14 @@ function App() {
           kolsCount={kols.length}
           progressCount={progressCount}
           email={email}
+          username={displayName}
           isDemo={isDemo}
+          onOpenAccount={() => setShowAccountSettings(true)}
           onSignOut={handleSignOut}
         />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <PageHeader page={viewMode} email={email} isDemo={isDemo} onSignOut={handleSignOut} />
+          <PageHeader page={viewMode} username={displayName} isDemo={isDemo} onOpenAccount={() => setShowAccountSettings(true)} />
 
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
             {viewMode === 'dashboard' && (
@@ -289,6 +295,16 @@ function App() {
           />
         )}
 
+        {showAccountSettings && !isDemo && (
+          <AccountSettingsModal
+            email={email}
+            username={username}
+            onClose={() => setShowAccountSettings(false)}
+            onSave={updateUsername}
+            onSignOut={handleSignOut}
+          />
+        )}
+
         <MobileNavigation active={viewMode} onNav={handleNavigate} kolsCount={kols.length} progressCount={progressCount} />
       </div>
     </ErrorBoundary>
@@ -301,7 +317,9 @@ function Sidebar({
   kolsCount,
   progressCount,
   email,
+  username,
   isDemo,
+  onOpenAccount,
   onSignOut,
 }: {
   active: ViewMode
@@ -309,20 +327,17 @@ function Sidebar({
   kolsCount: number
   progressCount: number
   email: string
+  username: string
   isDemo: boolean
+  onOpenAccount: () => void
   onSignOut: () => void
 }) {
   return (
     <aside className="hidden min-h-[100dvh] w-[216px] shrink-0 flex-col border-r border-black/[0.07] bg-white md:flex">
       <div className="px-5 pb-5 pt-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#0066FF] text-white shadow-[0_4px_12px_rgba(0,102,255,0.35)]">
-            <Star className="h-4 w-4" fill="white" />
-          </div>
-          <div>
-            <div className="text-[15px] font-extrabold leading-tight text-[#1D1D1F]">KOL Hub</div>
-            <div className="text-[11px] font-medium text-[#6E6E73]">品牌合作管理</div>
-          </div>
+        <div>
+          <img src={youyeetooLogo} alt="Youyeetoo 风火轮机器人 Logo" className="h-auto w-full max-w-[176px]" />
+          <div className="mt-2 border-t border-black/[0.07] pt-2 text-[12px] font-extrabold text-[#1D1D1F]">Youyeetoo KOL Hub</div>
         </div>
       </div>
 
@@ -351,11 +366,14 @@ function Sidebar({
 
       <div className="border-t border-black/[0.06] px-3 pb-5 pt-4">
         <div className="flex items-center gap-2 rounded-[8px] px-3 py-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-xs font-bold text-white">{isDemo ? '演' : email.slice(0, 1).toUpperCase()}</div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[12px] font-bold text-[#1D1D1F]">{email}</div>
-            <div className="text-[10px] text-[#6E6E73]">{isDemo ? '未连接 Supabase' : '内部成员'}</div>
-          </div>
+          <button type="button" onClick={isDemo ? undefined : onOpenAccount} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={isDemo ? undefined : '账号设置'}>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-xs font-bold text-white">{isDemo ? '演' : username.slice(0, 1).toUpperCase()}</div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12px] font-bold text-[#1D1D1F]">{username}</div>
+              <div className="truncate text-[10px] text-[#6E6E73]">{isDemo ? '未连接 Supabase' : email}</div>
+            </div>
+            {!isDemo && <Settings className="h-3.5 w-3.5 shrink-0 text-[#AEAEB2]" />}
+          </button>
           {!isDemo && (
             <button onClick={onSignOut} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[#86868B] hover:bg-[#F4F5F7] hover:text-[#1D1D1F]" title="退出登录">
               <LogOut className="h-4 w-4" />
@@ -367,22 +385,20 @@ function Sidebar({
   )
 }
 
-function PageHeader({ page, email, isDemo, onSignOut }: { page: ViewMode; email: string; isDemo: boolean; onSignOut: () => void }) {
+function PageHeader({ page, username, isDemo, onOpenAccount }: { page: ViewMode; username: string; isDemo: boolean; onOpenAccount: () => void }) {
   const meta = PAGE_META[page]
   const sub = page === 'dashboard' ? formatTodayLabel() : meta.sub
   return (
     <div className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.07] bg-white px-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#0066FF] text-white md:hidden">
-          <Star className="h-3.5 w-3.5" fill="currentColor" />
-        </div>
+        <img src={youyeetooLogo} alt="Youyeetoo" className="h-auto w-[82px] shrink-0 md:hidden" />
         <h1 className="truncate text-[17px] font-extrabold text-[#1D1D1F] sm:text-[18px]">{meta.title}</h1>
         <span className="hidden text-sm text-[#AEAEB2] sm:inline">·</span>
         <span className="hidden truncate text-[13px] font-medium text-[#6E6E73] sm:inline">{sub}</span>
       </div>
       {!isDemo && (
-        <button onClick={onSignOut} className="ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] text-[#86868B] hover:bg-[#F4F5F7] md:hidden" title={`${email} · 退出登录`}>
-          <LogOut className="h-4 w-4" />
+        <button onClick={onOpenAccount} className="ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1D1D1F] text-xs font-extrabold text-white md:hidden" title={`${username} · 账号设置`}>
+          {username.slice(0, 1).toUpperCase()}
         </button>
       )}
     </div>

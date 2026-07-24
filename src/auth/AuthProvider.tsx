@@ -7,7 +7,7 @@ import {
   LockKeyhole,
   Mail,
   ShieldCheck,
-  Star,
+  UserRound,
 } from 'lucide-react'
 import {
   createContext,
@@ -19,12 +19,16 @@ import {
   useState,
 } from 'react'
 import { getSupabase, hasSupabaseConfig } from '../lib/supabase'
+import youyeetooLogo from '../assets/youyeetoo-logo.png'
+import { readUsername, validateUsername } from './userProfile'
 
 type AuthAction = 'invite' | 'recovery' | null
 
 interface AuthContextValue {
   email: string
+  username: string
   isDemo: boolean
+  updateUsername: (username: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -82,13 +86,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(() => ({
     email: demo ? '本地演示模式' : session?.user.email || '内部账号',
+    username: demo ? '演示账号' : readUsername(session?.user.user_metadata),
     isDemo: demo,
+    updateUsername: async (username: string) => {
+      if (demo) return
+      const validationError = validateUsername(username)
+      if (validationError) throw new Error(validationError)
+      const { error } = await getSupabase().auth.updateUser({
+        data: { username: username.trim() },
+      })
+      if (error) throw new Error(authErrorMessage(error))
+    },
     signOut: async () => {
       if (demo) return
       const { error } = await getSupabase().auth.signOut({ scope: 'local' })
       if (error) throw error
     },
-  }), [demo, session?.user.email])
+  }), [demo, session?.user.email, session?.user.user_metadata])
 
   if (checking) return <AuthLoading />
   if (!demo && !configured) return <AuthConfigurationError />
@@ -183,7 +197,7 @@ function LoginScreen() {
             KOL 资源、沟通进度与合作数据统一沉淀，仅向管理员授权的成员开放。
           </p>
         </div>
-        <p className="text-xs font-semibold text-white/35">KOL Hub · Internal Access</p>
+        <p className="text-xs font-semibold text-white/35">Youyeetoo KOL Hub · Internal Access</p>
       </section>
 
       <section className="flex min-w-0 flex-1 items-center justify-center px-5 py-10 sm:px-10">
@@ -193,7 +207,7 @@ function LoginScreen() {
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[8px] border border-black/[0.07] bg-white shadow-sm">
               {mode === 'login' ? <LockKeyhole className="h-5 w-5" /> : <KeyRound className="h-5 w-5" />}
             </div>
-            <h2 className="text-2xl font-extrabold">{mode === 'login' ? '登录 KOL Hub' : '找回密码'}</h2>
+            <h2 className="text-2xl font-extrabold">{mode === 'login' ? '登录 Youyeetoo KOL Hub' : '找回密码'}</h2>
             <p className="mt-2 text-sm font-medium text-[#6E6E73]">
               {mode === 'login' ? '使用管理员分配的公司账号继续' : '重置链接将发送到已开通的公司邮箱'}
             </p>
@@ -276,6 +290,7 @@ function LoginScreen() {
 }
 
 function SetPasswordScreen({ action, onComplete }: { action: Exclude<AuthAction, null>; onComplete: () => void }) {
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -283,6 +298,13 @@ function SetPasswordScreen({ action, onComplete }: { action: Exclude<AuthAction,
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (action === 'invite') {
+      const usernameError = validateUsername(username)
+      if (usernameError) {
+        setError(usernameError)
+        return
+      }
+    }
     if (password !== confirmPassword) {
       setError('两次输入的密码不一致')
       return
@@ -295,7 +317,10 @@ function SetPasswordScreen({ action, onComplete }: { action: Exclude<AuthAction,
     setSubmitting(true)
     setError('')
     try {
-      const { error: updateError } = await getSupabase().auth.updateUser({ password })
+      const { error: updateError } = await getSupabase().auth.updateUser({
+        password,
+        ...(action === 'invite' ? { data: { username: username.trim() } } : {}),
+      })
       if (updateError) throw updateError
       window.history.replaceState({}, document.title, window.location.pathname)
       onComplete()
@@ -319,11 +344,30 @@ function SetPasswordScreen({ action, onComplete }: { action: Exclude<AuthAction,
           <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[8px] bg-[#1D1D1F] text-white">
             <KeyRound className="h-5 w-5" />
           </div>
-          <h1 className="text-2xl font-extrabold">{action === 'invite' ? '设置登录密码' : '设置新密码'}</h1>
-          <p className="mt-2 text-sm font-medium text-[#6E6E73]">完成后即可进入公司工作台</p>
+          <h1 className="text-2xl font-extrabold">{action === 'invite' ? '完善账号信息' : '设置新密码'}</h1>
+          <p className="mt-2 text-sm font-medium text-[#6E6E73]">{action === 'invite' ? '设置用户名和登录密码后进入公司工作台' : '完成后即可进入公司工作台'}</p>
         </div>
 
         <form onSubmit={submit} className="space-y-4">
+          {action === 'invite' && (
+            <label className="block">
+              <span className="mb-2 block text-xs font-bold text-[#525257]">用户名</span>
+              <div className="relative">
+                <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#AEAEB2]" />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={event => setUsername(event.target.value)}
+                  required
+                  minLength={2}
+                  maxLength={30}
+                  autoComplete="name"
+                  placeholder="例如：老朱"
+                  className="h-12 w-full rounded-[8px] border border-black/[0.09] bg-white pl-10 pr-3 text-sm font-semibold outline-none focus:border-[#0066FF]/60 focus:ring-4 focus:ring-blue-100"
+                />
+              </div>
+            </label>
+          )}
           <PasswordInput label="新密码" value={password} onChange={setPassword} autoComplete="new-password" />
           <PasswordInput label="确认新密码" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" />
           {error && <div className="rounded-[8px] border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">{error}</div>}
@@ -362,13 +406,11 @@ function PasswordInput({ label, value, onChange, autoComplete }: { label: string
 
 function Brand({ inverse = false }: { inverse?: boolean }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-[#0066FF] text-white shadow-[0_4px_12px_rgba(0,102,255,0.3)]">
-        <Star className="h-4 w-4" fill="currentColor" />
-      </div>
-      <div>
-        <div className={`text-[15px] font-extrabold ${inverse ? 'text-white' : 'text-[#1D1D1F]'}`}>KOL Hub</div>
-        <div className={`text-[11px] font-semibold ${inverse ? 'text-white/40' : 'text-[#86868B]'}`}>品牌合作管理</div>
+    <div className={inverse ? 'w-fit rounded-[8px] bg-white px-4 py-3' : 'w-fit'}>
+      <img src={youyeetooLogo} alt="Youyeetoo 风火轮机器人 Logo" className="h-auto w-[190px] sm:w-[220px]" />
+      <div className="mt-2 flex items-baseline justify-between gap-4 border-t border-black/[0.07] pt-2">
+        <div className="text-[13px] font-extrabold text-[#1D1D1F]">Youyeetoo KOL Hub</div>
+        <div className="text-[10px] font-semibold text-[#86868B]">品牌合作管理</div>
       </div>
     </div>
   )
